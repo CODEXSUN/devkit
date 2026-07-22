@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit",
-  "version": "1.0.42",
+  "version": "1.0.43",
   "private": true,
   "packageManager": "npm@12.0.1",
   "description": "Standalone CODEXSUN developer planning and collaboration stack",

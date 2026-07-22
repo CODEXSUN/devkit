@@ -2,11 +2,11 @@
 
 ## Version State
 
-Current version: 1.0.42
+Current version: 1.0.43
 
-Release tag: v-1.0.42
+Release tag: v-1.0.43
 
-Changelog label: v 1.0.42
+Changelog label: v 1.0.43
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
@@ -19,6 +19,19 @@ Records schema, migration, seed, tenant provisioning, and data compatibility cha
 #### App Codebase Changes
 
 Records UI, API, service logic, tooling, packaging, and documentation changes.
+
+## v-1.0.43
+
+### [v 1.0.43] 2026-07-22 8:52 pm - Remove legacy Devkit Assist content
+
+#### Database Changes
+
+- Database update: No (manual).
+
+#### App Codebase Changes
+
+- Removed the legacy Devkit Assist knowledge tree after product guidance moved to repository-owned Assist documentation.
+- Preserved this changelog as the immutable Devkit release record and bumped the workspace to 1.0.43.
 
 ## v-1.0.42
 
