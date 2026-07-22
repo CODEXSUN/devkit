@@ -1,0 +1,22 @@
+{
+  "name": "@codexsun/devkit-api",
+  "version": "1.0.42",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@codexsun/framework": "file:../../framework",
+    "fastify": "^5.2.1",
+    "zod": "^4.4.3"
+  }
+}

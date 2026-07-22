@@ -1,0 +1,42 @@
+[
+  {
+    "active": true,
+    "assignee": "",
+    "createdAt": "2026-07-11T11:14:45.605Z",
+    "description": "<p>activity</p>",
+    "dueDate": "",
+    "id": "activity-1783768485605-2twbzq",
+    "key": "activity",
+    "kind": "activity",
+    "lane": "",
+    "moduleKey": "work-automation",
+    "priority": "medium",
+    "referenceId": "task.project-manager.json",
+    "referenceType": "task",
+    "sortOrder": 0,
+    "status": "open",
+    "title": "activity",
+    "type": "work",
+    "updatedAt": "2026-07-11T11:14:45.605Z"
+  },
+  {
+    "active": true,
+    "assignee": "",
+    "createdAt": "2026-07-09T03:19:58.994Z",
+    "description": "",
+    "dueDate": "",
+    "id": "activity-seed-1",
+    "key": "activity.project-manager.started",
+    "kind": "activity",
+    "lane": "",
+    "moduleKey": "project-manager",
+    "priority": "medium",
+    "referenceId": "",
+    "referenceType": "",
+    "sortOrder": 10,
+    "status": "active",
+    "title": "Project Manager JSON workspace started",
+    "type": "system",
+    "updatedAt": "2026-07-09T03:19:58.994Z"
+  }
+]
