@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit-api",
-  "version": "1.0.43",
+  "version": "1.0.44",
   "private": false,
   "type": "module",
   "exports": {
@@ -17,6 +17,8 @@
   "dependencies": {
     "@codexsun/framework": "file:../../framework",
     "fastify": "^5.2.1",
+    "kysely": "^0.29.0",
+    "mysql2": "^3.22.3",
     "zod": "^4.4.3"
   }
 }

@@ -1,21 +1,47 @@
-import { createApiApp, registerHealthRoute, registerRequestLogging } from "@codexsun/framework/api";
+import {
+  createApiApp,
+  registerHealthRoute,
+  registerRequestLogging,
+} from "@codexsun/framework/api";
 import { registerModules } from "@codexsun/framework/modules";
 import { projectManagerModule } from "./modules/project-manager/index.js";
 import { taskManagerModule } from "./modules/task-manager/index.js";
+import {
+  registerDevkitAuthGuard,
+  registerPlatformAuthRoutes,
+} from "./auth/index.js";
+import {
+  bootstrapDevkitDatabase,
+  checkDevkitDatabase,
+  closeDevkitDatabase,
+} from "./database/index.js";
 import { env } from "./env.js";
 
 export async function createApp() {
+  await bootstrapDevkitDatabase();
   const app = await createApiApp({
     appName: "CODEXSUN Devkit API",
     cookieSecret: env.DEVKIT_COOKIE_SECRET,
     corsOrigins: localOriginAliases(env.DEVKIT_WEB_ORIGIN),
-    environment: env.NODE_ENV
+    environment: env.NODE_ENV,
   });
   registerRequestLogging(app);
-  registerHealthRoute(app, [{
-    name: "devkit-api",
-    check: () => ({ details: { modules: [projectManagerModule.key, taskManagerModule.key] }, status: "ok" })
-  }]);
+  registerHealthRoute(app, [
+    {
+      name: "devkit-api",
+      check: () => ({
+        details: { modules: [projectManagerModule.key, taskManagerModule.key] },
+        status: "ok",
+      }),
+    },
+    {
+      name: "devkit-database",
+      check: checkDevkitDatabase,
+    },
+  ]);
+  app.addHook("onClose", closeDevkitDatabase);
+  registerPlatformAuthRoutes(app);
+  registerDevkitAuthGuard(app);
   await registerModules([projectManagerModule, taskManagerModule], { app });
   return app;
 }

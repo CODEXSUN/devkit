@@ -1,56 +1,91 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { ok } from "@codexsun/framework/http";
-import { TaskManagerJsonStore } from "./task-manager.store.js";
-import { TaskManagerLookupStore } from "./task-manager.lookup-store.js";
-import type { TodoInput, TodoLookupKind, TodoStatus } from "./task-manager.types.js";
-const store = new TaskManagerJsonStore();
-const lookupStore = new TaskManagerLookupStore();
-const superAdminScope = "super-admin";
+import { z } from "zod";
+import { requireDevkitPlatformSession } from "../../auth/platform-auth.guard.js";
+import { TaskManagerService } from "./task-manager.service.js";
+
+const service = new TaskManagerService();
+const scopeKey = "super-admin";
+const idParamsSchema = z.object({ id: z.string().min(1) }).strict();
+const todoInputSchema = z
+  .object({
+    category: z.string().optional(),
+    description: z.string().optional(),
+    dueDate: z.string().optional(),
+    groupName: z.string().optional(),
+    priority: z.string().optional(),
+    status: z.string().optional(),
+    title: z.string().min(1)
+  })
+  .strict();
+const lookupInputSchema = z
+  .object({
+    kind: z.enum(["category", "group", "priority", "status"]),
+    name: z.string().min(1)
+  })
+  .strict();
+
 export async function registerTaskManagerRoutes(app: FastifyInstance) {
   app.get("/task-manager/todos", async (request) =>
-    ok(await store.list(superAdminScope), { requestId: request.id })
+    ok(await service.list(scopeKey), { requestId: request.id })
   );
   app.get("/task-manager/lookups", async (request) =>
-    ok(await lookupStore.list(superAdminScope), { requestId: request.id })
+    ok(await service.listLookups(scopeKey), { requestId: request.id })
   );
   app.post("/task-manager/lookups", async (request) => {
-    const body = request.body as { kind: TodoLookupKind; name: string };
-    return ok(await lookupStore.create(superAdminScope, body.kind, body.name), {
+    const body = lookupInputSchema.parse(request.body);
+    return ok(await service.createLookup(scopeKey, body.kind, body.name, actor(request)), {
       requestId: request.id
     });
   });
   app.post("/task-manager/todos", async (request) =>
-    ok(await store.create(superAdminScope, request.body as TodoInput), { requestId: request.id })
+    ok(await service.create(scopeKey, todoInputSchema.parse(request.body), actor(request)), {
+      requestId: request.id
+    })
   );
   app.post("/task-manager/todos/reorder", async (request) =>
     ok(
-      await store.reorder(superAdminScope, (request.body as { orderedIds: string[] }).orderedIds),
+      await service.reorder(
+        scopeKey,
+        z.object({ orderedIds: z.array(z.string()) }).strict().parse(request.body).orderedIds,
+        actor(request)
+      ),
       { requestId: request.id }
     )
   );
   app.put("/task-manager/todos/:id", async (request) =>
     ok(
-      await store.update(
-        superAdminScope,
-        (request.params as { id: string }).id,
-        request.body as Partial<TodoInput>
+      await service.update(
+        scopeKey,
+        idParamsSchema.parse(request.params).id,
+        todoInputSchema.partial().parse(request.body),
+        actor(request)
       ),
       { requestId: request.id }
     )
   );
   app.post("/task-manager/todos/:id/status", async (request) =>
     ok(
-      await store.setStatus(
-        superAdminScope,
-        (request.params as { id: string }).id,
-        (request.body as { status: TodoStatus }).status
+      await service.status(
+        scopeKey,
+        idParamsSchema.parse(request.params).id,
+        z.object({ status: z.string().min(1) }).strict().parse(request.body).status,
+        actor(request)
       ),
       { requestId: request.id }
     )
   );
   app.delete("/task-manager/todos/:id", async (request) =>
-    ok(await store.delete(superAdminScope, (request.params as { id: string }).id), {
-      requestId: request.id
-    })
+    ok(
+      await service.delete(scopeKey, idParamsSchema.parse(request.params).id, actor(request)),
+      { requestId: request.id }
+    )
+  );
+}
+
+function actor(request: FastifyRequest) {
+  return (
+    requireDevkitPlatformSession(request.headers.authorization).email?.trim() ||
+    "unknown@codexsun.local"
   );
 }

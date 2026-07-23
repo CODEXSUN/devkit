@@ -2,11 +2,11 @@
 
 ## Version State
 
-Current version: 1.0.43
+Current version: 1.0.44
 
-Release tag: v-1.0.43
+Release tag: v-1.0.44
 
-Changelog label: v 1.0.43
+Changelog label: v 1.0.44
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
@@ -19,6 +19,28 @@ Records schema, migration, seed, tenant provisioning, and data compatibility cha
 #### App Codebase Changes
 
 Records UI, API, service logic, tooling, packaging, and documentation changes.
+
+## v-1.0.44
+
+### [v 1.0.44] 2026-07-23 11:11 am - Move project and task managers to module-owned persistence
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Added module-owned Kysely/MySQL migrations and repeatable seeds for Project Manager and Task
+  Manager; operators must run the documented migrate and seed commands for existing installations.
+- Removed the obsolete JSON-backed stores while retaining JSON files only as import/seed inputs
+  where explicitly configured.
+
+#### App Codebase Changes
+
+- Reworked Project Manager and Task Manager repositories, services, routes, and types around their
+  owned database tables and fixed public contracts.
+- Added authentication/database startup wiring, module-boundary and queue-contract checks, runtime
+  smoke tooling, and API-first development preflight.
+- Updated the Devkit Web application and transport layer for the persisted workflows without
+  centralizing either module's business behavior.
+- Bumped workspace version to 1.0.44.
 
 ## v-1.0.43
 

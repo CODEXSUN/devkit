@@ -7,8 +7,8 @@
     "priority": "medium",
     "dueDate": "2026-07-08",
     "createdAt": "2026-07-11T04:37:49.406Z",
-    "updatedAt": "2026-07-11T06:57:58.495Z",
-    "position": 1,
+    "updatedAt": "2026-07-22T19:36:32.336Z",
+    "position": 0,
     "category": "work",
     "groupName": ""
   },
@@ -20,8 +20,8 @@
     "priority": "high",
     "dueDate": "",
     "createdAt": "2026-07-11T04:43:06.952Z",
-    "updatedAt": "2026-07-19T05:39:17.954Z",
-    "position": 0,
+    "updatedAt": "2026-07-22T19:37:22.134Z",
+    "position": 1,
     "category": "work",
     "groupName": "sundar"
   },
@@ -32,9 +32,9 @@
     "status": "open",
     "priority": "medium",
     "dueDate": "",
-    "position": 2,
+    "position": 3,
     "createdAt": "2026-07-11T06:59:54.867Z",
-    "updatedAt": "2026-07-11T06:59:54.867Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -45,9 +45,9 @@
     "status": "open",
     "priority": "medium",
     "dueDate": "",
-    "position": 3,
+    "position": 2,
     "createdAt": "2026-07-11T07:00:38.922Z",
-    "updatedAt": "2026-07-11T07:00:38.922Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -60,7 +60,7 @@
     "dueDate": "",
     "position": 4,
     "createdAt": "2026-07-11T07:01:15.354Z",
-    "updatedAt": "2026-07-11T07:01:15.354Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -73,7 +73,7 @@
     "dueDate": "",
     "position": 5,
     "createdAt": "2026-07-11T07:01:39.682Z",
-    "updatedAt": "2026-07-11T07:01:39.682Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -86,7 +86,7 @@
     "dueDate": "",
     "position": 6,
     "createdAt": "2026-07-11T07:02:02.194Z",
-    "updatedAt": "2026-07-11T07:02:02.194Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -97,9 +97,9 @@
     "status": "open",
     "priority": "medium",
     "dueDate": "",
-    "position": 9,
+    "position": 7,
     "createdAt": "2026-07-11T07:03:52.138Z",
-    "updatedAt": "2026-07-11T07:03:52.138Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -110,9 +110,9 @@
     "status": "open",
     "priority": "medium",
     "dueDate": "",
-    "position": 10,
+    "position": 8,
     "createdAt": "2026-07-11T07:04:05.746Z",
-    "updatedAt": "2026-07-11T07:04:05.746Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -123,9 +123,9 @@
     "status": "open",
     "priority": "medium",
     "dueDate": "",
-    "position": 11,
+    "position": 9,
     "createdAt": "2026-07-11T07:04:34.241Z",
-    "updatedAt": "2026-07-11T07:04:34.241Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -136,9 +136,9 @@
     "status": "open",
     "priority": "medium",
     "dueDate": "",
-    "position": 12,
+    "position": 10,
     "createdAt": "2026-07-11T07:05:15.242Z",
-    "updatedAt": "2026-07-11T07:05:15.242Z",
+    "updatedAt": "2026-07-22T19:36:32.336Z",
     "category": "work",
     "groupName": ""
   },
@@ -151,8 +151,8 @@
     "status": "in-progress",
     "priority": "high",
     "dueDate": "",
-    "position": 13,
+    "position": 11,
     "createdAt": "2026-07-11T07:33:26.482Z",
-    "updatedAt": "2026-07-11T07:33:26.482Z"
+    "updatedAt": "2026-07-22T19:36:32.336Z"
   }
 ]

@@ -14,9 +14,24 @@ export type Todo = {
   createdAt: string;
   updatedAt: string;
 };
-export type TodoInput = Partial<
-  Pick<Todo, "title" | "description" | "category" | "groupName" | "status" | "priority" | "dueDate">
-> & { title: string };
+export type TodoInput = {
+  category?: TodoCategory | undefined;
+  description?: string | undefined;
+  dueDate?: string | undefined;
+  groupName?: string | undefined;
+  priority?: TodoPriority | undefined;
+  status?: TodoStatus | undefined;
+  title: string;
+};
+export type TodoUpdateInput = {
+  category?: TodoCategory | undefined;
+  description?: string | undefined;
+  dueDate?: string | undefined;
+  groupName?: string | undefined;
+  priority?: TodoPriority | undefined;
+  status?: TodoStatus | undefined;
+  title?: string | undefined;
+};
 export type TodoLookupKind = "category" | "group" | "status" | "priority";
 export type TodoLookup = {
   id: string;

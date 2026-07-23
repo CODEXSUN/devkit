@@ -30,12 +30,18 @@ export type ProjectManagerRecord = {
   updatedAt: string;
 };
 
-export type ProjectManagerSavePayload = Partial<
+export type OptionalInput<T> = {
+  [Key in keyof T]?: T[Key] | undefined;
+};
+
+export type ProjectManagerSavePayload = OptionalInput<
   Omit<ProjectManagerRecord, "createdAt" | "id" | "kind" | "updatedAt">
 > & {
   key: string;
   title: string;
 };
+
+export type ProjectManagerUpdatePayload = OptionalInput<ProjectManagerSavePayload>;
 
 export type ProjectManagerResult = {
   generatedAt: string;
@@ -133,18 +139,21 @@ export type ProjectManagerRegistryResult = {
 };
 
 export type ProjectManagerRegistrySavePayload = {
-  active?: boolean;
-  description?: string;
-  documentation?: Record<string, ProjectManagerDocumentationRow[]>;
-  groupId?: string;
+  active?: boolean | undefined;
+  description?: string | undefined;
+  documentation?: Record<string, ProjectManagerDocumentationRow[]> | undefined;
+  groupId?: string | undefined;
   key: string;
-  moduleType?: ProjectManagerRegistryModule["moduleType"];
+  moduleType?: ProjectManagerRegistryModule["moduleType"] | undefined;
   name: string;
-  parentGroupId?: string;
-  parentModuleId?: string;
-  planningNotes?: ProjectManagerPlanningNote[];
-  platformId?: string;
-  routePath?: string;
-  sortOrder?: number;
-  status?: string;
+  parentGroupId?: string | undefined;
+  parentModuleId?: string | undefined;
+  planningNotes?: ProjectManagerPlanningNote[] | undefined;
+  platformId?: string | undefined;
+  routePath?: string | undefined;
+  sortOrder?: number | undefined;
+  status?: string | undefined;
 };
+
+export type ProjectManagerRegistryUpdatePayload =
+  OptionalInput<ProjectManagerRegistrySavePayload>;
