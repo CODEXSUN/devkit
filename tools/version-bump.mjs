@@ -1,38 +1,50 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const CHANGELOG_FILE = join("assist", "documentation", "CHANGELOG.md");
 
-export function bumpNextVersion(rootDir, title = "version update", options = {}) {
+export function bumpNextVersion(
+  rootDir,
+  title = "version update",
+  options = {},
+) {
   const currentVersion = readRootVersion(rootDir);
   const nextVersion = bumpPatch(currentVersion);
   const databaseUpdate = resolveDatabaseUpdate(rootDir, options.databaseUpdate);
   const packageFiles = findWorkspacePackageFiles(rootDir);
 
-  for (const file of packageFiles) {
-    updatePackageVersion(file, currentVersion, nextVersion);
-  }
+  if (!options.dryRun) {
+    for (const file of packageFiles) {
+      updatePackageVersion(file, currentVersion, nextVersion);
+    }
 
-  updatePackageLock(
-    resolve(rootDir, "package-lock.json"),
-    rootDir,
-    packageFiles,
-    currentVersion,
-    nextVersion
-  );
-  updateChangelog(rootDir, nextVersion, title, databaseUpdate);
+    updatePackageLock(
+      resolve(rootDir, "package-lock.json"),
+      rootDir,
+      packageFiles,
+      currentVersion,
+      nextVersion,
+    );
+    updateChangelog(rootDir, nextVersion, title, databaseUpdate);
+  }
 
   return {
     currentVersion,
     databaseUpdate,
     nextVersion,
     reference: Number.parseInt(nextVersion.split(".")[2] ?? "0", 10),
-    title
+    title,
   };
 }
 
@@ -87,7 +99,9 @@ function expandWorkspacePattern(rootDir, pattern) {
 }
 
 function readRootVersion(rootDir) {
-  const pkg = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf8"));
+  const pkg = JSON.parse(
+    readFileSync(resolve(rootDir, "package.json"), "utf8"),
+  );
 
   if (!pkg.version) {
     throw new Error("Root package.json does not contain a version.");
@@ -120,7 +134,7 @@ function updateInternalDependencyRanges(pkg, currentVersion, nextVersion) {
     "dependencies",
     "devDependencies",
     "peerDependencies",
-    "optionalDependencies"
+    "optionalDependencies",
   ]) {
     const deps = pkg[field];
     if (!deps || typeof deps !== "object") {
@@ -135,14 +149,22 @@ function updateInternalDependencyRanges(pkg, currentVersion, nextVersion) {
   }
 }
 
-function updatePackageLock(file, rootDir, packageFiles, currentVersion, nextVersion) {
+function updatePackageLock(
+  file,
+  rootDir,
+  packageFiles,
+  currentVersion,
+  nextVersion,
+) {
   if (!existsSync(file)) {
     return;
   }
 
   const lock = JSON.parse(readFileSync(file, "utf8"));
   const workspaceLockPaths = new Set(
-    packageFiles.map((packageFile) => relative(rootDir, dirname(packageFile)).replaceAll("\\", "/"))
+    packageFiles.map((packageFile) =>
+      relative(rootDir, dirname(packageFile)).replaceAll("\\", "/"),
+    ),
   );
 
   if (lock.version === currentVersion) {
@@ -189,7 +211,7 @@ function updateChangelog(rootDir, nextVersion, title, databaseUpdate) {
     "#### App Codebase Changes",
     "",
     `- Bumped workspace version to ${nextVersion}.`,
-    ""
+    "",
   ].join("\n");
 
   const markerIndex = content.indexOf("## v-");
@@ -220,7 +242,11 @@ function parseTitleArg(argv) {
     argv
       .filter((arg, index) => {
         const previous = argv[index - 1];
-        return !arg.startsWith("--") && previous !== "--database-update" && previous !== "--title";
+        return (
+          !arg.startsWith("--") &&
+          previous !== "--database-update" &&
+          previous !== "--title"
+        );
       })
       .join(" ")
       .trim() || "version update"
@@ -228,13 +254,21 @@ function parseTitleArg(argv) {
 }
 
 function parseDatabaseUpdateArg(argv) {
-  if (argv.some((arg) => arg === "--database-update" || arg === "--db-update" || arg === "--db")) {
+  if (
+    argv.some(
+      (arg) =>
+        arg === "--database-update" || arg === "--db-update" || arg === "--db",
+    )
+  ) {
     return true;
   }
 
   if (
     argv.some(
-      (arg) => arg === "--no-database-update" || arg === "--no-db-update" || arg === "--no-db"
+      (arg) =>
+        arg === "--no-database-update" ||
+        arg === "--no-db-update" ||
+        arg === "--no-db",
     )
   ) {
     return false;
@@ -253,7 +287,7 @@ function resolveDatabaseUpdate(rootDir, requested) {
     return {
       files: [],
       hasUpdate: requested,
-      mode: "manual"
+      mode: "manual",
     };
   }
 
@@ -261,7 +295,7 @@ function resolveDatabaseUpdate(rootDir, requested) {
   return {
     files,
     hasUpdate: files.length > 0,
-    mode: "auto"
+    mode: "auto",
   };
 }
 
@@ -270,7 +304,7 @@ function changedFiles(rootDir) {
     const output = execFileSync("git", ["diff", "--name-only", "HEAD", "--"], {
       cwd: rootDir,
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
+      stdio: ["ignore", "pipe", "ignore"],
     });
 
     return output
@@ -301,14 +335,20 @@ function isDatabaseUpdateFile(file) {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const argv = process.argv.slice(2);
   const result = bumpNextVersion(ROOT, parseTitleArg(argv), {
-    databaseUpdate: parseDatabaseUpdateArg(argv)
+    databaseUpdate: parseDatabaseUpdateArg(argv),
+    dryRun: argv.includes("--dry-run"),
   });
 
-  console.log(`Bumped ${result.currentVersion} -> ${result.nextVersion}`);
   console.log(
-    `Database update: ${result.databaseUpdate.hasUpdate ? "yes" : "no"} (${result.databaseUpdate.mode})`
+    `${argv.includes("--dry-run") ? "Version bump dry run" : "Bumped"} ${result.currentVersion} -> ${result.nextVersion}`,
+  );
+  console.log(
+    `Database update: ${result.databaseUpdate.hasUpdate ? "yes" : "no"} (${result.databaseUpdate.mode})`,
   );
 }
