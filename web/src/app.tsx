@@ -1,6 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { DatabaseIcon, FolderKanbanIcon, ListChecksIcon } from "lucide-react";
+import {
+  CircleGaugeIcon,
+  DatabaseIcon,
+  FolderKanbanIcon,
+  ListChecksIcon,
+  MapIcon,
+} from "lucide-react";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
 import { Toaster } from "@codexsun/ui/components/sonner";
 import {
@@ -23,6 +29,9 @@ const PlatformRegistryWorkspace = lazy(async () => ({
   default: (await import("./modules/platform-registry"))
     .PlatformRegistryWorkspace,
 }));
+const ProjectManagerOverview = lazy(async () => ({
+  default: (await import("./modules/project-manager")).ProjectManagerOverview,
+}));
 const TaskManagerWorkspace = lazy(async () => ({
   default: (await import("./modules/task-manager")).TaskManagerWorkspace,
 }));
@@ -31,7 +40,7 @@ const WorkAutomationWorkspace = lazy(async () => ({
 }));
 
 const queryClient = new QueryClient();
-type Page = "projects" | "tasks" | "registry";
+type Page = "overview" | "roadmap" | "projects" | "tasks" | "registry";
 
 applyDesignSystemPreference();
 
@@ -48,24 +57,16 @@ export function DevkitApp() {
 
 function DevkitRoute() {
   const pathname = window.location.pathname;
-  if (pathname === "/sa/login") return <LoginPage desk="sa" />;
-  if (pathname === "/admin/login") return <LoginPage desk="admin" />;
-  if (pathname.startsWith("/sa")) {
+  if (pathname === "/dev/login") return <LoginPage desk="dev" />;
+  if (pathname.startsWith("/dev")) {
     return (
-      <AuthGate desk="sa">
-        {(session) => <DevkitDesk desk="sa" session={session} />}
-      </AuthGate>
-    );
-  }
-  if (pathname.startsWith("/admin")) {
-    return (
-      <AuthGate desk="admin">
-        {(session) => <DevkitDesk desk="admin" session={session} />}
+      <AuthGate desk="dev">
+        {(session) => <DevkitDesk desk="dev" session={session} />}
       </AuthGate>
     );
   }
 
-  window.location.replace("/sa");
+  window.location.replace(legacyDevPath(pathname));
   return <GlobalLoader />;
 }
 
@@ -100,17 +101,32 @@ function DevkitDesk({
     );
   }
 
+  function openProjectIssues(projectId: string) {
+    setPage("projects");
+    window.history.pushState(
+      { page: "projects", projectId },
+      "",
+      `/dev/projects?project=${encodeURIComponent(projectId)}`,
+    );
+  }
+
   async function handleLogout() {
     await logout(desk);
-    window.location.assign(desk === "sa" ? "/sa/login" : "/admin/login");
+    window.location.assign("/dev/login");
   }
 
   const menuItems = useMemo<SidemenuItem[]>(
     () => [
       {
+        title: "Overview",
+        icon: CircleGaugeIcon,
+        isActive: page === "overview",
+        onSelect: () => selectPage("overview"),
+      },
+      {
         title: "Development",
         icon: FolderKanbanIcon,
-        isActive: page === "projects" || page === "tasks",
+        isActive: page === "roadmap" || page === "projects" || page === "tasks",
         items: [
           {
             title: "Projects",
@@ -136,13 +152,32 @@ function DevkitDesk({
 
   const workspaceItems = [
     {
+      title: "Overview",
+      description: "Short status cards for every project.",
+      icon: CircleGaugeIcon,
+      active: page === "overview",
+      onSelect: () => selectPage("overview"),
+    },
+    {
       title: "Projects",
       description:
-        "Project planning, issues, reviews, releases, and automation.",
+        "Project, issue, task, activity, and review delivery hierarchy.",
       icon: FolderKanbanIcon,
       active: page === "projects",
       onSelect: () => selectPage("projects"),
     },
+    ...(page === "roadmap"
+      ? [
+          {
+            title: "Issue Roadmap",
+            description:
+              "Performance view for one issue and its linked delivery chain.",
+            icon: MapIcon,
+            active: true,
+            onSelect: () => undefined,
+          },
+        ]
+      : []),
     {
       title: "Tasks",
       description:
@@ -159,35 +194,38 @@ function DevkitDesk({
       onSelect: () => selectPage("registry"),
     },
   ];
-  const superAdmin = desk === "sa";
-  const deskTitle = superAdmin ? "Super Admin Desk" : "Staff Admin Desk";
+  const deskTitle = "Developer Desk";
 
   return (
     <AppLayout
       brand={{
-        href: superAdmin ? "/sa" : "/admin",
+        href: "/dev",
         logoAlt: "CODEXSUN",
         logoDarkSrc: "/logo/logo-dark.svg",
         logoSrc: "/logo/logo.svg",
-        subtitle: superAdmin ? "super-admin" : "staff-admin",
+        subtitle: "development",
         title: deskTitle,
       }}
       headerTitle={deskTitle}
-      homeHref={superAdmin ? "/sa" : "/admin"}
+      homeHref="/dev"
       menuItems={menuItems}
       onLogout={handleLogout}
-      subtitle="Planning, task execution, platform registry, and development automation."
-      title={pageTitle(page)}
       user={{
         email: session.email,
-        fallback: superAdmin ? "S" : "A",
-        name: session.name || (superAdmin ? "Super Admin" : "Staff Admin"),
+        fallback: "D",
+        name: session.name || "Developer",
       }}
       userMenuItems={[]}
       versionLabel={`v ${import.meta.env.VITE_DEVKIT_VERSION}`}
       workspaceItems={workspaceItems}
     >
       <Suspense fallback={<GlobalLoader />}>
+        {page === "overview" ? (
+          <ProjectManagerOverview onOpenProject={openProjectIssues} />
+        ) : null}
+        {page === "roadmap" ? (
+          <WorkAutomationWorkspace initialView="roadmap" />
+        ) : null}
         {page === "projects" ? <WorkAutomationWorkspace /> : null}
         {page === "tasks" ? <TaskManagerWorkspace /> : null}
         {page === "registry" ? <PlatformRegistryWorkspace /> : null}
@@ -197,22 +235,35 @@ function DevkitDesk({
 }
 
 function pageFromPath(pathname: string): Page {
+  if (pathname.endsWith("/roadmap")) return "roadmap";
+  if (pathname.endsWith("/projects")) return "projects";
   if (pathname.endsWith("/tasks")) return "tasks";
   if (pathname.endsWith("/registry")) return "registry";
-  return "projects";
+  return "overview";
 }
 
 function pathForPage(desk: Desk, page: Page) {
-  const root = desk === "sa" ? "/sa" : "/admin";
+  void desk;
+  const root = "/dev";
   if (page === "tasks") return `${root}/tasks`;
   if (page === "registry") return `${root}/registry`;
+  if (page === "projects") return `${root}/projects`;
+  if (page === "roadmap") return `${root}/roadmap`;
   return root;
 }
 
+function legacyDevPath(pathname: string) {
+  const legacyMatch = pathname.match(/^\/(?:sa|admin)(\/.*)?$/u);
+  return legacyMatch ? `/dev${legacyMatch[1] ?? ""}` : "/dev";
+}
+
 function pageTitle(page: Page) {
+  if (page === "overview") return "Overview";
+  if (page === "roadmap") return "Issue Roadmap";
+  if (page === "projects") return "Project Manager";
   if (page === "tasks") return "Task Manager";
   if (page === "registry") return "Platform Registry";
-  return "Project Manager";
+  return "Issue Roadmap";
 }
 
 function applyDesignSystemPreference() {

@@ -9,35 +9,45 @@ import type {
   ProjectManagerRecord,
   ProjectManagerRegistryGroup,
   ProjectManagerRegistryModule,
-  ProjectManagerRegistryPlatform
+  ProjectManagerRegistryPlatform,
 } from "./project-manager.types.js";
 
-const sourceDir = join(dirname(fileURLToPath(import.meta.url)), "../../../project-manager-json");
+const sourceDir = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../project-manager-json",
+);
 
 const itemFiles: Record<ProjectManagerKind, string> = {
   activity: "activity-registry.json",
   discussion: "discussion-registry.json",
   issue: "issue-board.json",
   kanban: "kanban-board.json",
+  project: "project-registry.json",
   release: "release-registry.json",
   review: "review-registry.json",
   task: "task-registry.json",
   timeline: "timeline-registry.json",
-  todo: "todo-registry.json"
+  todo: "todo-registry.json",
 };
 
-export async function seedProjectManagerModule(database: Kysely<DevkitDatabase>) {
+export async function seedProjectManagerModule(
+  database: Kysely<DevkitDatabase>,
+) {
   let records = 0;
   records += await seedPlatforms(database);
   records += await seedGroups(database);
   records += await seedModules(database);
   records += await seedItems(database);
+  await attachLegacyRoadmapRecords(database);
   return { module: "devkit.project-manager", records };
 }
 
 async function seedPlatforms(database: Kysely<DevkitDatabase>) {
-  if ((await count(database, "project_manager_registry_platforms")) > 0) return 0;
-  const rows = await readJson<ProjectManagerRegistryPlatform[]>("platform-registry.json");
+  if ((await count(database, "project_manager_registry_platforms")) > 0)
+    return 0;
+  const rows = await readJson<ProjectManagerRegistryPlatform[]>(
+    "platform-registry.json",
+  );
   if (rows.length) {
     await database
       .insertInto("project_manager_registry_platforms")
@@ -51,8 +61,8 @@ async function seedPlatforms(database: Kysely<DevkitDatabase>) {
           sort_order: Number(row.sortOrder) || 0,
           status: row.status || (row.active ? "active" : "inactive"),
           updated_at: date(row.updatedAt),
-          uuid: importedUuid(row.id)
-        }))
+          uuid: importedUuid(row.id),
+        })),
       )
       .execute();
   }
@@ -61,7 +71,8 @@ async function seedPlatforms(database: Kysely<DevkitDatabase>) {
 
 async function seedGroups(database: Kysely<DevkitDatabase>) {
   if ((await count(database, "project_manager_registry_groups")) > 0) return 0;
-  const rows = await readJson<ProjectManagerRegistryGroup[]>("module-groups.json");
+  const rows =
+    await readJson<ProjectManagerRegistryGroup[]>("module-groups.json");
   if (rows.length) {
     await database
       .insertInto("project_manager_registry_groups")
@@ -77,8 +88,8 @@ async function seedGroups(database: Kysely<DevkitDatabase>) {
           sort_order: Number(row.sortOrder) || 0,
           status: row.status || (row.active ? "active" : "inactive"),
           updated_at: date(row.updatedAt),
-          uuid: importedUuid(row.id)
-        }))
+          uuid: importedUuid(row.id),
+        })),
       )
       .execute();
 
@@ -95,7 +106,9 @@ async function seedGroups(database: Kysely<DevkitDatabase>) {
 
 async function seedModules(database: Kysely<DevkitDatabase>) {
   if ((await count(database, "project_manager_registry_modules")) > 0) return 0;
-  const rows = await readJson<ProjectManagerRegistryModule[]>("module-registry.json");
+  const rows = await readJson<ProjectManagerRegistryModule[]>(
+    "module-registry.json",
+  );
   if (rows.length) {
     await database
       .insertInto("project_manager_registry_modules")
@@ -115,8 +128,8 @@ async function seedModules(database: Kysely<DevkitDatabase>) {
           sort_order: Number(row.sortOrder) || 0,
           status: row.status || (row.active ? "active" : "inactive"),
           updated_at: date(row.updatedAt),
-          uuid: importedUuid(row.id)
-        }))
+          uuid: importedUuid(row.id),
+        })),
       )
       .execute();
 
@@ -132,44 +145,69 @@ async function seedModules(database: Kysely<DevkitDatabase>) {
 }
 
 async function seedItems(database: Kysely<DevkitDatabase>) {
-  if ((await count(database, "project_manager_items")) > 0) return 0;
   const records = (
     await Promise.all(
       Object.entries(itemFiles).map(async ([kind, file]) => {
         const rows = await readJson<ProjectManagerRecord[]>(file);
-        return rows.map((row) => ({ ...row, kind: kind as ProjectManagerKind }));
-      })
+        return rows.map((row) => ({
+          ...row,
+          kind: kind as ProjectManagerKind,
+        }));
+      }),
     )
   ).flat();
 
-  if (records.length) {
-    await database
+  let inserted = 0;
+  for (const row of records) {
+    const result = await database
       .insertInto("project_manager_items")
-      .values(
-        records.map((row) => ({
-          active: row.active ? 1 : 0,
-          assignee: row.assignee ?? "",
-          created_at: date(row.createdAt),
-          description: row.description ?? "",
-          due_date: row.dueDate ?? "",
-          item_key: row.key,
-          item_type: row.type ?? "",
-          kind: row.kind,
-          lane: row.lane ?? "",
-          module_key: row.moduleKey ?? "project-manager",
-          priority: row.priority ?? "medium",
-          reference_id: row.referenceId ?? "",
-          reference_type: row.referenceType ?? "",
-          sort_order: Number(row.sortOrder) || 0,
-          status: row.status || "active",
-          title: row.title,
-          updated_at: date(row.updatedAt),
-          uuid: importedUuid(row.id)
-        }))
-      )
+      .ignore()
+      .values({
+        active: row.active ? 1 : 0,
+        assignee: row.assignee ?? "",
+        created_at: date(row.createdAt),
+        description: row.description ?? "",
+        due_date: row.dueDate ?? "",
+        item_key: row.key,
+        item_type: row.type ?? "",
+        kind: row.kind,
+        lane: row.lane ?? "",
+        module_key: row.moduleKey ?? "project-manager",
+        priority: row.priority ?? "medium",
+        reference_id: row.referenceId ?? "",
+        reference_type: row.referenceType ?? "",
+        sort_order: Number(row.sortOrder) || 0,
+        start_date: row.startDate ?? "",
+        status: row.status || "active",
+        title: row.title,
+        updated_at: date(row.updatedAt),
+        uuid: importedUuid(row.id),
+      })
       .execute();
+    inserted += Number(result[0]?.numInsertedOrUpdatedRows ?? 0);
   }
-  return records.length;
+  return inserted;
+}
+
+async function attachLegacyRoadmapRecords(database: Kysely<DevkitDatabase>) {
+  const project = await database
+    .selectFrom("project_manager_items")
+    .select(["item_key"])
+    .where("kind", "=", "project")
+    .orderBy("sort_order", "asc")
+    .executeTakeFirst();
+  if (!project) return;
+
+  await database
+    .updateTable("project_manager_items")
+    .set({
+      reference_id: project.item_key,
+      reference_type: "project",
+    })
+    .where("kind", "in", ["discussion", "issue"])
+    .where("reference_id", "=", "")
+    .where("reference_type", "=", "")
+    .execute();
 }
 
 async function readJson<T>(file: string) {
@@ -182,7 +220,7 @@ async function count(
     | "project_manager_items"
     | "project_manager_registry_groups"
     | "project_manager_registry_modules"
-    | "project_manager_registry_platforms"
+    | "project_manager_registry_platforms",
 ) {
   const row = await database
     .selectFrom(table)

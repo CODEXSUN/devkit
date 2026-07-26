@@ -1,10 +1,14 @@
 import type {
   ProjectManagerForm,
   ProjectManagerKind,
-  ProjectManagerRecord
+  ProjectManagerRecord,
 } from "./project-manager.types";
 
-export const projectManagerKinds: Array<{ kind: ProjectManagerKind; label: string }> = [
+export const projectManagerKinds: Array<{
+  kind: ProjectManagerKind;
+  label: string;
+}> = [
+  { kind: "project", label: "Projects" },
   { kind: "issue", label: "Issues" },
   { kind: "task", label: "Tasks" },
   { kind: "review", label: "Reviews" },
@@ -13,10 +17,12 @@ export const projectManagerKinds: Array<{ kind: ProjectManagerKind; label: strin
   { kind: "timeline", label: "Timeline" },
   { kind: "activity", label: "Activity" },
   { kind: "discussion", label: "Discussions" },
-  { kind: "release", label: "Releases" }
+  { kind: "release", label: "Releases" },
 ];
 
-export function formFromRecord(record?: ProjectManagerRecord | null): ProjectManagerForm {
+export function formFromRecord(
+  record?: ProjectManagerRecord | null,
+): ProjectManagerForm {
   return {
     assignee: record?.assignee ?? "",
     description: record?.description ?? "",
@@ -28,10 +34,11 @@ export function formFromRecord(record?: ProjectManagerRecord | null): ProjectMan
     referenceId: record?.referenceId ?? "",
     referenceType: record?.referenceType ?? "",
     sortOrder: String(record?.sortOrder ?? 0),
+    startDate: record?.startDate ?? "",
     status: record?.status ?? "open",
     title: record?.title ?? "",
     type: record?.type ?? "",
-    ...(record?.id ? { id: record.id } : {})
+    ...(record?.id ? { id: record.id } : {}),
   };
 }
 
@@ -47,9 +54,10 @@ export function payloadFromForm(form: ProjectManagerForm) {
     referenceId: form.referenceId.trim(),
     referenceType: form.referenceType.trim(),
     sortOrder: Number(form.sortOrder) || 0,
+    startDate: form.startDate.trim(),
     status: form.status.trim() || "open",
     title: form.title.trim(),
-    type: form.type.trim()
+    type: form.type.trim(),
   };
 }
 

@@ -3,6 +3,7 @@ export type ProjectManagerKind =
   | "discussion"
   | "issue"
   | "kanban"
+  | "project"
   | "release"
   | "review"
   | "task"
@@ -24,11 +25,38 @@ export type ProjectManagerRecord = {
   referenceId: string;
   referenceType: string;
   sortOrder: number;
+  startDate: string;
   status: string;
   title: string;
   type: string;
   updatedAt: string;
 };
+
+export type ProjectManagerAttachment = {
+  checksum: string;
+  createdAt: string;
+  createdBy: string;
+  id: string;
+  mimeType: string;
+  originalName: string;
+  recordId: string;
+  recordKind: ProjectManagerAttachmentKind;
+  sizeBytes: number;
+  storageKey: string;
+};
+
+export type ProjectManagerAttachmentKind =
+  "activity" | "issue" | "project" | "review" | "task";
+
+export type ProjectManagerAttachmentCreate = Omit<
+  ProjectManagerAttachment,
+  "createdAt"
+>;
+
+export type ProjectManagerAttachmentSummary = Omit<
+  ProjectManagerAttachment,
+  "storageKey"
+>;
 
 export type OptionalInput<T> = {
   [Key in keyof T]?: T[Key] | undefined;
@@ -41,7 +69,8 @@ export type ProjectManagerSavePayload = OptionalInput<
   title: string;
 };
 
-export type ProjectManagerUpdatePayload = OptionalInput<ProjectManagerSavePayload>;
+export type ProjectManagerUpdatePayload =
+  OptionalInput<ProjectManagerSavePayload>;
 
 export type ProjectManagerResult = {
   generatedAt: string;
@@ -122,9 +151,10 @@ export type ProjectManagerRegistryGroupNode = ProjectManagerRegistryGroup & {
   subGroups: ProjectManagerRegistryGroupNode[];
 };
 
-export type ProjectManagerRegistryPlatformNode = ProjectManagerRegistryPlatform & {
-  groups: ProjectManagerRegistryGroupNode[];
-};
+export type ProjectManagerRegistryPlatformNode =
+  ProjectManagerRegistryPlatform & {
+    groups: ProjectManagerRegistryGroupNode[];
+  };
 
 export type ProjectManagerRegistryResult = {
   generatedAt: string;

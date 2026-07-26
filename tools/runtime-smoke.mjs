@@ -2,15 +2,23 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHmac, randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { createConnection } from "mysql2/promise";
 
 const root = resolve(import.meta.dirname, "..");
 const jwtSecret = "devkit-runtime-smoke-secret-at-least-32-characters";
 const runtimeDatabaseName = `devkit_test_${process.pid}_${Date.now()}`;
+const runtimeStoragePath = mkdtempSync(
+  join(tmpdir(), "codexsun-devkit-attachments-"),
+);
 const databaseEnv = resolveDatabaseEnv();
+const apiPort = await findAvailablePort();
+const webPort = await findAvailablePort();
+const apiUrl = `http://127.0.0.1:${apiPort}`;
+const webUrl = `http://127.0.0.1:${webPort}`;
 const platformServer = createFakePlatformAuthServer();
 await listen(platformServer);
 const platformAddress = platformServer.address();
@@ -23,7 +31,12 @@ const child = spawn(process.execPath, ["tools/dev-stack.mjs"], {
   env: {
     ...process.env,
     ...databaseEnv,
+    DEVKIT_API_PORT: String(apiPort),
+    DEVKIT_API_URL: apiUrl,
     DEVKIT_DB_NAME: runtimeDatabaseName,
+    DEVKIT_STORAGE_PATH: runtimeStoragePath,
+    DEVKIT_WEB_ORIGIN: webUrl,
+    DEVKIT_WEB_PORT: String(webPort),
     JWT_SECRET: jwtSecret,
     PLATFORM_API_URL: `http://127.0.0.1:${platformAddress.port}`,
   },
@@ -41,36 +54,32 @@ child.stderr.on("data", (chunk) => {
 });
 
 try {
-  await waitForUrl("http://127.0.0.1:7030/health", "Devkit API", 90_000);
-  await waitForUrl("http://127.0.0.1:7040/sa/login", "Devkit Web", 30_000);
+  await waitForUrl(`${apiUrl}/health`, "Devkit API", 90_000);
+  await waitForUrl(`${webUrl}/dev/login`, "Devkit Web", 30_000);
 
-  const health = await getJson("http://127.0.0.1:7030/health");
-  const unauthorized = await fetch(
-    "http://127.0.0.1:7030/admin/project-manager/result",
-  );
-  const saToken = await login("sa", "sa@codexsun.test");
-  const adminToken = await login("admin", "admin@codexsun.test");
+  const health = await getJson(`${apiUrl}/health`);
+  const unauthorized = await fetch(`${apiUrl}/admin/project-manager/result`);
+  const devToken = await login("dev", "sa@codexsun.test");
+  const removedAdminLogin = await fetch(`${apiUrl}/auth/platform/login`, {
+    body: JSON.stringify({
+      desk: "admin",
+      email: "admin@codexsun.test",
+      password: "test-password",
+    }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
   const projects = await getJson(
-    "http://127.0.0.1:7030/admin/project-manager/result",
-    saToken,
+    `${apiUrl}/admin/project-manager/result`,
+    devToken,
   );
-  const tasks = await getJson(
-    "http://127.0.0.1:7030/task-manager/todos",
-    adminToken,
-  );
-  const saSession = await getJson(
-    "http://127.0.0.1:7030/auth/platform/session",
-    saToken,
-  );
-  const adminSession = await getJson(
-    "http://127.0.0.1:7030/auth/platform/session",
-    adminToken,
-  );
+  const tasks = await getJson(`${apiUrl}/task-manager/todos`, devToken);
+  const devSession = await getJson(`${apiUrl}/auth/platform/session`, devToken);
   const pages = await Promise.all([
-    fetch("http://127.0.0.1:7040/sa/login"),
-    fetch("http://127.0.0.1:7040/admin/login"),
-    fetch("http://127.0.0.1:7040/sa"),
-    fetch("http://127.0.0.1:7040/admin"),
+    fetch(`${webUrl}/dev/login`),
+    fetch(`${webUrl}/dev`),
+    fetch(`${webUrl}/dev/roadmap`),
+    fetch(`${webUrl}/dev/projects`),
   ]);
 
   assertObject(health, "health response");
@@ -79,39 +88,107 @@ try {
       `Protected Devkit API returned ${unauthorized.status} without a token.`,
     );
   }
+  if (removedAdminLogin.status !== 400) {
+    throw new Error(
+      `Removed admin desk login returned ${removedAdminLogin.status} instead of 400.`,
+    );
+  }
   assertEnvelope(projects, "project manager response");
   assertEnvelope(tasks, "task manager response");
-  assertEnvelope(saSession, "super admin session response");
-  assertEnvelope(adminSession, "staff admin session response");
+  assertEnvelope(devSession, "developer session response");
   const createdTodo = await sendJsonRequest(
-    "http://127.0.0.1:7030/task-manager/todos",
+    `${apiUrl}/task-manager/todos`,
     "POST",
     { title: "Runtime database persistence" },
-    adminToken,
+    devToken,
   );
   assertEnvelope(createdTodo, "created todo response");
   const createdIssue = await sendJsonRequest(
-    "http://127.0.0.1:7030/admin/project-manager/issue",
+    `${apiUrl}/admin/project-manager/issue`,
     "POST",
     {
       key: `runtime.database.${Date.now()}`,
       title: "Runtime database persistence",
     },
-    saToken,
+    devToken,
   );
   assertEnvelope(createdIssue, "created project response");
+  const attachment = await sendBinaryRequest(
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}/attachments`,
+    Buffer.from("Runtime attachment persistence", "utf8"),
+    "runtime-evidence.txt",
+    "text/plain",
+    devToken,
+  );
+  assertEnvelope(attachment, "created attachment response");
+  if ("storageKey" in attachment.data) {
+    throw new Error("Attachment responses exposed a private storage key.");
+  }
+  const attachments = await getJson(
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}/attachments`,
+    devToken,
+  );
+  assertEnvelope(attachments, "attachment list response");
+  if (
+    !Array.isArray(attachments.data) ||
+    attachments.data.length !== 1 ||
+    attachments.data[0].originalName !== "runtime-evidence.txt" ||
+    "storageKey" in attachments.data[0]
+  ) {
+    throw new Error("Runtime attachment metadata was not persisted.");
+  }
+  const attachmentDownload = await fetch(
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}/attachments/${attachment.data.id}/download`,
+    { headers: { Authorization: `Bearer ${devToken}` } },
+  );
+  if (
+    !attachmentDownload.ok ||
+    (await attachmentDownload.text()) !== "Runtime attachment persistence"
+  ) {
+    throw new Error("Runtime attachment content could not be downloaded.");
+  }
+  const rejectedType = await sendBinaryResponse(
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}/attachments`,
+    Buffer.from("<svg></svg>", "utf8"),
+    "unsafe.svg",
+    "image/svg+xml",
+    devToken,
+  );
+  if (rejectedType.status !== 400) {
+    throw new Error(
+      `Unsupported attachment type returned ${rejectedType.status} instead of 400.`,
+    );
+  }
+  const rejectedSize = await sendBinaryResponse(
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}/attachments`,
+    Buffer.alloc(2 * 1024 * 1024 + 1),
+    "too-large.txt",
+    "text/plain",
+    devToken,
+  );
+  if (rejectedSize.status !== 400) {
+    throw new Error(
+      `Oversized attachment returned ${rejectedSize.status} instead of 400.`,
+    );
+  }
   await assertDatabaseWrites();
   await sendJsonRequest(
-    `http://127.0.0.1:7030/task-manager/todos/${createdTodo.data.id}`,
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}/attachments/${attachment.data.id}`,
     "DELETE",
     undefined,
-    adminToken,
+    devToken,
   );
   await sendJsonRequest(
-    `http://127.0.0.1:7030/admin/project-manager/issue/${createdIssue.data.id}`,
+    `${apiUrl}/task-manager/todos/${createdTodo.data.id}`,
     "DELETE",
     undefined,
-    saToken,
+    devToken,
+  );
+  await sendJsonRequest(
+    `${apiUrl}/admin/project-manager/issue/${createdIssue.data.id}`,
+    "DELETE",
+    undefined,
+    devToken,
   );
   if (pages.some((response) => !response.ok)) {
     throw new Error(
@@ -120,7 +197,7 @@ try {
   }
 
   console.log(
-    "\nRuntime smoke passed: devkit_db migrations/imports, SQL writes/audits, Platform auth, API guards, and Web routes.",
+    "\nRuntime smoke passed: devkit_db migrations/imports, SQL writes/audits, single developer-desk auth, API guards, and Web routes.",
   );
 } catch (error) {
   console.error("\nRuntime smoke failed.");
@@ -130,10 +207,17 @@ try {
   stopProcessTree(child);
   await closeServer(platformServer);
   await dropRuntimeDatabase();
+  if (
+    runtimeStoragePath.startsWith(
+      join(tmpdir(), "codexsun-devkit-attachments-"),
+    )
+  ) {
+    rmSync(runtimeStoragePath, { force: true, recursive: true });
+  }
 }
 
 async function login(desk, email) {
-  const response = await fetch("http://127.0.0.1:7030/auth/platform/login", {
+  const response = await fetch(`${apiUrl}/auth/platform/login`, {
     body: JSON.stringify({ desk, email, password: "test-password" }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -144,6 +228,19 @@ async function login(desk, email) {
     throw new Error(`${desk} login response did not contain an access token.`);
   }
   return envelope.data.accessToken;
+}
+
+async function findAvailablePort() {
+  const server = createServer();
+  await listen(server);
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await closeServer(server);
+    throw new Error("Could not allocate an isolated runtime smoke port.");
+  }
+  const { port } = address;
+  await closeServer(server);
+  return port;
 }
 
 async function waitForUrl(url, label, timeoutMs) {
@@ -189,6 +286,35 @@ async function sendJsonRequest(url, method, body, token) {
     throw new Error(`${method} ${url} returned HTTP ${response.status}.`);
   }
   return value;
+}
+
+async function sendBinaryRequest(url, body, fileName, mimeType, token) {
+  const response = await sendBinaryResponse(
+    url,
+    body,
+    fileName,
+    mimeType,
+    token,
+  );
+  const value = await response.json();
+  if (!response.ok) {
+    throw new Error(`POST ${url} returned HTTP ${response.status}.`);
+  }
+  return value;
+}
+
+function sendBinaryResponse(url, body, fileName, mimeType, token) {
+  return fetch(url, {
+    body,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/octet-stream",
+      "X-File-Name": encodeURIComponent(fileName),
+      "X-File-Type": mimeType,
+    },
+    method: "POST",
+    signal: AbortSignal.timeout(10_000),
+  });
 }
 
 async function assertDatabaseWrites() {
@@ -393,7 +519,9 @@ function parseEnvValue(value) {
 
 async function dropRuntimeDatabase() {
   if (!/^devkit_test_\d+_\d+$/u.test(runtimeDatabaseName)) {
-    throw new Error(`Refusing to drop unexpected database ${runtimeDatabaseName}.`);
+    throw new Error(
+      `Refusing to drop unexpected database ${runtimeDatabaseName}.`,
+    );
   }
   const connection = await createConnection({
     host: databaseEnv.DB_HOST,
@@ -402,7 +530,9 @@ async function dropRuntimeDatabase() {
     user: databaseEnv.DB_USER,
   });
   try {
-    await connection.query(`DROP DATABASE IF EXISTS \`${runtimeDatabaseName}\``);
+    await connection.query(
+      `DROP DATABASE IF EXISTS \`${runtimeDatabaseName}\``,
+    );
   } finally {
     await connection.end();
   }

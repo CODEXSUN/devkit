@@ -5,7 +5,7 @@ import { WorkspaceSelect } from "@codexsun/ui/workspace/select";
 import {
   WorkspaceFormBanner,
   WorkspaceFormField,
-  WorkspaceFormGrid
+  WorkspaceFormGrid,
 } from "@codexsun/ui/workspace/upsert";
 import type { ProjectManagerForm } from "./project-manager.types";
 
@@ -15,7 +15,7 @@ export function ProjectManagerFormPanel({
   loading,
   onCancel,
   onChange,
-  onSubmit
+  onSubmit,
 }: {
   error: string;
   form: ProjectManagerForm;
@@ -26,7 +26,11 @@ export function ProjectManagerFormPanel({
 }) {
   return (
     <div className="rounded-md border bg-card p-4 shadow-sm">
-      {error ? <WorkspaceFormBanner title="Could not save">{error}</WorkspaceFormBanner> : null}
+      {error ? (
+        <WorkspaceFormBanner title="Could not save">
+          {error}
+        </WorkspaceFormBanner>
+      ) : null}
       <WorkspaceFormGrid columns={3}>
         <WorkspaceFormField label="Key" required>
           <Input
@@ -39,14 +43,18 @@ export function ProjectManagerFormPanel({
           <Input
             className="h-10"
             value={form.title}
-            onChange={(event) => onChange({ ...form, title: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, title: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Status">
           <Input
             className="h-10"
             value={form.status}
-            onChange={(event) => onChange({ ...form, status: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, status: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Priority">
@@ -56,10 +64,13 @@ export function ProjectManagerFormPanel({
               { label: "Low", value: "low" },
               { label: "Medium", value: "medium" },
               { label: "High", value: "high" },
-              { label: "Critical", value: "critical" }
+              { label: "Critical", value: "critical" },
             ]}
             onValueChange={(priority) =>
-              onChange({ ...form, priority: priority as ProjectManagerForm["priority"] })
+              onChange({
+                ...form,
+                priority: priority as ProjectManagerForm["priority"],
+              })
             }
           />
         </WorkspaceFormField>
@@ -67,7 +78,9 @@ export function ProjectManagerFormPanel({
           <Input
             className="h-10"
             value={form.assignee}
-            onChange={(event) => onChange({ ...form, assignee: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, assignee: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Due date">
@@ -75,40 +88,65 @@ export function ProjectManagerFormPanel({
             className="h-10"
             placeholder="YYYY-MM-DD"
             value={form.dueDate}
-            onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, dueDate: event.target.value })
+            }
+          />
+        </WorkspaceFormField>
+        <WorkspaceFormField label="Planned start">
+          <Input
+            className="h-10"
+            placeholder="YYYY-MM-DD"
+            value={form.startDate}
+            onChange={(event) =>
+              onChange({ ...form, startDate: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Reference">
           <Input
             className="h-10 font-mono"
             value={form.referenceId}
-            onChange={(event) => onChange({ ...form, referenceId: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, referenceId: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Reference type">
           <Input
             className="h-10"
             value={form.referenceType}
-            onChange={(event) => onChange({ ...form, referenceType: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, referenceType: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Lane">
           <Input
             className="h-10"
             value={form.lane}
-            onChange={(event) => onChange({ ...form, lane: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, lane: event.target.value })
+            }
           />
         </WorkspaceFormField>
         <WorkspaceFormField label="Description">
           <textarea
             className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm md:col-span-3"
             value={form.description}
-            onChange={(event) => onChange({ ...form, description: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, description: event.target.value })
+            }
           />
         </WorkspaceFormField>
       </WorkspaceFormGrid>
       <div className="mt-4 flex justify-end gap-2">
-        <Button disabled={loading} type="button" variant="outline" onClick={onCancel}>
+        <Button
+          disabled={loading}
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+        >
           <XIcon className="size-4" />
           Cancel
         </Button>

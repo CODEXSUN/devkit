@@ -1,5 +1,14 @@
 import { loadEnv } from "@codexsun/framework/env";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import { z } from "zod";
+
+const defaultStoragePath = resolve(
+  process.env.LOCALAPPDATA || process.env.APPDATA || homedir(),
+  "CODEXSUN",
+  "Devkit",
+  "storage",
+);
 
 const schema = z.object({
   NODE_ENV: z
@@ -20,6 +29,7 @@ const schema = z.object({
     .string()
     .regex(/^[a-zA-Z0-9_]+$/u)
     .default("devkit_db"),
+  DEVKIT_STORAGE_PATH: z.string().min(1).default(defaultStoragePath),
   JWT_SECRET: z.string().min(32),
   PLATFORM_API_URL: z.string().url().default("http://127.0.0.1:7010"),
 });

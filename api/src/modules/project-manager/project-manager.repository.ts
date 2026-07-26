@@ -3,17 +3,21 @@ import type { Kysely, Selectable } from "kysely";
 import { getDevkitDatabase } from "../../database/devkit-database.js";
 import type {
   DevkitDatabase,
+  ProjectManagerAttachmentsTable,
   ProjectManagerItemsTable,
   ProjectManagerRegistryGroupsTable,
   ProjectManagerRegistryModulesTable,
-  ProjectManagerRegistryPlatformsTable
+  ProjectManagerRegistryPlatformsTable,
 } from "../../database/schema.js";
 import type {
+  ProjectManagerAttachment,
+  ProjectManagerAttachmentCreate,
+  ProjectManagerAttachmentKind,
   ProjectManagerKind,
   ProjectManagerRecord,
   ProjectManagerRegistryGroup,
   ProjectManagerRegistryModule,
-  ProjectManagerRegistryPlatform
+  ProjectManagerRegistryPlatform,
 } from "./project-manager.types.js";
 
 type AuditInput = {
@@ -25,15 +29,17 @@ type AuditInput = {
 };
 
 export class ProjectManagerRepository {
-  constructor(private readonly database: Kysely<DevkitDatabase> = getDevkitDatabase()) {}
+  constructor(
+    private readonly database: Kysely<DevkitDatabase> = getDevkitDatabase(),
+  ) {}
 
   async list(kind: ProjectManagerKind) {
     const rows = await this.database
       .selectFrom("project_manager_items")
       .selectAll()
       .where("kind", "=", kind)
-      .orderBy("sort_order")
-      .orderBy("updated_at", "desc")
+      .orderBy("created_at", "asc")
+      .orderBy("id", "asc")
       .execute();
     return rows.map(mapItem);
   }
@@ -48,7 +54,11 @@ export class ProjectManagerRepository {
     return row ? mapItem(row) : null;
   }
 
-  async itemKeyExists(kind: ProjectManagerKind, key: string, exceptUuid?: string) {
+  async itemKeyExists(
+    kind: ProjectManagerKind,
+    key: string,
+    exceptUuid?: string,
+  ) {
     let query = this.database
       .selectFrom("project_manager_items")
       .select("id")
@@ -65,8 +75,8 @@ export class ProjectManagerRepository {
       .where((expression) =>
         expression.or([
           expression("reference_id", "=", record.id),
-          expression("reference_id", "=", record.key)
-        ])
+          expression("reference_id", "=", record.key),
+        ]),
       )
       .executeTakeFirst();
     return Boolean(dependent);
@@ -83,13 +93,17 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { key: record.key, title: record.title },
         recordKind: record.kind,
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
   }
 
-  async update(record: ProjectManagerRecord, actorEmail: string, action = "updated") {
+  async update(
+    record: ProjectManagerRecord,
+    actorEmail: string,
+    action = "updated",
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .updateTable("project_manager_items")
@@ -106,9 +120,10 @@ export class ProjectManagerRepository {
           reference_id: record.referenceId,
           reference_type: record.referenceType,
           sort_order: record.sortOrder,
+          start_date: record.startDate,
           status: record.status,
           title: record.title,
-          updated_at: new Date(record.updatedAt)
+          updated_at: new Date(record.updatedAt),
         })
         .where("kind", "=", record.kind)
         .where("uuid", "=", record.id)
@@ -116,9 +131,13 @@ export class ProjectManagerRepository {
       await writeActivity(transaction, {
         action,
         actorEmail,
-        details: { active: record.active, key: record.key, status: record.status },
+        details: {
+          active: record.active,
+          key: record.key,
+          status: record.status,
+        },
         recordKind: record.kind,
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
@@ -136,10 +155,97 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { key: record.key, title: record.title },
         recordKind: record.kind,
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return { deleted: true, id: record.id, title: record.title };
+  }
+
+  async listAttachments(
+    recordKind: ProjectManagerAttachmentKind,
+    recordUuid: string,
+  ) {
+    const rows = await this.database
+      .selectFrom("project_manager_attachments")
+      .selectAll()
+      .where("record_kind", "=", recordKind)
+      .where("record_uuid", "=", recordUuid)
+      .orderBy("created_at", "asc")
+      .orderBy("id", "asc")
+      .execute();
+    return rows.map(mapAttachment);
+  }
+
+  async findAttachment(
+    recordKind: ProjectManagerAttachmentKind,
+    recordUuid: string,
+    attachmentUuid: string,
+  ) {
+    const row = await this.database
+      .selectFrom("project_manager_attachments")
+      .selectAll()
+      .where("record_kind", "=", recordKind)
+      .where("record_uuid", "=", recordUuid)
+      .where("uuid", "=", attachmentUuid)
+      .executeTakeFirst();
+    return row ? mapAttachment(row) : null;
+  }
+
+  async createAttachment(
+    input: ProjectManagerAttachmentCreate,
+    actorEmail: string,
+  ) {
+    await this.database.transaction().execute(async (transaction) => {
+      await transaction
+        .insertInto("project_manager_attachments")
+        .values({
+          checksum: input.checksum,
+          created_by: input.createdBy,
+          mime_type: input.mimeType,
+          original_name: input.originalName,
+          record_kind: input.recordKind,
+          record_uuid: input.recordId,
+          size_bytes: input.sizeBytes,
+          storage_key: input.storageKey,
+          uuid: input.id,
+        })
+        .executeTakeFirstOrThrow();
+      await writeActivity(transaction, {
+        action: "attachment-created",
+        actorEmail,
+        details: {
+          attachmentId: input.id,
+          fileName: input.originalName,
+          sizeBytes: input.sizeBytes,
+        },
+        recordKind: input.recordKind,
+        recordUuid: input.recordId,
+      });
+    });
+    return this.findAttachment(input.recordKind, input.recordId, input.id);
+  }
+
+  async deleteAttachment(
+    attachment: ProjectManagerAttachment,
+    actorEmail: string,
+  ) {
+    await this.database.transaction().execute(async (transaction) => {
+      await transaction
+        .deleteFrom("project_manager_attachments")
+        .where("uuid", "=", attachment.id)
+        .executeTakeFirstOrThrow();
+      await writeActivity(transaction, {
+        action: "attachment-deleted",
+        actorEmail,
+        details: {
+          attachmentId: attachment.id,
+          fileName: attachment.originalName,
+        },
+        recordKind: attachment.recordKind,
+        recordUuid: attachment.recordId,
+      });
+    });
+    return { deleted: true, id: attachment.id };
   }
 
   async listRegistryPlatforms() {
@@ -170,7 +276,10 @@ export class ProjectManagerRepository {
     return Boolean(await query.executeTakeFirst());
   }
 
-  async createRegistryPlatform(record: ProjectManagerRegistryPlatform, actorEmail: string) {
+  async createRegistryPlatform(
+    record: ProjectManagerRegistryPlatform,
+    actorEmail: string,
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .insertInto("project_manager_registry_platforms")
@@ -181,13 +290,16 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { key: record.key, name: record.name },
         recordKind: "registry-platform",
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
   }
 
-  async updateRegistryPlatform(record: ProjectManagerRegistryPlatform, actorEmail: string) {
+  async updateRegistryPlatform(
+    record: ProjectManagerRegistryPlatform,
+    actorEmail: string,
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .updateTable("project_manager_registry_platforms")
@@ -198,7 +310,7 @@ export class ProjectManagerRepository {
           platform_key: record.key,
           sort_order: record.sortOrder,
           status: record.status,
-          updated_at: new Date(record.updatedAt)
+          updated_at: new Date(record.updatedAt),
         })
         .where("uuid", "=", record.id)
         .executeTakeFirstOrThrow();
@@ -207,7 +319,7 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { active: record.active, key: record.key },
         recordKind: "registry-platform",
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
@@ -241,7 +353,10 @@ export class ProjectManagerRepository {
     return Boolean(await query.executeTakeFirst());
   }
 
-  async createRegistryGroup(record: ProjectManagerRegistryGroup, actorEmail: string) {
+  async createRegistryGroup(
+    record: ProjectManagerRegistryGroup,
+    actorEmail: string,
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .insertInto("project_manager_registry_groups")
@@ -252,13 +367,16 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { key: record.key, name: record.name },
         recordKind: "registry-group",
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
   }
 
-  async updateRegistryGroup(record: ProjectManagerRegistryGroup, actorEmail: string) {
+  async updateRegistryGroup(
+    record: ProjectManagerRegistryGroup,
+    actorEmail: string,
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .updateTable("project_manager_registry_groups")
@@ -271,7 +389,7 @@ export class ProjectManagerRepository {
           platform_uuid: record.platformId,
           sort_order: record.sortOrder,
           status: record.status,
-          updated_at: new Date(record.updatedAt)
+          updated_at: new Date(record.updatedAt),
         })
         .where("uuid", "=", record.id)
         .executeTakeFirstOrThrow();
@@ -280,7 +398,7 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { active: record.active, key: record.key },
         recordKind: "registry-group",
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
@@ -314,7 +432,10 @@ export class ProjectManagerRepository {
     return Boolean(await query.executeTakeFirst());
   }
 
-  async createRegistryModule(record: ProjectManagerRegistryModule, actorEmail: string) {
+  async createRegistryModule(
+    record: ProjectManagerRegistryModule,
+    actorEmail: string,
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .insertInto("project_manager_registry_modules")
@@ -325,13 +446,16 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { key: record.key, name: record.name },
         recordKind: "registry-module",
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
   }
 
-  async updateRegistryModule(record: ProjectManagerRegistryModule, actorEmail: string) {
+  async updateRegistryModule(
+    record: ProjectManagerRegistryModule,
+    actorEmail: string,
+  ) {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .updateTable("project_manager_registry_modules")
@@ -348,7 +472,7 @@ export class ProjectManagerRepository {
           route_path: record.routePath,
           sort_order: record.sortOrder,
           status: record.status,
-          updated_at: new Date(record.updatedAt)
+          updated_at: new Date(record.updatedAt),
         })
         .where("uuid", "=", record.id)
         .executeTakeFirstOrThrow();
@@ -357,7 +481,7 @@ export class ProjectManagerRepository {
         actorEmail,
         details: { active: record.active, key: record.key },
         recordKind: "registry-module",
-        recordUuid: record.id
+        recordUuid: record.id,
       });
     });
     return record;
@@ -380,10 +504,11 @@ function itemValues(record: ProjectManagerRecord) {
     reference_id: record.referenceId,
     reference_type: record.referenceType,
     sort_order: record.sortOrder,
+    start_date: record.startDate,
     status: record.status,
     title: record.title,
     updated_at: new Date(record.updatedAt),
-    uuid: record.id
+    uuid: record.id,
   };
 }
 
@@ -397,7 +522,7 @@ function platformValues(record: ProjectManagerRegistryPlatform) {
     sort_order: record.sortOrder,
     status: record.status,
     updated_at: new Date(record.updatedAt),
-    uuid: record.id
+    uuid: record.id,
   };
 }
 
@@ -413,7 +538,7 @@ function groupValues(record: ProjectManagerRegistryGroup) {
     sort_order: record.sortOrder,
     status: record.status,
     updated_at: new Date(record.updatedAt),
-    uuid: record.id
+    uuid: record.id,
   };
 }
 
@@ -433,11 +558,14 @@ function moduleValues(record: ProjectManagerRegistryModule) {
     sort_order: record.sortOrder,
     status: record.status,
     updated_at: new Date(record.updatedAt),
-    uuid: record.id
+    uuid: record.id,
   };
 }
 
-async function writeActivity(database: Kysely<DevkitDatabase>, input: AuditInput) {
+async function writeActivity(
+  database: Kysely<DevkitDatabase>,
+  input: AuditInput,
+) {
   await database
     .insertInto("project_manager_activity")
     .values({
@@ -446,12 +574,14 @@ async function writeActivity(database: Kysely<DevkitDatabase>, input: AuditInput
       details_json: JSON.stringify(input.details ?? {}),
       record_kind: input.recordKind,
       record_uuid: input.recordUuid,
-      uuid: newUuid()
+      uuid: newUuid(),
     })
     .executeTakeFirstOrThrow();
 }
 
-function mapItem(row: Selectable<ProjectManagerItemsTable>): ProjectManagerRecord {
+function mapItem(
+  row: Selectable<ProjectManagerItemsTable>,
+): ProjectManagerRecord {
   return {
     active: Boolean(row.active),
     assignee: row.assignee,
@@ -467,15 +597,33 @@ function mapItem(row: Selectable<ProjectManagerItemsTable>): ProjectManagerRecor
     referenceId: row.reference_id,
     referenceType: row.reference_type,
     sortOrder: row.sort_order,
+    startDate: row.start_date,
     status: row.status,
     title: row.title,
     type: row.item_type,
-    updatedAt: iso(row.updated_at)
+    updatedAt: iso(row.updated_at),
+  };
+}
+
+function mapAttachment(
+  row: Selectable<ProjectManagerAttachmentsTable>,
+): ProjectManagerAttachment {
+  return {
+    checksum: row.checksum,
+    createdAt: iso(row.created_at),
+    createdBy: row.created_by,
+    id: row.uuid,
+    mimeType: row.mime_type,
+    originalName: row.original_name,
+    recordId: row.record_uuid,
+    recordKind: row.record_kind as ProjectManagerAttachmentKind,
+    sizeBytes: row.size_bytes,
+    storageKey: row.storage_key,
   };
 }
 
 function mapPlatform(
-  row: Selectable<ProjectManagerRegistryPlatformsTable>
+  row: Selectable<ProjectManagerRegistryPlatformsTable>,
 ): ProjectManagerRegistryPlatform {
   return {
     active: Boolean(row.active),
@@ -486,12 +634,12 @@ function mapPlatform(
     name: row.name,
     sortOrder: row.sort_order,
     status: row.status,
-    updatedAt: iso(row.updated_at)
+    updatedAt: iso(row.updated_at),
   };
 }
 
 function mapGroup(
-  row: Selectable<ProjectManagerRegistryGroupsTable>
+  row: Selectable<ProjectManagerRegistryGroupsTable>,
 ): ProjectManagerRegistryGroup {
   return {
     active: Boolean(row.active),
@@ -504,12 +652,12 @@ function mapGroup(
     platformId: row.platform_uuid,
     sortOrder: row.sort_order,
     status: row.status,
-    updatedAt: iso(row.updated_at)
+    updatedAt: iso(row.updated_at),
   };
 }
 
 function mapModule(
-  row: Selectable<ProjectManagerRegistryModulesTable>
+  row: Selectable<ProjectManagerRegistryModulesTable>,
 ): ProjectManagerRegistryModule {
   return {
     active: Boolean(row.active),
@@ -526,7 +674,7 @@ function mapModule(
     routePath: row.route_path,
     sortOrder: row.sort_order,
     status: row.status,
-    updatedAt: iso(row.updated_at)
+    updatedAt: iso(row.updated_at),
   };
 }
 
@@ -539,7 +687,9 @@ function parseJson<T>(value: string, fallback: T): T {
 }
 
 function iso(value: Date | string) {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString();
 }
 
 function newUuid() {

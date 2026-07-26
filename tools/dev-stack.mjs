@@ -8,6 +8,14 @@ const platformRoot = resolve(root, "../codexsun");
 const platformApiUrl = (
   process.env.PLATFORM_API_URL || "http://127.0.0.1:7010"
 ).replace(/\/$/u, "");
+const devkitApiUrl = (
+  process.env.DEVKIT_API_URL ||
+  `http://127.0.0.1:${process.env.DEVKIT_API_PORT || "7030"}`
+).replace(/\/$/u, "");
+const devkitWebUrl = (
+  process.env.DEVKIT_WEB_ORIGIN ||
+  `http://127.0.0.1:${process.env.DEVKIT_WEB_PORT || "7040"}`
+).replace(/\/$/u, "");
 const services = {
   "platform-auth": {
     args: ["tools/preflight.mjs", "platform-api"],
@@ -91,11 +99,11 @@ async function startStack() {
 
   console.log(`  - ${services["devkit-api"].label}`);
   startService("devkit-api");
-  await waitForHealthyUrl("http://127.0.0.1:7030/health", "Devkit API", 90_000);
+  await waitForHealthyUrl(`${devkitApiUrl}/health`, "Devkit API", 90_000);
 
   console.log(`  - ${services["devkit-web"].label}`);
   startService("devkit-web");
-  await waitForHealthyUrl("http://127.0.0.1:7040/", "Devkit Web", 30_000);
+  await waitForHealthyUrl(`${devkitWebUrl}/`, "Devkit Web", 30_000);
   console.log("  ok Devkit API and Web are ready\n");
   monitorStackHealth();
 }
@@ -128,8 +136,8 @@ function monitorStackHealth() {
       label: "Platform auth API",
       url: `${platformApiUrl}/health`,
     },
-    { failures: 0, label: "Devkit API", url: "http://127.0.0.1:7030/health" },
-    { failures: 0, label: "Devkit Web", url: "http://127.0.0.1:7040/" },
+    { failures: 0, label: "Devkit API", url: `${devkitApiUrl}/health` },
+    { failures: 0, label: "Devkit Web", url: `${devkitWebUrl}/` },
   ];
   let checking = false;
 

@@ -2,11 +2,11 @@
 
 ## Version State
 
-Current version: 1.0.46
+Current version: 1.0.47
 
-Release tag: v-1.0.46
+Release tag: v-1.0.47
 
-Changelog label: v 1.0.46
+Changelog label: v 1.0.47
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
@@ -19,6 +19,30 @@ Records schema, migration, seed, tenant provisioning, and data compatibility cha
 #### App Codebase Changes
 
 Records UI, API, service logic, tooling, packaging, and documentation changes.
+
+## v-1.0.47
+
+### [v 1.0.47] 2026-07-26 3:08 pm - Complete authenticated project delivery and attachment workflows
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Migrated Project Manager records into `devkit_db`, added module-owned attachment metadata with
+  record cleanup, and retained deterministic import of the existing project registries.
+- Added protected file persistence for Project, Issue, Task, Activity, and Review attachments with
+  generated storage keys and audited metadata.
+
+#### App Codebase Changes
+
+- Aligned the Developer Desk with Platform authentication, `/dev` routing, project-first navigation,
+  overview cards, and authenticated API clients.
+- Completed the Issue-to-Task-to-Activity-to-Review drill-down with issue-level roadmap, hierarchy,
+  performance rings, Kanban, and Gantt views.
+- Added multi-file drag-and-drop attachments for validated images, PDF, and text files up to 2 MB
+  each, including download, removal, rollback, and runtime coverage.
+- Stabilized Vite dependency resolution, made stack readiness use configured API/Web endpoints, and
+  expanded the isolated runtime smoke test for database, auth, roadmap, and attachment behavior.
+- Bumped workspace version to 1.0.47.
 
 ## v-1.0.46
 

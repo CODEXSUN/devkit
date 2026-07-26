@@ -19,15 +19,14 @@ export class PlatformAuthService {
       "/auth/login",
       platformLoginResultSchema,
       {
-        body: JSON.stringify(input),
+        body: JSON.stringify({ ...input, desk: "sa" }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       },
     );
-    const expectedUserType = input.desk === "sa" ? "super_admin" : "staff";
-    if (result.userType !== expectedUserType) {
+    if (result.userType !== "super_admin") {
       throw AppError.forbidden(
-        "This Platform account cannot access the requested Devkit desk.",
+        "This Platform account cannot access the Devkit developer desk.",
       );
     }
     return result;

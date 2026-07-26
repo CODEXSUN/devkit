@@ -3,6 +3,7 @@ export type ProjectManagerKind =
   | "discussion"
   | "issue"
   | "kanban"
+  | "project"
   | "release"
   | "review"
   | "task"
@@ -24,10 +25,26 @@ export type ProjectManagerRecord = {
   referenceId: string;
   referenceType: string;
   sortOrder: number;
+  startDate: string;
   status: string;
   title: string;
   type: string;
   updatedAt: string;
+};
+
+export type ProjectManagerAttachmentKind =
+  "activity" | "issue" | "project" | "review" | "task";
+
+export type ProjectManagerAttachment = {
+  checksum: string;
+  createdAt: string;
+  createdBy: string;
+  id: string;
+  mimeType: string;
+  originalName: string;
+  recordId: string;
+  recordKind: ProjectManagerAttachmentKind;
+  sizeBytes: number;
 };
 
 export type ProjectManagerResult = {
@@ -53,6 +70,7 @@ export type ProjectManagerForm = {
   referenceId: string;
   referenceType: string;
   sortOrder: string;
+  startDate: string;
   status: string;
   title: string;
   type: string;
@@ -126,9 +144,10 @@ export type ProjectManagerRegistryGroupNode = ProjectManagerRegistryGroup & {
   subGroups: ProjectManagerRegistryGroupNode[];
 };
 
-export type ProjectManagerRegistryPlatformNode = ProjectManagerRegistryPlatform & {
-  groups: ProjectManagerRegistryGroupNode[];
-};
+export type ProjectManagerRegistryPlatformNode =
+  ProjectManagerRegistryPlatform & {
+    groups: ProjectManagerRegistryGroupNode[];
+  };
 
 export type ProjectManagerRegistryResult = {
   generatedAt: string;

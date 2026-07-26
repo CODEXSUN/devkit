@@ -9,6 +9,7 @@ export type TimestampColumn = ColumnType<
 export type DevkitDatabase = {
   devkit_migrations: DevkitMigrationsTable;
   project_manager_activity: ProjectManagerActivityTable;
+  project_manager_attachments: ProjectManagerAttachmentsTable;
   project_manager_items: ProjectManagerItemsTable;
   project_manager_registry_groups: ProjectManagerRegistryGroupsTable;
   project_manager_registry_modules: ProjectManagerRegistryModulesTable;
@@ -40,6 +41,7 @@ export type ProjectManagerItemsTable = {
   reference_id: string;
   reference_type: string;
   sort_order: number;
+  start_date: string;
   status: string;
   title: string;
   updated_at: TimestampColumn;
@@ -101,6 +103,20 @@ export type ProjectManagerActivityTable = {
   id: Generated<number>;
   record_kind: string;
   record_uuid: string;
+  uuid: string;
+};
+
+export type ProjectManagerAttachmentsTable = {
+  checksum: string;
+  created_at: TimestampColumn;
+  created_by: string;
+  id: Generated<number>;
+  mime_type: string;
+  original_name: string;
+  record_kind: string;
+  record_uuid: string;
+  size_bytes: number;
+  storage_key: string;
   uuid: string;
 };
 

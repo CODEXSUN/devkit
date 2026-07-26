@@ -2,11 +2,14 @@ import { sql, type Kysely } from "kysely";
 import type { DevkitDatabase } from "../../database/schema.js";
 
 export const projectManagerMigration = {
-  description: "Project Manager records, registry hierarchy, and audit activity.",
-  key: "devkit.project-manager.sql.v1"
+  description:
+    "Project Manager records, attachments, project roadmaps, registry hierarchy, and audit activity.",
+  key: "devkit.project-manager.sql.v3",
 } as const;
 
-export async function migrateProjectManagerModule(database: Kysely<DevkitDatabase>) {
+export async function migrateProjectManagerModule(
+  database: Kysely<DevkitDatabase>,
+) {
   await sql`
     CREATE TABLE IF NOT EXISTS project_manager_items (
       id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -23,6 +26,7 @@ export async function migrateProjectManagerModule(database: Kysely<DevkitDatabas
       reference_id VARCHAR(160) NOT NULL DEFAULT '',
       reference_type VARCHAR(80) NOT NULL DEFAULT '',
       sort_order INT NOT NULL DEFAULT 0,
+      start_date VARCHAR(16) NOT NULL DEFAULT '',
       status VARCHAR(24) NOT NULL DEFAULT 'active',
       item_type VARCHAR(80) NOT NULL DEFAULT '',
       active TINYINT(1) NOT NULL DEFAULT 1,
@@ -32,6 +36,11 @@ export async function migrateProjectManagerModule(database: Kysely<DevkitDatabas
       UNIQUE KEY uq_project_manager_items_kind_key (kind, item_key),
       KEY idx_project_manager_items_kind_order (kind, sort_order, updated_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+
+  await sql`
+    ALTER TABLE project_manager_items
+    ADD COLUMN IF NOT EXISTS start_date VARCHAR(16) NOT NULL DEFAULT '' AFTER sort_order
   `.execute(database);
 
   await sql`
@@ -115,6 +124,27 @@ export async function migrateProjectManagerModule(database: Kysely<DevkitDatabas
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uq_project_manager_activity_uuid (uuid),
       KEY idx_project_manager_activity_record (record_kind, record_uuid, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS project_manager_attachments (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(8) NOT NULL,
+      record_kind VARCHAR(24) NOT NULL,
+      record_uuid CHAR(8) NOT NULL,
+      original_name VARCHAR(240) NOT NULL,
+      storage_key VARCHAR(500) NOT NULL,
+      mime_type VARCHAR(120) NOT NULL,
+      size_bytes INT UNSIGNED NOT NULL,
+      checksum CHAR(64) NOT NULL,
+      created_by VARCHAR(240) NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_project_manager_attachments_uuid (uuid),
+      UNIQUE KEY uq_project_manager_attachments_storage_key (storage_key),
+      KEY idx_project_manager_attachments_record (record_kind, record_uuid, created_at),
+      CONSTRAINT fk_project_manager_attachments_record
+        FOREIGN KEY (record_uuid) REFERENCES project_manager_items (uuid) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `.execute(database);
 

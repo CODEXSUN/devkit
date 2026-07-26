@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
   const apiUrl = env.DEVKIT_API_URL || "http://127.0.0.1:7030";
   const webPort = Number(env.DEVKIT_WEB_PORT || 7040);
   return {
-    cacheDir: "../../node_modules/.vite/devkit-web",
+    cacheDir: "../node_modules/.vite/devkit-web",
     define: {
       "import.meta.env.VITE_DEVKIT_VERSION": JSON.stringify(packageVersion),
     },

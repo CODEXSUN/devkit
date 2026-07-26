@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const platformDeskSchema = z.enum(["sa", "admin"]);
+export const platformDeskSchema = z.literal("dev");
 export const platformUserTypeSchema = z.enum(["super_admin", "staff"]);
 
 export const platformLoginInputSchema = z

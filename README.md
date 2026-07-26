@@ -4,6 +4,13 @@ Standalone developer workspace extracted from CODEXSUN Platform. Devkit owns the
 
 Devkit is an executable composition root. It consumes backend infrastructure from the sibling `@codexsun/framework` repository and presentation primitives from the sibling `@codexsun/ui` repository through their declared package exports.
 
+## Container deployment
+
+Run `bash setup.sh` for installation and `bash update.sh` for later releases.
+DevKit reuses CXApp shared infrastructure and owns only `devkit_db`, its
+application volume, API, and Web containers. Cloudflare routes
+`devkit.codexsun.com` to `http://devkit-web:80`.
+
 ## Development
 
 ```powershell
@@ -30,10 +37,9 @@ The API also runs the idempotent migrations and seed/import lifecycle at startup
 
 ## Authentication
 
-- `/sa/login` uses the Platform Super Admin credentials and opens the protected `/sa` desk.
-- `/admin/login` uses the Platform Software Admin credentials and opens the protected `/admin` desk.
+- `/dev/login` uses Platform Super Admin credentials and opens the single protected `/dev` developer desk.
 - Platform remains the login and token owner. Devkit exposes a fixed same-origin auth bridge and validates Platform-signed JWTs through `@codexsun/framework`.
-- All Project Manager, Task Manager, Platform Registry, and Work Automation API routes require a valid Platform `super_admin` or `staff` token. Root, health, and the three fixed auth bridge routes are the only public API endpoints.
+- All Project Manager, Task Manager, Platform Registry, and Work Automation API routes require a valid Platform `super_admin` token. Root, health, and the three fixed auth bridge routes are the only public API endpoints.
 - Local development inherits `JWT_SECRET` from the sibling Platform environment when Devkit does not define it. Production must provide the same Platform JWT secret explicitly.
 
 ## Verification

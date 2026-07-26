@@ -1,9 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
-import { Button } from "@codexsun/ui/components/button";
-import { Card } from "@codexsun/ui/components/card";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
-import { StatusBadge } from "@codexsun/ui/components/StatusBadge";
 import {
   clearToken,
   getSession,
@@ -13,13 +10,7 @@ import {
 } from "./auth.services";
 
 const loginPaths: Record<Desk, string> = {
-  admin: "/admin/login",
-  sa: "/sa/login",
-};
-
-const deskLabels: Record<Desk, string> = {
-  admin: "staff admin",
-  sa: "super admin",
+  dev: "/dev/login",
 };
 
 export function AuthGate({
@@ -42,9 +33,7 @@ export function AuthGate({
 
     void getSession(desk)
       .then((result) => {
-        const expectedUserType = desk === "sa" ? "super_admin" : "staff";
-        if (!cancelled && result.userType === expectedUserType)
-          setSession(result);
+        if (!cancelled && result.userType === "super_admin") setSession(result);
         else if (!cancelled) setSession(null);
       })
       .catch(() => {
@@ -57,24 +46,10 @@ export function AuthGate({
     };
   }, [desk]);
 
-  if (session) return children(session);
-  if (session === undefined) return <GlobalLoader />;
+  useEffect(() => {
+    if (session === null) window.location.replace(loginPaths[desk]);
+  }, [desk, session]);
 
-  return (
-    <main className="simple-page">
-      <Card title="Login required">
-        <StatusBadge tone="red">Blocked</StatusBadge>
-        <p className="mb-6 mt-4">
-          You need an active {deskLabels[desk]} Platform session to view this
-          page.
-        </p>
-        <Button
-          className="w-full"
-          onClick={() => window.location.assign(loginPaths[desk])}
-        >
-          Go to Login
-        </Button>
-      </Card>
-    </main>
-  );
+  if (session) return children(session);
+  return <GlobalLoader />;
 }

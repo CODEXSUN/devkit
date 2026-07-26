@@ -5,7 +5,7 @@ import {
 } from "@codexsun/framework/api";
 import { env } from "../env.js";
 
-const allowedUserTypes = ["super_admin", "staff"] as const;
+const allowedUserTypes = ["super_admin"] as const;
 const publicPaths = new Set([
   "/",
   "/health",

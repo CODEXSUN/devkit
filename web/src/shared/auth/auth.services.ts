@@ -1,4 +1,4 @@
-export type Desk = "sa" | "admin";
+export type Desk = "dev";
 export type PlatformUserType = "super_admin" | "staff";
 
 export type PlatformSession = {
@@ -11,16 +11,22 @@ export type PlatformSession = {
 };
 
 const tokenKeys: Record<Desk, string> = {
-  admin: "codexsun_session_admin",
-  sa: "codexsun_session_sa",
+  dev: "codexsun_session_dev",
 };
+const legacySuperAdminTokenKey = "codexsun_session_sa";
 
 type ApiEnvelope<T> =
   { data: T; success: true } | { error: { message: string }; success: false };
 
 export function getToken(desk: Desk): string | null {
   try {
-    return window.localStorage.getItem(tokenKeys[desk]);
+    const token = window.localStorage.getItem(tokenKeys[desk]);
+    if (token) return token;
+    const legacyToken = window.localStorage.getItem(legacySuperAdminTokenKey);
+    if (!legacyToken) return null;
+    window.localStorage.setItem(tokenKeys[desk], legacyToken);
+    window.localStorage.removeItem(legacySuperAdminTokenKey);
+    return legacyToken;
   } catch {
     return null;
   }
@@ -33,13 +39,15 @@ export function setToken(desk: Desk, token: string) {
 export function clearToken(desk: Desk) {
   try {
     window.localStorage.removeItem(tokenKeys[desk]);
+    window.localStorage.removeItem(legacySuperAdminTokenKey);
   } catch (error) {
     void error;
   }
 }
 
 export function deskFromPath(pathname = window.location.pathname): Desk {
-  return pathname.startsWith("/admin") ? "admin" : "sa";
+  void pathname;
+  return "dev";
 }
 
 export function devkitAuthHeaders(): Record<string, string> {
@@ -60,11 +68,10 @@ export function isLocalSessionValid(desk: Desk) {
       exp?: number;
       userType?: string;
     };
-    const expectedUserType = desk === "sa" ? "super_admin" : "staff";
     return (
       typeof claims.exp === "number" &&
       claims.exp * 1000 > Date.now() &&
-      claims.userType === expectedUserType
+      claims.userType === "super_admin"
     );
   } catch {
     return false;

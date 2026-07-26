@@ -1,0 +1,23 @@
+ARG NODE_RUNTIME_VERSION=26.5.0
+FROM node:${NODE_RUNTIME_VERSION}-bookworm-slim
+ARG NPM_RUNTIME_VERSION=12.0.1
+WORKDIR /workspace
+RUN npm install --global npm@${NPM_RUNTIME_VERSION}
+COPY framework ./framework
+COPY ui ./ui
+COPY devkit ./devkit
+WORKDIR /workspace/devkit
+RUN npm ci \
+  && npm ci --prefix ../framework \
+  && npm ci --prefix ../ui \
+  && npm run build --prefix ../framework \
+  && npm run build \
+  && npm run dependencies:check \
+  && cp -R api/project-manager-json dist/project-manager-json \
+  && mkdir -p /storage \
+  && chown -R node:node /workspace /storage
+ENV NODE_ENV=production
+USER node
+EXPOSE 7030
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=10 CMD node -e "fetch('http://127.0.0.1:'+process.env.DEVKIT_API_PORT+'/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+CMD ["node", "dist/api/server.js"]

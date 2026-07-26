@@ -10,7 +10,7 @@ export function LoginPage({ desk }: { desk: Desk }) {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const title = desk === "sa" ? "Super Admin Login" : "Staff Admin Login";
+  const title = "Developer Login";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,7 +23,7 @@ export function LoginPage({ desk }: { desk: Desk }) {
         setMessage(result.error?.message ?? "Login failed.");
         return;
       }
-      window.location.assign(desk === "sa" ? "/sa" : "/admin");
+      window.location.assign("/dev");
     } catch {
       setMessage("Network error, please try again.");
     } finally {
@@ -32,7 +32,11 @@ export function LoginPage({ desk }: { desk: Desk }) {
   }
 
   return (
-    <AuthLayout surface={desk} title={title}>
+    <AuthLayout
+      description="Use your Platform super admin credentials for the developer desk."
+      surface="sa"
+      title={title}
+    >
       <form className="auth-form" noValidate onSubmit={submit}>
         <Field
           autoComplete="email"

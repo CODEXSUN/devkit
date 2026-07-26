@@ -43,3 +43,30 @@ export const apiPut = <T>(path: string, data?: unknown, _scope?: string) =>
   request<T>(path, { body: JSON.stringify(data ?? {}), method: "PUT" });
 export const apiDelete = <T>(path: string, _scope?: string) =>
   request<T>(path, { method: "DELETE" });
+export const apiBinaryPost = <T>(
+  path: string,
+  data: Blob,
+  headers: Record<string, string>,
+) =>
+  request<T>(path, {
+    body: data,
+    headers: { "Content-Type": "application/octet-stream", ...headers },
+    method: "POST",
+  });
+export async function apiGetBlob(path: string) {
+  const response = await fetch(`/api/devkit${path}`, {
+    headers: devkitAuthHeaders(),
+    method: "GET",
+  });
+  if (!response.ok) {
+    const envelope = (await response
+      .json()
+      .catch(() => null)) as ApiEnvelope<unknown> | null;
+    throw new Error(
+      envelope && !envelope.success
+        ? envelope.error.message
+        : `Devkit API download failed (${response.status}).`,
+    );
+  }
+  return response.blob();
+}
