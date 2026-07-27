@@ -3,13 +3,18 @@ import { createPool, type PoolOptions } from "mysql2";
 import { createConnection } from "mysql2/promise";
 import { env } from "../env.js";
 import {
+  devkitAuthMigration,
+  migrateDevkitAuthModule,
+} from "../auth/devkit-auth.migration.js";
+import { seedDevkitAuthModule } from "../auth/devkit-auth.seed.js";
+import {
   migrateProjectManagerModule,
-  projectManagerMigration
+  projectManagerMigration,
 } from "../modules/project-manager/project-manager.migration.js";
 import { seedProjectManagerModule } from "../modules/project-manager/project-manager.seed.js";
 import {
   migrateTaskManagerModule,
-  taskManagerMigration
+  taskManagerMigration,
 } from "../modules/task-manager/task-manager.migration.js";
 import { seedTaskManagerModule } from "../modules/task-manager/task-manager.seed.js";
 import { assertDatabaseName, quoteIdentifier } from "./database-utils.js";
@@ -20,18 +25,23 @@ let bootstrapped = false;
 
 const migrationSteps = [
   {
+    migrate: migrateDevkitAuthModule,
+    name: devkitAuthMigration.key,
+  },
+  {
     migrate: migrateProjectManagerModule,
-    name: projectManagerMigration.key
+    name: projectManagerMigration.key,
   },
   {
     migrate: migrateTaskManagerModule,
-    name: taskManagerMigration.key
-  }
+    name: taskManagerMigration.key,
+  },
 ] as const;
 
 const seedSteps = [
+  { name: "devkit.auth", seed: seedDevkitAuthModule },
   { name: "devkit.project-manager", seed: seedProjectManagerModule },
-  { name: "devkit.task-manager", seed: seedTaskManagerModule }
+  { name: "devkit.task-manager", seed: seedTaskManagerModule },
 ] as const;
 
 export function devkitDatabaseName() {
@@ -44,7 +54,7 @@ export function devkitDatabaseConfig() {
     host: env.DB_HOST,
     password: env.DB_PASSWORD,
     port: env.DB_PORT,
-    user: env.DB_USER
+    user: env.DB_USER,
   };
 }
 
@@ -55,9 +65,9 @@ export function getDevkitDatabase() {
         pool: createPool({
           ...devkitDatabaseConfig(),
           connectionLimit: 10,
-          timezone: "Z"
-        } satisfies PoolOptions)
-      })
+          timezone: "Z",
+        } satisfies PoolOptions),
+      }),
     });
   }
   return database;
@@ -78,11 +88,11 @@ export async function createDevkitDatabase() {
     password: env.DB_PASSWORD,
     port: env.DB_PORT,
     timezone: "Z",
-    user: env.DB_USER
+    user: env.DB_USER,
   });
   try {
     await connection.query(
-      `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(devkitDatabaseName())} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(devkitDatabaseName())} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
     );
   } finally {
     await connection.end();
@@ -97,13 +107,17 @@ export async function migrateDevkitDatabase() {
     .addColumn("id", "integer", (column) => column.primaryKey().autoIncrement())
     .addColumn("name", "varchar(160)", (column) => column.notNull().unique())
     .addColumn("applied_at", "datetime", (column) =>
-      column.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
+      column.notNull().defaultTo(sql`CURRENT_TIMESTAMP`),
     )
     .execute();
 
   for (const step of migrationSteps) {
     await step.migrate(db);
-    await db.insertInto("devkit_migrations").ignore().values({ name: step.name }).execute();
+    await db
+      .insertInto("devkit_migrations")
+      .ignore()
+      .values({ name: step.name })
+      .execute();
     console.info(`[database] DevKit migration applied: ${step.name}`);
   }
 }
@@ -120,7 +134,7 @@ export async function checkDevkitDatabase() {
   await sql`SELECT 1`.execute(getDevkitDatabase());
   return {
     details: { database: devkitDatabaseName() },
-    status: "ok" as const
+    status: "ok" as const,
   };
 }
 

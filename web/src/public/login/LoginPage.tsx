@@ -33,7 +33,7 @@ export function LoginPage({ desk }: { desk: Desk }) {
 
   return (
     <AuthLayout
-      description="Use your Platform super admin credentials for the developer desk."
+      description="Use your DevKit developer account stored in the local DevKit database."
       surface="sa"
       title={title}
     >

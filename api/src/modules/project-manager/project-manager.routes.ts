@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { AppError } from "@codexsun/framework/errors";
 import { ok } from "@codexsun/framework/http";
 import { z } from "zod";
-import { requireDevkitPlatformSession } from "../../auth/platform-auth.guard.js";
+import { requireDevkitSession } from "../../auth/devkit-auth.guard.js";
 import { ProjectManagerService } from "./project-manager.service.js";
 import { projectManagerAttachmentLimitBytes } from "./project-manager.storage.js";
 
@@ -393,7 +393,7 @@ function decodeFileName(value: string) {
 
 function actor(request: FastifyRequest) {
   return (
-    requireDevkitPlatformSession(request.headers.authorization).email?.trim() ||
+    requireDevkitSession(request.headers.authorization).email.trim() ||
     "unknown@codexsun.local"
   );
 }

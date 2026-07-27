@@ -1,12 +1,6 @@
-import { registerGracefulShutdown, startApiServer } from "@codexsun/framework/api";
-import { createApp } from "./app.js";
-import { env } from "./env.js";
+import { registerCxAppShutdown } from "@codexsun/cxapp";
+import { createDevkitRuntime } from "./stack.js";
 
-const app = await createApp();
-registerGracefulShutdown(app);
-await startApiServer({
-  app,
-  host: env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1",
-  port: env.DEVKIT_API_PORT,
-  readyLabel: "  ok devkit api ready: {address}"
-});
+const runtime = await createDevkitRuntime();
+registerCxAppShutdown(runtime);
+await runtime.listen();

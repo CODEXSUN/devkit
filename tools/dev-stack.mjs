@@ -4,10 +4,6 @@ import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const platformRoot = resolve(root, "../codexsun");
-const platformApiUrl = (
-  process.env.PLATFORM_API_URL || "http://127.0.0.1:7010"
-).replace(/\/$/u, "");
 const devkitApiUrl = (
   process.env.DEVKIT_API_URL ||
   `http://127.0.0.1:${process.env.DEVKIT_API_PORT || "7030"}`
@@ -17,12 +13,6 @@ const devkitWebUrl = (
   `http://127.0.0.1:${process.env.DEVKIT_WEB_PORT || "7040"}`
 ).replace(/\/$/u, "");
 const services = {
-  "platform-auth": {
-    args: ["tools/preflight.mjs", "platform-api"],
-    color: "\x1b[35m",
-    cwd: platformRoot,
-    label: "auth",
-  },
   "devkit-api": {
     args: ["tools/preflight.mjs", "devkit-api"],
     color: "\x1b[36m",
@@ -85,18 +75,6 @@ function startService(serviceName) {
 }
 
 async function startStack() {
-  if (await isHealthyUrl(`${platformApiUrl}/health`)) {
-    console.log(`  ok Platform auth is available at ${platformApiUrl}`);
-  } else {
-    console.log(`  - ${services["platform-auth"].label}`);
-    startService("platform-auth");
-    await waitForHealthyUrl(
-      `${platformApiUrl}/health`,
-      "Platform auth API",
-      90_000,
-    );
-  }
-
   console.log(`  - ${services["devkit-api"].label}`);
   startService("devkit-api");
   await waitForHealthyUrl(`${devkitApiUrl}/health`, "Devkit API", 90_000);
@@ -131,11 +109,6 @@ async function waitForHealthyUrl(url, label, timeoutMs) {
 
 function monitorStackHealth() {
   const targets = [
-    {
-      failures: 0,
-      label: "Platform auth API",
-      url: `${platformApiUrl}/health`,
-    },
     { failures: 0, label: "Devkit API", url: `${devkitApiUrl}/health` },
     { failures: 0, label: "Devkit Web", url: `${devkitWebUrl}/` },
   ];
@@ -168,15 +141,6 @@ function monitorStackHealth() {
       checking = false;
     }
   }, 2_000);
-}
-
-async function isHealthyUrl(url) {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(2_000) });
-    return response.ok;
-  } catch {
-    return false;
-  }
 }
 
 function writeServiceLines(service, chunk) {

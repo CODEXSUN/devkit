@@ -2,7 +2,10 @@
 
 Standalone developer workspace extracted from CODEXSUN Platform. Devkit owns the existing Project Manager, Task Manager, Platform Registry, Work Automation, and the module-owned SQL tables stored in `devkit_db`. Product-wide engineering guidance remains owned by the sibling `codexsun/assist` knowledge base; Devkit retains only its immutable changelog locally.
 
-Devkit is an executable composition root. It consumes backend infrastructure from the sibling `@codexsun/framework` repository and presentation primitives from the sibling `@codexsun/ui` repository through their declared package exports.
+Devkit owns its fixed-client stack manifest and business modules. It consumes the sibling
+`@codexsun/cxapp` runtime, backend infrastructure from `@codexsun/framework`, and presentation
+primitives from `@codexsun/ui` through declared package exports. The repositories remain
+independent.
 
 ## Container deployment
 
@@ -22,7 +25,11 @@ npm.cmd run dev
 - Web: `http://127.0.0.1:7040`
 - API: `http://127.0.0.1:7030`
 
-The root launcher performs API/Web preflight, verifies the sibling Framework and UI links, reuses an active Platform API or starts the sibling Platform API for authentication, starts the Devkit API before the Web app, waits for every health endpoint, labels service logs, monitors runtime health, and stops the owned stack when a service exits.
+The root launcher performs API/Web preflight, verifies the sibling CXApp, Framework, and UI links,
+starts the Devkit API before the Web app, waits for every health endpoint, labels service logs,
+monitors runtime health, and stops the owned stack when a service exits. CXApp boots Devkit with
+the `single-client` scope and fixed `devkit_db` provider; Devkit does not start or depend on the
+multi-tenant Platform runtime.
 
 ## Database
 
@@ -37,10 +44,21 @@ The API also runs the idempotent migrations and seed/import lifecycle at startup
 
 ## Authentication
 
-- `/dev/login` uses Platform Super Admin credentials and opens the single protected `/dev` developer desk.
-- Platform remains the login and token owner. Devkit exposes a fixed same-origin auth bridge and validates Platform-signed JWTs through `@codexsun/framework`.
-- All Project Manager, Task Manager, Platform Registry, and Work Automation API routes require a valid Platform `super_admin` token. Root, health, and the three fixed auth bridge routes are the only public API endpoints.
-- Local development inherits `JWT_SECRET` from the sibling Platform environment when Devkit does not define it. Production must provide the same Platform JWT secret explicitly.
+- `/dev/login` uses the configured local Devkit developer account and opens the single protected `/dev` developer desk.
+- Devkit owns `devkit_users` in `devkit_db`, seeds the configured developer administrator on first boot, hashes its password with scrypt, and issues Devkit-only JWT sessions.
+- All Project Manager, Task Manager, Platform Registry, and Work Automation API routes require a valid Devkit `developer` token. Root, health, and `/auth/login`, `/auth/session`, and `/auth/logout` are the only public API endpoints.
+- Configure `DEVKIT_ADMIN_EMAIL`, `DEVKIT_ADMIN_NAME`, `DEVKIT_ADMIN_PASSWORD`, and `DEVKIT_JWT_SECRET`. The configured bootstrap developer is synchronized on each boot, so changing its name or password in `.env` and restarting updates that account without touching any other future users.
+- Devkit is single-client: no tenant registry, tenant selector, tenant ID/header, tenant database pool, plan activation, or entitlement lookup is part of its runtime.
+- `api/src/stack.ts` adapts Devkit-owned authentication, database lifecycle, and public modules to
+  the shared CXApp runtime. It does not move Devkit users or project behavior into CXApp.
+
+Generate or rotate the Devkit-only JWT signing secret with:
+
+```powershell
+npm.cmd run env:jwt-secret
+```
+
+The command writes a new 64-character hexadecimal `DEVKIT_JWT_SECRET` to the repository-local `.env`. Restart the Devkit API after rotation; existing browser sessions will be invalidated.
 
 ## Verification
 
@@ -51,9 +69,11 @@ npm.cmd run dependencies:check
 npm.cmd run test:runtime
 ```
 
-The runtime smoke test creates an isolated temporary Devkit database, verifies migrations and JSON import, exercises audited Project Manager and Task Manager SQL writes, verifies the Platform login bridge and global API protection, and removes the temporary database afterward.
+The runtime smoke test creates an isolated temporary Devkit database, verifies the local developer user migration/seed and JSON import, exercises audited Project Manager and Task Manager SQL writes, verifies local login and global API protection, and removes the temporary database afterward.
 
-The Framework and UI dependencies are local sibling links during development. Devkit binds to localhost by default. Authentication and shared database persistence are implemented; threaded discussions and richer bug workflows remain future Devkit work.
+The CXApp, Framework, and UI dependencies are local sibling links during development. Devkit binds
+to localhost by default. Authentication and shared database persistence are implemented; threaded
+discussions and richer bug workflows remain future Devkit work.
 
 ## Ownership
 

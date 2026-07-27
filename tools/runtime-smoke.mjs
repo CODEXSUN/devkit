@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawn } from "node:child_process";
-import { createHmac, randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -10,6 +9,8 @@ import { createConnection } from "mysql2/promise";
 
 const root = resolve(import.meta.dirname, "..");
 const jwtSecret = "devkit-runtime-smoke-secret-at-least-32-characters";
+const developerEmail = "developer@devkit.test";
+const developerPassword = "DevkitSmoke!234";
 const runtimeDatabaseName = `devkit_test_${process.pid}_${Date.now()}`;
 const runtimeStoragePath = mkdtempSync(
   join(tmpdir(), "codexsun-devkit-attachments-"),
@@ -19,13 +20,6 @@ const apiPort = await findAvailablePort();
 const webPort = await findAvailablePort();
 const apiUrl = `http://127.0.0.1:${apiPort}`;
 const webUrl = `http://127.0.0.1:${webPort}`;
-const platformServer = createFakePlatformAuthServer();
-await listen(platformServer);
-const platformAddress = platformServer.address();
-if (!platformAddress || typeof platformAddress === "string") {
-  throw new Error("Fake Platform auth server did not expose a TCP port.");
-}
-
 const child = spawn(process.execPath, ["tools/dev-stack.mjs"], {
   cwd: root,
   env: {
@@ -37,8 +31,10 @@ const child = spawn(process.execPath, ["tools/dev-stack.mjs"], {
     DEVKIT_STORAGE_PATH: runtimeStoragePath,
     DEVKIT_WEB_ORIGIN: webUrl,
     DEVKIT_WEB_PORT: String(webPort),
-    JWT_SECRET: jwtSecret,
-    PLATFORM_API_URL: `http://127.0.0.1:${platformAddress.port}`,
+    DEVKIT_ADMIN_EMAIL: developerEmail,
+    DEVKIT_ADMIN_NAME: "Runtime Developer",
+    DEVKIT_ADMIN_PASSWORD: developerPassword,
+    DEVKIT_JWT_SECRET: jwtSecret,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -58,13 +54,16 @@ try {
   await waitForUrl(`${webUrl}/dev/login`, "Devkit Web", 30_000);
 
   const health = await getJson(`${apiUrl}/health`);
+  const tenantHeaderProbe = await fetch(`${apiUrl}/`, {
+    headers: { "x-tenant-id": "must-not-be-consumed" },
+  });
+  const tenantHeaderProbeBody = await tenantHeaderProbe.json();
   const unauthorized = await fetch(`${apiUrl}/admin/project-manager/result`);
-  const devToken = await login("dev", "sa@codexsun.test");
-  const removedAdminLogin = await fetch(`${apiUrl}/auth/platform/login`, {
+  const devToken = await login(developerEmail, developerPassword);
+  const invalidLogin = await fetch(`${apiUrl}/auth/login`, {
     body: JSON.stringify({
-      desk: "admin",
-      email: "admin@codexsun.test",
-      password: "test-password",
+      email: developerEmail,
+      password: "invalid-password",
     }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -74,7 +73,7 @@ try {
     devToken,
   );
   const tasks = await getJson(`${apiUrl}/task-manager/todos`, devToken);
-  const devSession = await getJson(`${apiUrl}/auth/platform/session`, devToken);
+  const devSession = await getJson(`${apiUrl}/auth/session`, devToken);
   const pages = await Promise.all([
     fetch(`${webUrl}/dev/login`),
     fetch(`${webUrl}/dev`),
@@ -83,19 +82,35 @@ try {
   ]);
 
   assertObject(health, "health response");
+  if (
+    tenantHeaderProbe.headers.has("x-tenant-id") ||
+    tenantHeaderProbeBody?.meta?.tenantId
+  ) {
+    throw new Error("Single-client DevKit consumed a tenant request header.");
+  }
   if (unauthorized.status !== 401) {
     throw new Error(
       `Protected Devkit API returned ${unauthorized.status} without a token.`,
     );
   }
-  if (removedAdminLogin.status !== 400) {
+  if (invalidLogin.status !== 401) {
     throw new Error(
-      `Removed admin desk login returned ${removedAdminLogin.status} instead of 400.`,
+      `Invalid local login returned ${invalidLogin.status} instead of 401.`,
     );
   }
   assertEnvelope(projects, "project manager response");
   assertEnvelope(tasks, "task manager response");
   assertEnvelope(devSession, "developer session response");
+  if (
+    devSession.data.userType !== "developer" ||
+    devSession.data.role !== "developer_admin" ||
+    "tenantId" in devSession.data ||
+    "tenantDbName" in devSession.data
+  ) {
+    throw new Error(
+      "Devkit session is not isolated from tenant-aware Platform claims.",
+    );
+  }
   const createdTodo = await sendJsonRequest(
     `${apiUrl}/task-manager/todos`,
     "POST",
@@ -197,7 +212,7 @@ try {
   }
 
   console.log(
-    "\nRuntime smoke passed: devkit_db migrations/imports, SQL writes/audits, single developer-desk auth, API guards, and Web routes.",
+    "\nRuntime smoke passed: devkit_db local user/migrations/imports, SQL writes/audits, single-client developer auth, API guards, and Web routes.",
   );
 } catch (error) {
   console.error("\nRuntime smoke failed.");
@@ -205,7 +220,6 @@ try {
   throw error;
 } finally {
   stopProcessTree(child);
-  await closeServer(platformServer);
   await dropRuntimeDatabase();
   if (
     runtimeStoragePath.startsWith(
@@ -216,16 +230,18 @@ try {
   }
 }
 
-async function login(desk, email) {
-  const response = await fetch(`${apiUrl}/auth/platform/login`, {
-    body: JSON.stringify({ desk, email, password: "test-password" }),
+async function login(email, password) {
+  const response = await fetch(`${apiUrl}/auth/login`, {
+    body: JSON.stringify({ email, password }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
   });
   const envelope = await response.json();
-  assertEnvelope(envelope, `${desk} login response`);
+  assertEnvelope(envelope, "developer login response");
   if (typeof envelope.data.accessToken !== "string") {
-    throw new Error(`${desk} login response did not contain an access token.`);
+    throw new Error(
+      "Developer login response did not contain an access token.",
+    );
   }
   return envelope.data.accessToken;
 }
@@ -327,119 +343,22 @@ async function assertDatabaseWrites() {
   });
   try {
     const [rows] = await connection.query(
-      "SELECT (SELECT COUNT(*) FROM task_manager_activity) AS task_activity, (SELECT COUNT(*) FROM project_manager_activity) AS project_activity",
+      "SELECT (SELECT COUNT(*) FROM devkit_users) AS users, (SELECT COUNT(*) FROM task_manager_activity) AS task_activity, (SELECT COUNT(*) FROM project_manager_activity) AS project_activity",
     );
     const result = Array.isArray(rows) ? rows[0] : null;
     if (
       !result ||
+      Number(result.users) !== 1 ||
       Number(result.task_activity) < 1 ||
       Number(result.project_activity) < 1
     ) {
-      throw new Error("DevKit database writes were not audited.");
+      throw new Error(
+        "DevKit local user seed or audited database writes are missing.",
+      );
     }
   } finally {
     await connection.end();
   }
-}
-
-function createFakePlatformAuthServer() {
-  return createServer(async (request, response) => {
-    if (request.method === "GET" && request.url === "/health") {
-      sendJson(response, 200, { data: { status: "ok" }, success: true });
-      return;
-    }
-
-    if (request.method === "POST" && request.url === "/auth/login") {
-      const body = JSON.parse(await readBody(request));
-      const userType =
-        body.desk === "sa"
-          ? "super_admin"
-          : body.desk === "admin"
-            ? "staff"
-            : null;
-      const expectedEmail =
-        body.desk === "sa" ? "sa@codexsun.test" : "admin@codexsun.test";
-      if (
-        !userType ||
-        body.email !== expectedEmail ||
-        body.password !== "test-password"
-      ) {
-        sendJson(response, 401, {
-          error: {
-            code: "AUTH_INVALID_CREDENTIALS",
-            message: "Invalid credentials.",
-          },
-          success: false,
-        });
-        return;
-      }
-
-      sendJson(response, 200, {
-        data: {
-          accessToken: signToken({ email: body.email, userType }),
-          email: body.email,
-          name: userType === "super_admin" ? "Super Admin" : "Staff Admin",
-          userType,
-        },
-        success: true,
-      });
-      return;
-    }
-
-    if (request.method === "POST" && request.url === "/auth/logout") {
-      sendJson(response, 200, { data: { loggedOut: true }, success: true });
-      return;
-    }
-
-    sendJson(response, 404, {
-      error: { code: "NOT_FOUND", message: "Not found." },
-      success: false,
-    });
-  });
-}
-
-function signToken({ email, userType }) {
-  const now = Math.floor(Date.now() / 1000);
-  const header = base64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const payload = base64Url(
-    JSON.stringify({
-      aud: "codexsun-platform",
-      email,
-      exp: now + 3600,
-      iat: now,
-      iss: "codexsun-platform-api",
-      jti: randomUUID(),
-      name: userType === "super_admin" ? "Super Admin" : "Staff Admin",
-      sessionIssuedAt: new Date(now * 1000).toISOString(),
-      userId: email,
-      userType,
-    }),
-  );
-  const signature = createHmac("sha256", jwtSecret)
-    .update(`${header}.${payload}`)
-    .digest("base64url");
-  return `${header}.${payload}.${signature}`;
-}
-
-function base64Url(value) {
-  return Buffer.from(value).toString("base64url");
-}
-
-function readBody(request) {
-  return new Promise((resolveBody, rejectBody) => {
-    let body = "";
-    request.setEncoding("utf8");
-    request.on("data", (chunk) => {
-      body += chunk;
-    });
-    request.on("end", () => resolveBody(body));
-    request.on("error", rejectBody);
-  });
-}
-
-function sendJson(response, statusCode, value) {
-  response.writeHead(statusCode, { "Content-Type": "application/json" });
-  response.end(JSON.stringify(value));
 }
 
 function listen(server) {

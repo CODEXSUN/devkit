@@ -35,7 +35,7 @@ const config = apps[app];
 const fileEnv = loadDotEnv(resolve(root, ".env"));
 const platformFileEnv = loadDotEnv(resolve(root, "../codexsun/.env"));
 const platformFallbackEnv = Object.fromEntries(
-  ["DB_HOST", "DB_PASSWORD", "DB_PORT", "DB_USER", "JWT_SECRET"]
+  ["DB_HOST", "DB_PASSWORD", "DB_PORT", "DB_USER"]
     .filter((key) => platformFileEnv[key] !== undefined)
     .map((key) => [key, platformFileEnv[key]]),
 );
@@ -52,10 +52,6 @@ ensureSiblingPackage("@codexsun/ui", "../ui");
 
 if (app === "devkit-api") {
   ensureLinkedPackageBuild("@codexsun/framework", "../framework");
-  if (!runtimeEnv.JWT_SECRET) {
-    console.error("  x Missing JWT_SECRET in Devkit or Platform environment.");
-    process.exit(1);
-  }
   if (!runtimeEnv.DB_HOST || !runtimeEnv.DB_USER) {
     console.error("  x Missing DevKit database connection settings.");
     process.exit(1);

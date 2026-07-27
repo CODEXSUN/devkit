@@ -8,6 +8,7 @@ export type TimestampColumn = ColumnType<
 
 export type DevkitDatabase = {
   devkit_migrations: DevkitMigrationsTable;
+  devkit_users: DevkitUsersTable;
   project_manager_activity: ProjectManagerActivityTable;
   project_manager_attachments: ProjectManagerAttachmentsTable;
   project_manager_items: ProjectManagerItemsTable;
@@ -17,6 +18,19 @@ export type DevkitDatabase = {
   task_manager_activity: TaskManagerActivityTable;
   task_manager_lookups: TaskManagerLookupsTable;
   task_manager_todos: TaskManagerTodosTable;
+};
+
+export type DevkitUsersTable = {
+  created_at: TimestampColumn;
+  email: string;
+  id: Generated<number>;
+  last_login_at: TimestampColumn | null;
+  name: string;
+  password_hash: string;
+  role: string;
+  status: string;
+  updated_at: TimestampColumn;
+  uuid: string;
 };
 
 export type DevkitMigrationsTable = {

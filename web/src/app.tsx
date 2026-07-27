@@ -21,7 +21,7 @@ import { AuthGate } from "./shared/auth/AuthGate";
 import {
   logout,
   type Desk,
-  type PlatformSession,
+  type DevkitSession,
 } from "./shared/auth/auth.services";
 import { LoginPage } from "./public/login/LoginPage";
 
@@ -70,13 +70,7 @@ function DevkitRoute() {
   return <GlobalLoader />;
 }
 
-function DevkitDesk({
-  desk,
-  session,
-}: {
-  desk: Desk;
-  session: PlatformSession;
-}) {
+function DevkitDesk({ desk, session }: { desk: Desk; session: DevkitSession }) {
   const [page, setPage] = useState<Page>(() =>
     pageFromPath(window.location.pathname),
   );

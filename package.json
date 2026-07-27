@@ -22,6 +22,7 @@
     "check:module-boundaries": "node tools/check-module-boundaries.mjs",
     "db:migrate": "node tools/database.mjs migrate",
     "db:seed": "node tools/database.mjs seed",
+    "env:jwt-secret": "node tools/env-jwt-secret.mjs",
     "test:runtime": "node tools/runtime-smoke.mjs",
     "test:queue-contract": "node --test tools/queue-contract.test.mjs",
     "dependencies:check": "node tools/check-root-artifacts.mjs",
@@ -32,6 +33,7 @@
     "github:now": "node tools/github-helper.mjs"
   },
   "devDependencies": {
+    "@codexsun/cxapp": "file:../cxapp",
     "@eslint/js": "^9.17.0",
     "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^26.1.1",

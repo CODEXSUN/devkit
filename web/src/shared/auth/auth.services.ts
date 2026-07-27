@@ -1,32 +1,26 @@
 export type Desk = "dev";
-export type PlatformUserType = "super_admin" | "staff";
+export type DevkitUserType = "developer";
 
-export type PlatformSession = {
+export type DevkitSession = {
   authenticated: true;
   email: string;
   expiresAt: string;
-  name?: string;
-  sessionIssuedAt?: string;
-  userType: PlatformUserType;
+  name: string;
+  role: "developer_admin";
+  sessionIssuedAt: string;
+  userType: DevkitUserType;
 };
 
 const tokenKeys: Record<Desk, string> = {
   dev: "codexsun_session_dev",
 };
-const legacySuperAdminTokenKey = "codexsun_session_sa";
 
 type ApiEnvelope<T> =
   { data: T; success: true } | { error: { message: string }; success: false };
 
 export function getToken(desk: Desk): string | null {
   try {
-    const token = window.localStorage.getItem(tokenKeys[desk]);
-    if (token) return token;
-    const legacyToken = window.localStorage.getItem(legacySuperAdminTokenKey);
-    if (!legacyToken) return null;
-    window.localStorage.setItem(tokenKeys[desk], legacyToken);
-    window.localStorage.removeItem(legacySuperAdminTokenKey);
-    return legacyToken;
+    return window.localStorage.getItem(tokenKeys[desk]);
   } catch {
     return null;
   }
@@ -39,7 +33,6 @@ export function setToken(desk: Desk, token: string) {
 export function clearToken(desk: Desk) {
   try {
     window.localStorage.removeItem(tokenKeys[desk]);
-    window.localStorage.removeItem(legacySuperAdminTokenKey);
   } catch (error) {
     void error;
   }
@@ -71,7 +64,7 @@ export function isLocalSessionValid(desk: Desk) {
     return (
       typeof claims.exp === "number" &&
       claims.exp * 1000 > Date.now() &&
-      claims.userType === "super_admin"
+      claims.userType === "developer"
     );
   } catch {
     return false;
@@ -88,10 +81,11 @@ export async function login(input: {
     const result = await request<{
       accessToken: string;
       email: string;
-      name?: string;
-      userType: PlatformUserType;
-    }>("/auth/platform/login", {
-      body: JSON.stringify(input),
+      name: string;
+      role: "developer_admin";
+      userType: DevkitUserType;
+    }>("/auth/login", {
+      body: JSON.stringify({ email: input.email, password: input.password }),
       method: "POST",
     });
     setToken(input.desk, result.accessToken);
@@ -102,21 +96,13 @@ export async function login(input: {
 }
 
 export function getSession(desk: Desk) {
-  return request<PlatformSession>(
-    "/auth/platform/session",
-    { method: "GET" },
-    desk,
-  );
+  return request<DevkitSession>("/auth/session", { method: "GET" }, desk);
 }
 
 export async function logout(desk: Desk) {
   try {
     if (getToken(desk)) {
-      await request(
-        "/auth/platform/logout",
-        { body: "{}", method: "POST" },
-        desk,
-      );
+      await request("/auth/logout", { body: "{}", method: "POST" }, desk);
     }
   } catch (error) {
     void error;

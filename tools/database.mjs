@@ -14,14 +14,18 @@ if (!["migrate", "seed"].includes(command)) {
 const devkitEnv = loadDotEnv(resolve(root, ".env"));
 const platformEnv = loadDotEnv(resolve(root, "../codexsun/.env"));
 const fallback = Object.fromEntries(
-  ["DB_HOST", "DB_PASSWORD", "DB_PORT", "DB_USER", "JWT_SECRET"]
+  ["DB_HOST", "DB_PASSWORD", "DB_PORT", "DB_USER"]
     .filter((key) => platformEnv[key] !== undefined)
     .map((key) => [key, platformEnv[key]]),
 );
 
 execFileSync(
   process.execPath,
-  [resolve(root, "node_modules/tsx/dist/cli.mjs"), "api/src/database/db-cli.ts", command],
+  [
+    resolve(root, "node_modules/tsx/dist/cli.mjs"),
+    "api/src/database/db-cli.ts",
+    command,
+  ],
   {
     cwd: root,
     env: { ...fallback, ...devkitEnv, ...process.env },

@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
 import {
   clearToken,
+  type DevkitSession,
   getSession,
   isLocalSessionValid,
   type Desk,
-  type PlatformSession,
 } from "./auth.services";
 
 const loginPaths: Record<Desk, string> = {
@@ -17,10 +17,10 @@ export function AuthGate({
   children,
   desk,
 }: {
-  children: (session: PlatformSession) => ReactElement;
+  children: (session: DevkitSession) => ReactElement;
   desk: Desk;
 }) {
-  const [session, setSession] = useState<PlatformSession | null | undefined>(
+  const [session, setSession] = useState<DevkitSession | null | undefined>(
     undefined,
   );
 
@@ -33,7 +33,7 @@ export function AuthGate({
 
     void getSession(desk)
       .then((result) => {
-        if (!cancelled && result.userType === "super_admin") setSession(result);
+        if (!cancelled && result.userType === "developer") setSession(result);
         else if (!cancelled) setSession(null);
       })
       .catch(() => {
