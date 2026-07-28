@@ -1,39 +1,87 @@
 {
   "name": "@codexsun/devkit",
-  "version": "1.0.47",
-  "private": true,
+  "version": "1.0.49",
+  "private": false,
   "packageManager": "npm@12.0.1",
-  "description": "Standalone CODEXSUN developer planning and collaboration stack",
+  "description": "CXApp-pluggable developer planning and collaboration package",
   "type": "module",
   "workspaces": [
-    "api",
-    "web"
+    "src/api",
+    "src/web"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/api/stack.d.ts",
+      "default": "./dist/api/stack.js"
+    },
+    "./stack": {
+      "types": "./dist/api/stack.d.ts",
+      "default": "./dist/api/stack.js"
+    },
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "default": "./dist/api/index.js"
+    },
+    "./host": {
+      "types": "./dist/api/app.d.ts",
+      "default": "./dist/api/app.js"
+    },
+    "./database": {
+      "types": "./dist/api/database/index.d.ts",
+      "default": "./dist/api/database/index.js"
+    },
+    "./web": "./src/web/src/index.ts",
+    "./web/cxapp": "./src/web/src/cxapp.tsx"
+  },
+  "files": [
+    "dist",
+    "src/api/src",
+    "src/api/project-manager-json",
+    "src/api/task-manager-json",
+    "src/web/src",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "dev": "node tools/dev-stack.mjs",
-    "dev:api": "node tools/preflight.mjs devkit-api",
-    "dev:web": "node tools/preflight.mjs devkit-web",
-    "build": "npm run build --workspace @codexsun/devkit-api && npm run build --workspace @codexsun/devkit-web",
+    "build": "node tools/clean.mjs && npm run build --workspace @codexsun/devkit-api && npm run build --workspace @codexsun/devkit-web",
     "typecheck": "npm run typecheck --workspace @codexsun/devkit-api && npm run typecheck --workspace @codexsun/devkit-web",
     "lint": "npm run lint --workspace @codexsun/devkit-api && npm run lint --workspace @codexsun/devkit-web",
-    "check": "npm run check:text-encoding && npm run test:queue-contract && npm run typecheck && npm run lint",
+    "check": "npm run check:text-encoding && npm run check:module-boundaries && npm run typecheck && npm run lint && npm run test:stack-contract && npm run test:sync-security && npm run dependencies:check",
     "check:text-encoding": "node tools/check-env-encoding.mjs",
     "check:env-encoding": "npm run check:text-encoding",
     "check:module-boundaries": "node tools/check-module-boundaries.mjs",
-    "db:migrate": "node tools/database.mjs migrate",
-    "db:seed": "node tools/database.mjs seed",
-    "env:jwt-secret": "node tools/env-jwt-secret.mjs",
-    "test:runtime": "node tools/runtime-smoke.mjs",
-    "test:queue-contract": "node --test tools/queue-contract.test.mjs",
+    "test:stack-contract": "node --test test/stack-contract.test.mjs",
+    "test:sync-security": "node --import tsx --test test/sync-security.test.mjs",
     "dependencies:check": "node tools/check-root-artifacts.mjs",
     "version:show": "node tools/version/version.mjs show",
     "version:bump": "node tools/version-bump.mjs",
     "changelog:append": "node tools/version/version.mjs append",
     "check:versions": "node tools/check-versions.mjs",
-    "github:now": "node tools/github-helper.mjs"
+    "github:now": "node tools/github-helper.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@tanstack/react-query": "^5.100.10",
+    "@tanstack/react-table": "^8.21.3",
+    "date-fns": "^4.4.0",
+    "fastify": "^5.2.1",
+    "kysely": "^0.29.0",
+    "lucide-react": "^1.22.0",
+    "react-is": "^19.0.0",
+    "sonner": "^2.0.7",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@codexsun/framework": "1.0.46",
+    "@codexsun/ui": "1.0.47",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@codexsun/cxapp": "file:../cxapp",
     "@eslint/js": "^9.17.0",
     "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^26.1.1",

@@ -1,0 +1,12 @@
+devkit.codexsun.com {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy cxapp-api:7030
+	}
+
+	handle {
+		reverse_proxy cxapp-web:80
+	}
+}
+

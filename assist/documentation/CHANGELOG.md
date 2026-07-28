@@ -2,23 +2,63 @@
 
 ## Version State
 
-Current version: 1.0.47
+Current version: 1.0.49
 
-Release tag: v-1.0.47
+Release tag: v-1.0.49
 
-Changelog label: v 1.0.47
+Changelog label: v 1.0.49
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
 New entries should keep database-facing work and application code work separate.
 
+## v-1.0.49
+
+### [v 1.0.49] 2026-07-29 12:50 am - version update
+
 #### Database Changes
 
-Records schema, migration, seed, tenant provisioning, and data compatibility changes.
+- Database update: Yes (auto-check).
 
 #### App Codebase Changes
 
-Records UI, API, service logic, tooling, packaging, and documentation changes.
+- Bumped workspace version to 1.0.49.
+
+## v-1.0.48
+
+### [v 1.0.48] 2026-07-29 12:16 am - Consolidate DevKit as an owner package
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Preserved DevKit-owned project and task migrations and seed contracts behind the public database
+  lifecycle while removing the obsolete standalone API copy.
+
+#### App Codebase Changes
+
+- Added the `/app/devkit/today` Daily Developer Dashboard as the default DevKit workspace with
+  due and overdue tasks, blockers, pending reviews, repository changes and divergence, recorded
+  build/test failures, upcoming releases, and exact continue-work links.
+- Preserved Git porcelain status columns on the first changed-file row so repository details no
+  longer remove the leading character from its filename.
+- Added a DevKit-owned Design System desk with Components and Templates pages, nested routes,
+  and sidebar navigation.
+- Reused the public `@codexsun/ui` component, theme, workspace, and form contracts to mirror
+  CODEXSUN presentation standards without importing private Platform source.
+- Added searchable component previews, persistent theme selection, and list, details, upsert,
+  and dashboard workspace templates.
+- Added the DevKit-owned GitHub Dashboard module with read-only workspace discovery, branch,
+  upstream, synchronization, working-tree, remote, and last-commit status for all local projects.
+- Added clickable repository details with changed filenames, local and upstream revisions,
+  `package.json` identity/version, changelog version, last commit, and GitHub remote metadata.
+- Made project cards on the DevKit overview navigate to the Projects workspace at
+  `/app/devkit/projects`.
+- Added the GitHub sidebar header and Projects desk at `/app/devkit/github`; guarded Orbit
+  repository mutations and SSH setup remain outside the composed DevKit runtime.
+
+- Consolidated DevKit into owner-public API, database, queue, and web package surfaces for CXApp
+  composition while retaining its project, task, roadmap, GitHub, and design-system workspaces.
+- Bumped workspace version to 1.0.48.
 
 ## v-1.0.47
 
@@ -29,6 +69,10 @@ Records UI, API, service logic, tooling, packaging, and documentation changes.
 - Database update: Yes (manual).
 - Migrated Project Manager records into `devkit_db`, added module-owned attachment metadata with
   record cleanup, and retained deterministic import of the existing project registries.
+- Added forward-compatible table renames so every Project Manager and Task Manager table uses the
+  owning `devkit_` prefix without losing existing tenant data.
+- Consolidated DevKit migration history into the shared `schema_migrations` journal with the
+  `@codexsun/devkit` package tag.
 - Added protected file persistence for Project, Issue, Task, Activity, and Review attachments with
   generated storage keys and audited metadata.
 
@@ -42,6 +86,10 @@ Records UI, API, service logic, tooling, packaging, and documentation changes.
   each, including download, removal, rollback, and runtime coverage.
 - Stabilized Vite dependency resolution, made stack readiness use configured API/Web endpoints, and
   expanded the isolated runtime smoke test for database, auth, roadmap, and attachment behavior.
+- Registered the issue roadmap as a CXApp-composed DevKit workspace and replaced legacy `/dev`
+  navigation with the public `/app/devkit` route contract.
+- Verified that roadmap projects, issues, tasks, activities, and reviews persist in the CXApp
+  tenant MariaDB; bundled JSON files remain deterministic seed sources only.
 - Bumped workspace version to 1.0.47.
 
 ## v-1.0.46

@@ -4,7 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const workspaceRoots = ["api", "web"].map((directory) => join(root, directory));
+const workspaceRoots = ["src/api", "src/web"].map((directory) => join(root, directory));
 const forbiddenDirectories = new Set(["dist", "dist-types", "node_modules"]);
 const nestedArtifacts = [];
 

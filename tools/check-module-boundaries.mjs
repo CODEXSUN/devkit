@@ -29,25 +29,59 @@ const frontendRoles = [
 const failures = [];
 
 for (const moduleName of modules) {
-  const apiRoot = join(root, "api/src/modules", moduleName);
-  const webRoot = join(root, "web/src/modules", moduleName);
+  const apiRoot = join(root, "src/api/src/modules", moduleName);
+  const webRoot = join(root, "src/web/src/modules", moduleName);
   for (const role of backendRoles) {
     requireFile(join(apiRoot, `${moduleName}.${role}.ts`));
   }
   for (const role of frontendRoles) {
-    const extension = ["form", "list", "workspace"].includes(role) ? "tsx" : "ts";
+    const extension = ["form", "list", "workspace"].includes(role)
+      ? "tsx"
+      : "ts";
     requireFile(join(webRoot, `${moduleName}.${role}.${extension}`));
   }
 
   const repository = readFile(join(apiRoot, `${moduleName}.repository.ts`));
   const migration = readFile(join(apiRoot, `${moduleName}.migration.ts`));
   const routes = readFile(join(apiRoot, `${moduleName}.routes.ts`));
+  const seed = readFile(join(apiRoot, `${moduleName}.seed.ts`));
   const service = readFile(join(apiRoot, `${moduleName}.service.ts`));
 
-  reject(repository, /node:fs|JSON_DIR|JsonStore/u, `${moduleName} repository uses file storage`);
-  reject(service, /JsonStore|\.store\.js/u, `${moduleName} service uses file storage`);
-  reject(routes, /\brequest\.(body|params|query)\s+as\b/u, `${moduleName} routes cast requests`);
-  requireMatch(migration, /CREATE TABLE IF NOT EXISTS/u, `${moduleName} migration has no table`);
+  reject(
+    repository,
+    /node:fs|JSON_DIR|JsonStore/u,
+    `${moduleName} repository uses file storage`,
+  );
+  reject(
+    service,
+    /JsonStore|\.store\.js/u,
+    `${moduleName} service uses file storage`,
+  );
+  reject(
+    routes,
+    /\brequest\.(body|params|query)\s+as\b/u,
+    `${moduleName} routes cast requests`,
+  );
+  requireMatch(
+    migration,
+    /CREATE TABLE IF NOT EXISTS/u,
+    `${moduleName} migration has no table`,
+  );
+  reject(
+    migration,
+    /CREATE TABLE IF NOT EXISTS\s+(?!devkit_)/u,
+    `${moduleName} migration creates an unprefixed table`,
+  );
+  for (const [source, owner] of [
+    [repository, "repository"],
+    [seed, "seed"],
+  ]) {
+    reject(
+      source,
+      /\.(?:selectFrom|insertInto|updateTable|deleteFrom)\(\s*["'](?!devkit_|schema_migrations)/u,
+      `${moduleName} ${owner} queries an unprefixed table`,
+    );
+  }
   requireMatch(
     repository,
     /\.(selectFrom|insertInto|updateTable|deleteFrom)\(/u,

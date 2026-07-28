@@ -1,0 +1,374 @@
+import { AppError } from "@codexsun/framework/errors";
+import {
+  decryptSyncToken,
+  encryptSyncToken,
+  generateSyncToken,
+  snapshotChecksum,
+  syncTokenHash,
+} from "./sync.crypto.js";
+import { DevkitSyncRepository, synchronizedTables } from "./sync.repository.js";
+import {
+  DEVKIT_SYNC_CLOUD_URL,
+  type DevkitSyncResult,
+  type DevkitSyncRole,
+  type DevkitSyncSnapshot,
+  type DevkitSyncStatus,
+} from "./sync.types.js";
+
+type CloudSnapshotEnvelope = {
+  checksum: string;
+  revision: number;
+  snapshot: DevkitSyncSnapshot;
+};
+
+export class DevkitSyncService {
+  constructor(private readonly repository = new DevkitSyncRepository()) {}
+
+  role(): DevkitSyncRole {
+    const role = process.env.DEVKIT_SYNC_ROLE?.trim().toLowerCase() || "local";
+    if (!["cloud", "disabled", "local"].includes(role)) {
+      throw new Error("DEVKIT_SYNC_ROLE must be cloud, local, or disabled.");
+    }
+    return role as DevkitSyncRole;
+  }
+
+  async status(): Promise<DevkitSyncStatus> {
+    const [connection, conflicts, pendingRecords] = await Promise.all([
+      this.repository.connection(),
+      this.repository.conflictCount(),
+      this.repository.pendingCount(),
+    ]);
+    const role = this.role();
+    const connectionStatus =
+      role === "disabled"
+        ? "disabled"
+        : connection?.status === "conflict"
+          ? "conflict"
+          : connection
+            ? "bound"
+            : "unbound";
+    return {
+      bound: Boolean(connection),
+      cloudUrl: DEVKIT_SYNC_CLOUD_URL,
+      conflictCount: conflicts,
+      instanceId:
+        connection?.instance_id ??
+        process.env.DEVKIT_SYNC_INSTANCE_ID?.trim() ??
+        "",
+      lastError: connection?.last_error ?? null,
+      lastPulledAt: iso(connection?.last_pulled_at),
+      lastPublishedAt: iso(connection?.last_published_at),
+      pendingRecords,
+      remoteRevision: connection?.remote_revision ?? 0,
+      role,
+      status: connectionStatus,
+    };
+  }
+
+  async generateCloudToken(label: string, actor: string) {
+    this.requireRole("cloud");
+    const token = generateSyncToken();
+    await this.repository.createToken({
+      actor,
+      hash: syncTokenHash(token),
+      label: requiredLabel(label),
+    });
+    return {
+      createdAt: new Date().toISOString(),
+      label: requiredLabel(label),
+      token,
+    };
+  }
+
+  async bind(token: string, instanceId: string) {
+    this.requireRole("local");
+    const normalizedToken = requiredToken(token);
+    const normalizedInstance = requiredInstanceId(instanceId);
+    await cloudRequest<{ valid: true }>("/v1/status", normalizedToken);
+    await this.repository.saveConnection({
+      encryptedToken: encryptSyncToken(normalizedToken),
+      instanceId: normalizedInstance,
+    });
+    return this.status();
+  }
+
+  async publish(): Promise<DevkitSyncResult> {
+    this.requireRole("local");
+    const connection = await this.requiredConnection();
+    const run = await this.repository.startRun(
+      "push",
+      connection.remote_revision,
+    );
+    try {
+      const token = decryptSyncToken(connection.encrypted_token);
+      const snapshot = await this.repository.exportSnapshot(
+        connection.instance_id,
+      );
+      const response = await cloudRequest<{
+        records: number;
+        revision: number;
+        synchronizedAt: string;
+      }>("/v1/snapshot", token, {
+        baseRevision: connection.remote_revision,
+        snapshot,
+      });
+      await this.repository.updateConnection({
+        error: null,
+        publishedAt: new Date(response.synchronizedAt),
+        revision: response.revision,
+        status: "bound",
+      });
+      await this.repository.markPublished();
+      await this.repository.finishRun(run, {
+        records: response.records,
+        remoteRevision: response.revision,
+        status: "completed",
+      });
+      return { direction: "push", ...response };
+    } catch (error) {
+      const message = errorMessage(error);
+      const conflict = error instanceof AppError && error.statusCode === 409;
+      await this.repository.updateConnection({
+        error: message,
+        status: conflict ? "conflict" : "error",
+      });
+      if (conflict) {
+        await this.repository.recordConflict({
+          instanceId: connection.instance_id,
+          localRevision: connection.remote_revision,
+          message,
+          remoteRevision: remoteRevision(message),
+        });
+      }
+      await this.repository.finishRun(run, {
+        error: message,
+        status: conflict ? "conflict" : "failed",
+      });
+      throw error;
+    }
+  }
+
+  async pull(): Promise<DevkitSyncResult> {
+    this.requireRole("local");
+    const connection = await this.requiredConnection();
+    const run = await this.repository.startRun(
+      "pull",
+      connection.remote_revision,
+    );
+    try {
+      const token = decryptSyncToken(connection.encrypted_token);
+      const response = await cloudRequest<CloudSnapshotEnvelope>(
+        "/v1/snapshot",
+        token,
+      );
+      const payload = JSON.stringify(response.snapshot);
+      if (snapshotChecksum(payload) !== response.checksum) {
+        throw AppError.validation("Cloud snapshot checksum validation failed.");
+      }
+      const records = await this.repository.importSnapshot(response.snapshot);
+      const synchronizedAt = new Date().toISOString();
+      await this.repository.updateConnection({
+        error: null,
+        pulledAt: new Date(synchronizedAt),
+        revision: response.revision,
+        status: "bound",
+      });
+      await this.repository.finishRun(run, {
+        records,
+        remoteRevision: response.revision,
+        status: "completed",
+      });
+      return {
+        direction: "pull",
+        records,
+        revision: response.revision,
+        synchronizedAt,
+      };
+    } catch (error) {
+      const message = errorMessage(error);
+      await this.repository.updateConnection({ error: message, status: "error" });
+      await this.repository.finishRun(run, { error: message, status: "failed" });
+      throw error;
+    }
+  }
+
+  async authenticateCloudToken(token: string) {
+    this.requireRole("cloud");
+    const normalized = requiredToken(token);
+    const record = await this.repository.findActiveToken(
+      syncTokenHash(normalized),
+    );
+    if (!record) throw AppError.unauthorized("DevKit sync token is invalid.");
+    await this.repository.touchToken(record.uuid);
+    return record;
+  }
+
+  async cloudStatus(token: string) {
+    const record = await this.authenticateCloudToken(token);
+    const snapshot = await this.repository.latestSnapshot();
+    return {
+      label: record.label,
+      protocolVersion: 1,
+      revision: snapshot?.revision ?? 0,
+      serverId: "codexsun-cloud",
+      valid: true as const,
+    };
+  }
+
+  async cloudSnapshot(token: string): Promise<CloudSnapshotEnvelope> {
+    await this.authenticateCloudToken(token);
+    const current = await this.repository.latestSnapshot();
+    const snapshot = current
+      ? parseSnapshot(current.payload_json)
+      : await this.repository.exportSnapshot("codexsun-cloud");
+    const payload = JSON.stringify(snapshot);
+    return {
+      checksum: current?.checksum ?? snapshotChecksum(payload),
+      revision: current?.revision ?? 0,
+      snapshot,
+    };
+  }
+
+  async cloudPublish(
+    token: string,
+    baseRevision: number,
+    snapshot: DevkitSyncSnapshot,
+  ) {
+    const tokenRecord = await this.authenticateCloudToken(token);
+    validateSnapshot(snapshot);
+    const current = await this.repository.latestSnapshot();
+    const currentRevision = current?.revision ?? 0;
+    if (baseRevision !== currentRevision) {
+      throw AppError.conflict(
+        `Cloud revision is ${currentRevision}; pull before publishing again.`,
+      );
+    }
+    const payload = JSON.stringify(snapshot);
+    const revision = currentRevision + 1;
+    const records = await this.repository.importSnapshot(snapshot);
+    await this.repository.saveSnapshot({
+      checksum: snapshotChecksum(payload),
+      payload,
+      publisher: `${tokenRecord.label}:${snapshot.instanceId}`,
+      revision,
+    });
+    return {
+      records,
+      revision,
+      synchronizedAt: new Date().toISOString(),
+    };
+  }
+
+  private async requiredConnection() {
+    const connection = await this.repository.connection();
+    if (!connection)
+      throw AppError.validation(
+        "Bind this DevKit installation to the cloud before synchronizing.",
+      );
+    return connection;
+  }
+
+  private requireRole(expected: DevkitSyncRole) {
+    if (this.role() !== expected) {
+      throw AppError.forbidden(
+        `DevKit sync operation requires the ${expected} runtime role.`,
+      );
+    }
+  }
+}
+
+async function cloudRequest<T>(
+  path: string,
+  token: string,
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${cloudUrl()}${path}`, {
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    headers: {
+      accept: "application/json",
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      "x-devkit-sync-token": token,
+    },
+    method: body === undefined ? "GET" : "POST",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const result = (await response.json().catch(() => null)) as {
+    data?: T;
+    error?: { message?: string };
+    success?: boolean;
+  } | null;
+  if (!response.ok || !result?.success || result.data === undefined) {
+    throw new AppError({
+      code: response.status === 409 ? "SYNC_CONFLICT" : "SYNC_REMOTE_ERROR",
+      message:
+        result?.error?.message ??
+        `DevKit cloud synchronization failed (${response.status}).`,
+      statusCode: response.status === 409 ? 409 : 502,
+    });
+  }
+  return result.data;
+}
+
+function cloudUrl() {
+  const testUrl =
+    process.env.NODE_ENV === "test"
+      ? process.env.DEVKIT_SYNC_TEST_CLOUD_URL?.trim()
+      : "";
+  return `${testUrl || `${DEVKIT_SYNC_CLOUD_URL}/api/devkit-sync`}`.replace(
+    /\/+$/u,
+    "",
+  );
+}
+
+function requiredLabel(value: string) {
+  const label = value.trim();
+  if (!label || label.length > 160)
+    throw AppError.validation("Sync token label is required.");
+  return label;
+}
+
+function requiredToken(value: string) {
+  const token = value.trim();
+  if (!/^[A-Za-z0-9]{16}$/u.test(token))
+    throw AppError.validation("DevKit sync token must contain 16 characters.");
+  return token;
+}
+
+function requiredInstanceId(value: string) {
+  const instanceId = value.trim();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{1,79}$/u.test(instanceId)) {
+    throw AppError.validation(
+      "Instance ID must contain 2-80 letters, numbers, underscores, or hyphens.",
+    );
+  }
+  return instanceId;
+}
+
+function validateSnapshot(snapshot: DevkitSyncSnapshot) {
+  if (snapshot.protocolVersion !== 1)
+    throw AppError.validation("DevKit sync protocol version is unsupported.");
+  for (const table of Object.keys(snapshot.tables)) {
+    if (
+      !synchronizedTables.includes(table as (typeof synchronizedTables)[number])
+    ) {
+      throw AppError.validation(`DevKit sync table is not allowed: ${table}.`);
+    }
+  }
+}
+
+function parseSnapshot(value: string) {
+  return JSON.parse(value) as DevkitSyncSnapshot;
+}
+
+function iso(value: Date | string | null | undefined) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown synchronization error.";
+}
+
+function remoteRevision(message: string) {
+  const match = /Cloud revision is (\d+)/u.exec(message);
+  return match ? Number(match[1]) : 0;
+}
