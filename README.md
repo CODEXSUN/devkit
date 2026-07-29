@@ -5,7 +5,7 @@ collaboration.
 
 It owns Project Manager, Task Manager, Platform Registry, Work Automation, the read-only GitHub
 Dashboard, their applicable migrations and seeds, fixed API routes, and web workspace contributions.
-It does not own authentication, tenant resolution, plans, subscriptions, entitlements, runtime
+It does not own authentication, client resolution, plans, subscriptions, entitlements, runtime
 registries, queues, API/web servers, or public application shells; CXApp supplies those runtime
 capabilities.
 
@@ -19,8 +19,8 @@ capabilities.
 - `@codexsun/devkit/web` and `@codexsun/devkit/web/cxapp` export `devkitWebBundle` and the owned
   workspace contributions.
 
-The host resolves the trusted actor and tenant database, then passes both to
-`registerDevkitApiForHost`. DevKit never selects a tenant database or authenticates a request.
+The host resolves the trusted actor and fixed client database, then passes both to
+`registerDevkitApiForHost`. DevKit never selects a database or authenticates a request.
 CXApp may include these public contributions in a stack catalog or omit the package completely;
 DevKit has no import of CXApp internals and CXApp does not need DevKit as a foundation dependency.
 

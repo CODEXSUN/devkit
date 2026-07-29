@@ -1,7 +1,7 @@
-export const DEVKIT_PACKAGE_VERSION = "1.0.51";
+export const DEVKIT_PACKAGE_VERSION = "1.0.52";
 
 export const devkitStackContribution = Object.freeze({
-  applicationMode: "tenant" as const,
+  applicationMode: "client" as const,
   capabilities: Object.freeze({
     api: true,
     database: true,
@@ -12,7 +12,8 @@ export const devkitStackContribution = Object.freeze({
   }),
   contractVersion: 1,
   dependencies: Object.freeze([] as string[]),
-  description: "Developer planning, task, registry and work-automation application.",
+  description:
+    "Developer planning, task, registry and work-automation application.",
   displayName: "CODEXSUN DevKit",
   id: "devkit",
   packageId: "@codexsun/devkit",

@@ -24,20 +24,26 @@ export function ProjectManagerOverview({
   const atRiskProjects = activeProjects.filter((project) =>
     ["blocked", "on-hold"].includes(project.status),
   );
+  const recentProjects = activeProjects.slice(0, 4);
 
   return (
-    <main className="mx-auto w-[calc(100%-2rem)] max-w-[92rem] space-y-4 py-5 lg:w-[calc(100%-3rem)]">
-      <section className="rounded-md border bg-card px-5 py-4 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-muted-foreground">
-          Developer workspace
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold">Overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          A short view of every project and its current delivery status.
-        </p>
+    <main className="mx-auto w-[calc(100%-2rem)] max-w-[92rem] space-y-3 py-4 lg:w-[calc(100%-3rem)]">
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-md border bg-card px-5 py-4 shadow-sm">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Developer workspace
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold">DevKit</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Projects, delivery status, planning, and developer operations in one
+            view.
+          </p>
+        </div>
+        <WorkspaceStatusBadge
+          label={`${activeProjects.length} active`}
+          tone={atRiskProjects.length ? "warning" : "success"}
+        />
       </section>
-
-      <SyncOverview />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <OverviewMetric
@@ -62,12 +68,14 @@ export function ProjectManagerOverview({
         />
       </section>
 
-      <section className="space-y-3">
+      <SyncOverview />
+
+      <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold">Projects</h2>
+            <h2 className="text-base font-semibold">Recent projects</h2>
             <p className="text-sm text-muted-foreground">
-              Open a project to continue through its delivery timeline.
+              Open a project to continue its delivery timeline.
             </p>
           </div>
           <WorkspaceStatusBadge
@@ -77,8 +85,8 @@ export function ProjectManagerOverview({
         </div>
 
         {projectsQuery.isLoading ? (
-          <div className="rounded-md border bg-card py-16">
-            <GlobalLoader className="min-h-28" fullScreen={false} />
+          <div className="py-8">
+            <GlobalLoader className="min-h-20" fullScreen={false} />
           </div>
         ) : null}
         {projectsQuery.error ? (
@@ -97,9 +105,9 @@ export function ProjectManagerOverview({
             </p>
           </div>
         ) : null}
-        {projects.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
+        {recentProjects.length ? (
+          <div className="grid gap-2 md:grid-cols-2">
+            {recentProjects.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
@@ -146,7 +154,7 @@ function ProjectCard({
 }) {
   return (
     <button
-      className="group min-h-44 rounded-md border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group rounded-md border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       type="button"
       onClick={onOpen}
     >
@@ -159,16 +167,17 @@ function ProjectCard({
           tone={project.active ? statusTone(project.status) : "neutral"}
         />
       </div>
-      <p className="mt-4 font-mono text-xs text-muted-foreground">
-        {project.key}
-      </p>
-      <h3 className="mt-1 font-semibold group-hover:text-primary">
-        {project.title}
-      </h3>
-      <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
-        {plainText(project.description) || "No project summary has been added."}
-      </p>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-xs text-muted-foreground">
+            {project.key}
+          </p>
+          <h3 className="mt-0.5 font-semibold group-hover:text-primary">
+            {project.title}
+          </h3>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
         <span>{project.assignee || "Owner not assigned"}</span>
         <span>{formatDate(project.dueDate)}</span>
       </div>
@@ -189,14 +198,6 @@ function label(value: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function plainText(value: string) {
-  return value
-    .replace(/<[^>]+>/gu, " ")
-    .replace(/&nbsp;/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
 }
 
 function formatDate(value: string) {

@@ -92,7 +92,7 @@ export const devkitWebBundle = Object.freeze({
   id: "devkit",
   rootPath: "/app/devkit",
   title: "DevKit",
-  version: "1.0.49",
+  version: "1.0.52",
   workspaces,
   applicationSwitcherItem(active: boolean): TopMenuWorkspaceItem {
     return {
@@ -184,7 +184,7 @@ export const devkitWebBundle = Object.freeze({
     ];
   },
   resolveWorkspace(pathname: string): DevkitWorkspaceContribution | undefined {
-    const [surface, packageId, section = "today", page] = pathname
+    const [surface, packageId, section = "overview", page] = pathname
       .split("/")
       .filter(Boolean);
     if (surface !== "app" || packageId !== "devkit") return undefined;

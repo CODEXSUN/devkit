@@ -11,7 +11,7 @@ test("DevKit publishes an optional CXApp stack contract", async () => {
 
   assert.equal(devkitStackContribution.packageId, packageJson.name);
   assert.equal(devkitStackContribution.version, packageJson.version);
-  assert.equal(devkitStackContribution.applicationMode, "tenant");
+  assert.equal(devkitStackContribution.applicationMode, "client");
   assert.deepEqual(devkitStackContribution.capabilities, {
     api: true,
     database: true,

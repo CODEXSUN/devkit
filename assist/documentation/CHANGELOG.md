@@ -2,15 +2,47 @@
 
 ## Version State
 
-Current version: 1.0.51
+Current version: 1.0.53
 
-Release tag: v-1.0.51
+Release tag: v-1.0.53
 
-Changelog label: v 1.0.51
+Changelog label: v 1.0.53
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
 New entries should keep database-facing work and application code work separate.
+
+## v-1.0.53
+
+### [v 1.0.53] 2026-07-29 5:29 pm - #52 - Release DevKit Excalidraw planning module
+
+#### Database Changes
+
+- Database update: No (auto-check).
+
+#### App Codebase Changes
+
+- Bumped workspace version to 1.0.53.
+
+## v-1.0.52
+
+### [v 1.0.52] 2026-07-29 5:25 pm - Release DevKit Excalidraw planning module
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Released the DevKit-owned `devkit_planning_boards` schema through the ordered owner lifecycle,
+  after Task Manager and before Sync.
+- Persisted project associations, editable Excalidraw scenes, authorship and timestamps, with
+  standard sync direction, status, version and tombstone fields for local/cloud synchronization.
+
+#### App Codebase Changes
+
+- Bumped workspace version to 1.0.52.
+- Released the separate Planning module with project-validated board APIs, Whiteboards navigation,
+  lazy-loaded Excalidraw editing, debounced autosave, explicit save/delete actions and cloud sync.
+- Recorded the hardened Excalidraw dependency set and patched transitive overrides that leave the
+  production dependency audit clear.
 
 ## v-1.0.51
 
