@@ -15,4 +15,32 @@ export type PlanningBoard = {
   updatedAt: string;
   updatedBy: string;
   uuid: string;
+  syncVersion: number;
+};
+
+export type PlanningRecordKind =
+  | "project"
+  | "issue"
+  | "task"
+  | "activity"
+  | "review";
+
+export type PlanningReaction = {
+  createdBy: string;
+  reaction: string;
+  uuid: string;
+};
+
+export type PlanningComment = {
+  body: string;
+  createdAt: string;
+  createdBy: string;
+  elementId: string | null;
+  mentions: string[];
+  reactions: PlanningReaction[];
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  status: "open" | "resolved";
+  updatedAt: string;
+  uuid: string;
 };

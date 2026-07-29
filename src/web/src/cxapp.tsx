@@ -92,7 +92,7 @@ export const devkitWebBundle = Object.freeze({
   id: "devkit",
   rootPath: "/app/devkit",
   title: "DevKit",
-  version: "1.0.52",
+  version: "1.0.54",
   workspaces,
   applicationSwitcherItem(active: boolean): TopMenuWorkspaceItem {
     return {

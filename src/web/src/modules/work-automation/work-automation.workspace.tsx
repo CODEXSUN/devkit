@@ -6,6 +6,7 @@ import {
   ChartNoAxesGanttIcon,
   ChevronRightIcon,
   ListTreeIcon,
+  LinkIcon,
   MapIcon,
   PencilIcon,
   PlusIcon,
@@ -59,6 +60,10 @@ import type {
   ProjectManagerForm,
   ProjectManagerRecord,
 } from "../project-manager/project-manager.types";
+import {
+  openRecordWhiteboards,
+  ProjectWhiteboards,
+} from "../planning/planning.record-whiteboards";
 import {
   RoadmapStatistics,
   WorkAutomationWorkflow,
@@ -961,6 +966,9 @@ export function WorkAutomationWorkspace({
                               {plainText(record.description)}
                             </div>
                           ) : null}
+                          {record.kind === "project" ? (
+                            <ProjectWhiteboards project={record} />
+                          ) : null}
                         </td>
                         <td className="px-4 py-3">{label(record.type)}</td>
                         <td className="px-4 py-3">{record.assignee || "-"}</td>
@@ -991,6 +999,13 @@ export function WorkAutomationWorkspace({
                             <WorkspaceRowActions
                               title={record.title}
                               actions={[
+                                {
+                                  id: "whiteboards",
+                                  label: "Whiteboards",
+                                  icon: <LinkIcon className="size-4" />,
+                                  onSelect: () =>
+                                    openRecordWhiteboards(record),
+                                },
                                 {
                                   id: "edit",
                                   label: "Edit",

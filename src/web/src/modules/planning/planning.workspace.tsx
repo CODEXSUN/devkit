@@ -1,11 +1,32 @@
 import "@excalidraw/excalidraw/index.css";
-import { Excalidraw, serializeAsJSON } from "@excalidraw/excalidraw";
-import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
+import {
+  CaptureUpdateAction,
+  Excalidraw,
+  exportToBlob,
+  exportToSvg,
+  serializeAsJSON,
+} from "@excalidraw/excalidraw";
+import type {
+  AppState,
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { Button } from "@codexsun/ui/components/button";
-import { Input } from "@codexsun/ui/components/input";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
-import { PlusIcon, SaveIcon, Trash2Icon } from "lucide-react";
+import { Input } from "@codexsun/ui/components/input";
+import {
+  CheckIcon,
+  DownloadIcon,
+  FrameIcon,
+  ImportIcon,
+  MessageSquareIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SaveIcon,
+  SearchIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useProjectManagerRecordsQuery } from "../project-manager/project-manager.hooks";
@@ -13,8 +34,13 @@ import {
   usePlanningActions,
   usePlanningBoard,
   usePlanningBoards,
+  usePlanningComments,
 } from "./planning.hooks";
-import type { PlanningScene } from "./planning.types";
+import { planningSceneFromSerialized } from "./planning.scene";
+import type {
+  PlanningRecordKind,
+  PlanningScene,
+} from "./planning.types";
 
 export function PlanningWorkspace() {
   const uuid = window.location.pathname.split("/").filter(Boolean)[3] ?? "";
@@ -22,7 +48,12 @@ export function PlanningWorkspace() {
 }
 
 function PlanningBoardList() {
-  const boards = usePlanningBoards();
+  const search = new URLSearchParams(window.location.search);
+  const recordKind = search.get("recordKind") as PlanningRecordKind | null;
+  const recordUuid = search.get("recordUuid");
+  const record =
+    recordKind && recordUuid ? { kind: recordKind, uuid: recordUuid } : undefined;
+  const boards = usePlanningBoards(record);
   const projects = useProjectManagerRecordsQuery("project");
   const actions = usePlanningActions();
   const [title, setTitle] = useState("");
@@ -30,24 +61,30 @@ function PlanningBoardList() {
   const create = async () => {
     const board = await actions.create.mutateAsync({
       description: "",
-      projectUuid: projectUuid || null,
+      projectUuid:
+        record?.kind === "project" ? record.uuid : projectUuid || null,
+      ...(record
+        ? { recordKind: record.kind, recordUuid: record.uuid }
+        : {}),
       title: title.trim(),
     });
     window.location.assign(`/app/devkit/planning/${board.uuid}`);
   };
   return (
     <main className="mx-auto w-[calc(100%-2rem)] max-w-[92rem] space-y-4 py-5">
-      <header className="flex flex-wrap items-end justify-between gap-3 rounded-md border bg-card p-5 shadow-sm">
-        <div>
-          <p className="text-sm font-semibold uppercase text-muted-foreground">
-            Planning
+      <header className="rounded-md border bg-card p-5 shadow-sm">
+        <p className="text-sm font-semibold uppercase text-muted-foreground">
+          Planning
+        </p>
+        <h1 className="text-2xl font-semibold">Whiteboards</h1>
+        <p className="text-sm text-muted-foreground">
+          Visual plans connected to DevKit work and synchronized with cloud.
+        </p>
+        {record ? (
+          <p className="mt-2 text-xs font-medium text-primary">
+            Linked to this {record.kind} · {boards.data?.length ?? 0} boards
           </p>
-          <h1 className="text-2xl font-semibold">Whiteboards</h1>
-          <p className="text-sm text-muted-foreground">
-            Visual plans connected to DevKit projects and synchronized with
-            cloud.
-          </p>
-        </div>
+        ) : null}
       </header>
       <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-[1fr_18rem_auto]">
         <Input
@@ -57,7 +94,8 @@ function PlanningBoardList() {
         />
         <select
           className="h-9 rounded-md border bg-background px-3 text-sm"
-          value={projectUuid}
+          value={record?.kind === "project" ? record.uuid : projectUuid}
+          disabled={Boolean(record)}
           onChange={(event) => setProjectUuid(event.target.value)}
         >
           <option value="">No project</option>
@@ -78,7 +116,7 @@ function PlanningBoardList() {
         <GlobalLoader />
       ) : (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {(boards.data ?? []).map((board) => (
+          {(boards.data ?? []).map((board, index) => (
             <button
               key={board.uuid}
               className="rounded-md border bg-card p-4 text-left shadow-sm hover:border-primary"
@@ -91,7 +129,8 @@ function PlanningBoardList() {
                 {board.description || "Visual planning board"}
               </p>
               <p className="mt-4 text-xs text-muted-foreground">
-                Updated {new Date(board.updatedAt).toLocaleString()}
+                {index === 0 ? "Most recent · " : ""}Last edited{" "}
+                {new Date(board.updatedAt).toLocaleString()} by {board.updatedBy}
               </p>
             </button>
           ))}
@@ -104,17 +143,44 @@ function PlanningBoardList() {
 function PlanningEditor({ uuid }: { uuid: string }) {
   const board = usePlanningBoard(uuid);
   const actions = usePlanningActions();
+  const comments = usePlanningComments(uuid);
+  const api = useRef<ExcalidrawImperativeAPI | null>(null);
+  const importInput = useRef<HTMLInputElement | null>(null);
   const pending = useRef<PlanningScene | null>(null);
+  const pendingFingerprint = useRef<string | null>(null);
+  const persistedFingerprint = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveState, setSaveState] = useState<
+    "failed" | "saved" | "saving" | "unsaved"
+  >("saved");
+  const [commentBody, setCommentBody] = useState("");
+  const [commentsOpen, setCommentsOpen] = useState(true);
   const save = async (notify = false) => {
-    if (!pending.current) return;
-    await actions.update.mutateAsync({
-      uuid,
-      input: { scene: pending.current },
-    });
-    pending.current = null;
-    if (notify)
-      toast.success("Planning board saved", { description: board.data?.title });
+    const scene = pending.current;
+    const fingerprint = pendingFingerprint.current;
+    if (!scene) return true;
+    setSaveState("saving");
+    try {
+      await actions.update.mutateAsync({ uuid, input: { scene } });
+      persistedFingerprint.current = fingerprint;
+      if (pending.current === scene) {
+        pending.current = null;
+        pendingFingerprint.current = null;
+        setSaveState("saved");
+      } else setSaveState("unsaved");
+      if (notify)
+        toast.success("Planning board saved", {
+          description: board.data?.title,
+        });
+      return true;
+    } catch (error) {
+      setSaveState("failed");
+      toast.error("Planning board could not be saved", {
+        description:
+          error instanceof Error ? error.message : "Unknown save error.",
+      });
+      return false;
+    }
   };
   useEffect(
     () => () => {
@@ -123,9 +189,109 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     [],
   );
   if (board.isLoading || !board.data) return <GlobalLoader />;
+  if (persistedFingerprint.current === null)
+    persistedFingerprint.current = JSON.stringify(board.data.scene);
+  const leave = async () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (await save()) window.location.assign("/app/devkit/planning");
+  };
   const remove = async () => {
     await actions.delete.mutateAsync(uuid);
     window.location.assign("/app/devkit/planning");
+  };
+  const currentScene = (): PlanningScene => ({
+    appState: api.current?.getAppState() as unknown as Record<string, unknown>,
+    elements: api.current?.getSceneElements() ?? [],
+    files: api.current?.getFiles() as unknown as Record<string, unknown>,
+  });
+  const download = (content: Blob, extension: string) => {
+    const anchor = document.createElement("a");
+    anchor.href = URL.createObjectURL(content);
+    anchor.download = `${safeFileName(board.data.title)}.${extension}`;
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
+  };
+  const exportScene = async (format: "excalidraw" | "png" | "svg") => {
+    const current = currentScene();
+    if (format === "excalidraw") {
+      download(
+        new Blob(
+          [
+            JSON.stringify({
+              type: "excalidraw",
+              version: 2,
+              source: window.location.origin,
+              ...current,
+            }),
+          ],
+          { type: "application/json" },
+        ),
+        "excalidraw",
+      );
+      return;
+    }
+    const options = {
+      appState: current.appState as Partial<AppState>,
+      elements: current.elements as readonly ExcalidrawElement[],
+      files: current.files as BinaryFiles,
+    };
+    if (format === "png")
+      download(await exportToBlob({ ...options, mimeType: "image/png" }), "png");
+    else
+      download(
+        new Blob(
+          [new XMLSerializer().serializeToString(await exportToSvg(options))],
+          { type: "image/svg+xml" },
+        ),
+        "svg",
+      );
+  };
+  const importScene = async (file: File) => {
+    try {
+      const imported = planningSceneFromSerialized(await file.text());
+      api.current?.updateScene({
+        appState: imported.appState as unknown as AppState,
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+        elements: imported.elements as readonly ExcalidrawElement[],
+      });
+      api.current?.addFiles(
+        Object.values((imported.files ?? {}) as BinaryFiles),
+      );
+      toast.success("Excalidraw scene imported");
+    } catch (error) {
+      toast.error("Could not import this Excalidraw file", {
+        description: error instanceof Error ? error.message : "Invalid scene.",
+      });
+    }
+  };
+  const refreshRemote = async () => {
+    if (pending.current) {
+      toast.warning("Save or discard local changes before refreshing.");
+      return;
+    }
+    const result = await board.refetch();
+    if (!result.data || !api.current) return;
+    api.current.updateScene({
+      appState: result.data.scene.appState as unknown as AppState,
+      captureUpdate: CaptureUpdateAction.NEVER,
+      elements: result.data.scene.elements as readonly ExcalidrawElement[],
+    });
+    api.current.addFiles(
+      Object.values((result.data.scene.files ?? {}) as BinaryFiles),
+    );
+    api.current.history.clear();
+    persistedFingerprint.current = JSON.stringify(result.data.scene);
+    toast.success("Latest synchronized scene loaded");
+  };
+  const addComment = async () => {
+    const elementId = Object.entries(
+      api.current?.getAppState().selectedElementIds ?? {},
+    ).find(([, selected]) => selected)?.[0];
+    await comments.create.mutateAsync({
+      body: commentBody.trim(),
+      ...(elementId ? { elementId } : {}),
+    });
+    setCommentBody("");
   };
   return (
     <main className="flex h-[calc(100vh-3.5rem)] flex-col p-4">
@@ -133,13 +299,22 @@ function PlanningEditor({ uuid }: { uuid: string }) {
         <div>
           <button
             className="text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => window.location.assign("/app/devkit/planning")}
+            onClick={() => void leave()}
           >
             ← Whiteboards
           </button>
           <h1 className="text-lg font-semibold">{board.data.title}</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <span className="self-center text-xs text-muted-foreground">
+            {saveState === "saving"
+              ? "Saving..."
+              : saveState === "unsaved"
+                ? "Unsaved changes"
+                : saveState === "failed"
+                  ? "Save failed"
+                  : "Saved"}
+          </span>
           <Button
             variant="outline"
             onClick={() => void save(true)}
@@ -147,31 +322,189 @@ function PlanningEditor({ uuid }: { uuid: string }) {
           >
             <SaveIcon /> Save
           </Button>
+          <Button variant="outline" onClick={() => void refreshRemote()}>
+            <RefreshCwIcon /> Refresh
+          </Button>
+          <Button variant="outline" onClick={() => importInput.current?.click()}>
+            <ImportIcon /> Import
+          </Button>
+          <input
+            ref={importInput}
+            className="hidden"
+            accept=".excalidraw,application/json"
+            type="file"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void importScene(file);
+              event.target.value = "";
+            }}
+          />
+          {(["excalidraw", "png", "svg"] as const).map((format) => (
+            <Button
+              key={format}
+              variant="outline"
+              onClick={() => void exportScene(format)}
+            >
+              <DownloadIcon /> {format.toUpperCase()}
+            </Button>
+          ))}
+          <Button
+            variant="outline"
+            title="Scene search is also available with Ctrl+F."
+            onClick={() =>
+              document.dispatchEvent(
+                new KeyboardEvent("keydown", { ctrlKey: true, key: "f" }),
+              )
+            }
+          >
+            <SearchIcon /> Search
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => api.current?.setActiveTool({ type: "frame" })}
+          >
+            <FrameIcon /> Frame
+          </Button>
+          <Button
+            variant={commentsOpen ? "default" : "outline"}
+            onClick={() => setCommentsOpen((value) => !value)}
+          >
+            <MessageSquareIcon /> Comments
+          </Button>
           <Button variant="outline" onClick={() => void remove()}>
             <Trash2Icon /> Delete
           </Button>
         </div>
       </header>
-      <section className="min-h-0 flex-1 overflow-hidden rounded-md border bg-white">
-        <Excalidraw
-          initialData={{
-            elements: board.data.scene.elements as readonly ExcalidrawElement[],
-            appState: board.data.scene.appState as Partial<AppState>,
-            files: board.data.scene.files as BinaryFiles,
-          }}
-          onChange={(elements, appState, files) => {
-            const serialized = serializeAsJSON(
-              elements,
-              appState,
-              files,
-              "database",
-            );
-            pending.current = JSON.parse(serialized) as PlanningScene;
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(() => void save(), 1200);
-          }}
-        />
+      <section
+        className={`grid min-h-0 flex-1 overflow-hidden rounded-md border bg-white ${
+          commentsOpen ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""
+        }`}
+      >
+        <div className="min-h-0">
+          <Excalidraw
+            excalidrawAPI={(value) => {
+              api.current = value;
+            }}
+            initialData={{
+              elements:
+                board.data.scene.elements as readonly ExcalidrawElement[],
+              appState: board.data.scene.appState as Partial<AppState>,
+              files: board.data.scene.files as BinaryFiles,
+            }}
+            onChange={(elements, appState, files) => {
+              const nextScene = planningSceneFromSerialized(
+                serializeAsJSON(elements, appState, files, "database"),
+              );
+              const nextFingerprint = JSON.stringify(nextScene);
+              if (nextFingerprint === persistedFingerprint.current) return;
+              pending.current = nextScene;
+              pendingFingerprint.current = nextFingerprint;
+              setSaveState("unsaved");
+              if (timer.current) clearTimeout(timer.current);
+              timer.current = setTimeout(() => void save(), 1200);
+            }}
+          />
+        </div>
+        {commentsOpen ? (
+          <aside className="overflow-y-auto border-l bg-card p-3">
+            <h2 className="font-semibold">Board comments</h2>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Select an element before commenting to anchor it. Use @name or
+              @email to mention someone.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={commentBody}
+                placeholder="Add a comment…"
+                onChange={(event) => setCommentBody(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && commentBody.trim())
+                    void addComment();
+                }}
+              />
+              <Button
+                size="icon"
+                disabled={!commentBody.trim() || comments.create.isPending}
+                onClick={() => void addComment()}
+              >
+                <PlusIcon />
+              </Button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {(comments.query.data ?? []).map((comment) => (
+                <article
+                  key={comment.uuid}
+                  className={`rounded-md border p-3 ${
+                    comment.status === "resolved" ? "opacity-60" : ""
+                  }`}
+                >
+                  <button
+                    className="w-full text-left"
+                    onClick={() => {
+                      if (!comment.elementId) return;
+                      const element = api.current
+                        ?.getSceneElements()
+                        .find((entry) => entry.id === comment.elementId);
+                      if (element)
+                        api.current?.scrollToContent(element, { animate: true });
+                    }}
+                  >
+                    <p className="text-sm">{comment.body}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {comment.createdBy} ·{" "}
+                      {new Date(comment.createdAt).toLocaleString()}
+                      {comment.elementId ? " · Anchored" : ""}
+                    </p>
+                  </button>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {["👍", "❤️", "👀"].map((reaction) => (
+                      <Button
+                        key={reaction}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          comments.react.mutate({
+                            commentUuid: comment.uuid,
+                            reaction,
+                          })
+                        }
+                      >
+                        {reaction}{" "}
+                        {
+                          comment.reactions.filter(
+                            (entry) => entry.reaction === reaction,
+                          ).length
+                        }
+                      </Button>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        comments.resolve.mutate({
+                          commentUuid: comment.uuid,
+                          resolved: comment.status !== "resolved",
+                        })
+                      }
+                    >
+                      <CheckIcon />
+                      {comment.status === "resolved" ? "Reopen" : "Resolve"}
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </aside>
+        ) : null}
       </section>
     </main>
+  );
+}
+
+function safeFileName(value: string) {
+  return (
+    value.trim().replace(/[^\w.-]+/gu, "-").replace(/^-+|-+$/gu, "") ||
+    "devkit-board"
   );
 }

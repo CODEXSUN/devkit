@@ -9,6 +9,9 @@ export const syncMigration = {
 
 const ownedTables = [
   "devkit_planning_boards",
+  "devkit_planning_board_links",
+  "devkit_planning_comments",
+  "devkit_planning_reactions",
   "devkit_project_manager_items",
   "devkit_project_manager_registry_platforms",
   "devkit_project_manager_registry_groups",

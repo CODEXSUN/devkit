@@ -2,15 +2,49 @@
 
 ## Version State
 
-Current version: 1.0.53
+Current version: 1.0.55
 
-Release tag: v-1.0.53
+Release tag: v-1.0.55
 
-Changelog label: v 1.0.53
+Changelog label: v 1.0.55
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
 New entries should keep database-facing work and application code work separate.
+
+## v-1.0.55
+
+### [v 1.0.55] 2026-07-29 7:24 pm - Link DevKit whiteboards to all work records
+
+#### Database Changes
+
+- Database update: Yes (auto-check).
+
+#### App Codebase Changes
+
+- Bumped workspace version to 1.0.55.
+
+## v-1.0.54
+
+### [v 1.0.54] 2026-07-29 7:18 pm - Link DevKit whiteboards to all work records
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Added `devkit_planning_board_links`, `devkit_planning_comments`, and
+  `devkit_planning_reactions` in the ordered DevKit Planning migration.
+- Registered all new owner tables with DevKit two-way sync, including direction,
+  status, version, updated timestamp, and tombstone-compatible fields.
+
+#### App Codebase Changes
+
+- Bumped workspace version to 1.0.54.
+- Linked whiteboards to projects, issues, tasks, activities, and reviews with
+  contextual create/open actions and project-level count, recent, and last-edited details.
+- Added `.excalidraw` import/export, PNG/SVG export, scene search, frames, built-in
+  flowchart/link tooling, and guarded remote scene refresh without polluting undo history.
+- Added element-anchored comments, parsed mentions, resolved/reopened threads, and
+  per-user reactions without enabling real-time multiplayer.
 
 ## v-1.0.53
 
@@ -23,6 +57,10 @@ New entries should keep database-facing work and application code work separate.
 #### App Codebase Changes
 
 - Bumped workspace version to 1.0.53.
+- Fixed Excalidraw persistence by removing serializer-only `type`, `version`, and `source`
+  metadata before sending the strict DevKit Planning scene contract.
+- Added race-safe debounced saves, visible saved/unsaved/failed status, actionable save errors,
+  and a navigation flush so drawings can be reopened and reused without losing pending changes.
 
 ## v-1.0.52
 

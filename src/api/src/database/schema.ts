@@ -10,6 +10,9 @@ export type DevkitDatabase = {
   schema_migrations: DevkitMigrationsTable;
   devkit_users: DevkitUsersTable;
   devkit_planning_boards: PlanningBoardsTable;
+  devkit_planning_board_links: PlanningBoardLinksTable;
+  devkit_planning_comments: PlanningCommentsTable;
+  devkit_planning_reactions: PlanningReactionsTable;
   devkit_project_manager_activity: ProjectManagerActivityTable;
   devkit_project_manager_attachments: ProjectManagerAttachmentsTable;
   devkit_project_manager_items: ProjectManagerItemsTable;
@@ -37,6 +40,41 @@ export type PlanningBoardsTable = SyncColumns & {
   title: string;
   updated_at: TimestampColumn;
   updated_by: string;
+  uuid: string;
+};
+
+export type PlanningBoardLinksTable = SyncColumns & {
+  board_uuid: string;
+  created_at: TimestampColumn;
+  created_by: string;
+  id: Generated<number>;
+  record_kind: string;
+  record_uuid: string;
+  uuid: string;
+};
+
+export type PlanningCommentsTable = SyncColumns & {
+  board_uuid: string;
+  body: string;
+  created_at: TimestampColumn;
+  created_by: string;
+  element_id: string | null;
+  id: Generated<number>;
+  mentions_json: string;
+  resolved_at: TimestampColumn | null;
+  resolved_by: string | null;
+  status: string;
+  updated_at: TimestampColumn;
+  updated_by: string;
+  uuid: string;
+};
+
+export type PlanningReactionsTable = SyncColumns & {
+  comment_uuid: string;
+  created_at: TimestampColumn;
+  created_by: string;
+  id: Generated<number>;
+  reaction: string;
   uuid: string;
 };
 
