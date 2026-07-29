@@ -23,6 +23,8 @@ New entries should keep database-facing work and application code work separate.
 #### App Codebase Changes
 
 - Bumped workspace version to 1.0.51.
+- Aligned the public CXApp stack contract with the automatically advanced repository release
+  version.
 
 ## v-1.0.50
 
