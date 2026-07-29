@@ -10,12 +10,14 @@ import { projectManagerModule } from "./modules/project-manager/index.js";
 import { taskManagerModule } from "./modules/task-manager/index.js";
 import { githubDashboardModule } from "./modules/github-dashboard/index.js";
 import { syncModule } from "./modules/sync/index.js";
+import { planningModule } from "./modules/planning/index.js";
 import { runWithDevkitActor, type DevkitActor } from "./request-context.js";
 
 export const devkitApiModuleKeys = [
   projectManagerModule.key,
   taskManagerModule.key,
   githubDashboardModule.key,
+  planningModule.key,
   syncModule.key,
 ] as const;
 
@@ -67,6 +69,7 @@ export async function registerDevkitApiForHost(
     await projectManagerModule.register({ app: devkitApp });
     await taskManagerModule.register({ app: devkitApp });
     await githubDashboardModule.register({ app: devkitApp });
+    await planningModule.register({ app: devkitApp });
     await syncModule.register({ app: devkitApp });
   });
 }

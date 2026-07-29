@@ -7,6 +7,7 @@ import { ProjectManagerAttachmentStorage } from "../project-manager/project-mana
 import type { DevkitSyncSnapshot } from "./sync.types.js";
 
 export const synchronizedTables = [
+  "devkit_planning_boards",
   "devkit_project_manager_registry_platforms",
   "devkit_project_manager_registry_groups",
   "devkit_project_manager_registry_modules",
@@ -39,9 +40,8 @@ export class DevkitSyncRepository {
     );
     const attachmentData: Record<string, string> = {};
     const attachmentRows =
-      (Object.fromEntries(entries)[
-        "devkit_project_manager_attachments"
-      ] as Record<string, unknown>[] | undefined) ?? [];
+      (Object.fromEntries(entries)["devkit_project_manager_attachments"] as
+        Record<string, unknown>[] | undefined) ?? [];
     for (const row of attachmentRows) {
       if (row.sync_status === "deleted") continue;
       const storageKey = String(row.storage_key);

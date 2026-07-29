@@ -1,4 +1,4 @@
-export const DEVKIT_PACKAGE_VERSION = "1.0.48";
+export const DEVKIT_PACKAGE_VERSION = "1.0.50";
 
 export const devkitStackContribution = Object.freeze({
   applicationMode: "tenant" as const,

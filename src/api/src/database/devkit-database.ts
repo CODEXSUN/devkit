@@ -15,6 +15,10 @@ import {
   syncMigration,
 } from "../modules/sync/sync.migration.js";
 import type { DevkitDatabase } from "./schema.js";
+import {
+  migratePlanningModule,
+  planningMigration,
+} from "../modules/planning/planning.migration.js";
 
 const databaseContext = new AsyncLocalStorage<Kysely<DevkitDatabase>>();
 const requestDatabase = new Proxy({} as Kysely<DevkitDatabase>, {
@@ -35,6 +39,10 @@ const migrationSteps = [
   {
     migrate: migrateTaskManagerModule,
     name: taskManagerMigration.key,
+  },
+  {
+    migrate: migratePlanningModule,
+    name: planningMigration.key,
   },
   {
     migrate: migrateSyncModule,

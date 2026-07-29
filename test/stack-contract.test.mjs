@@ -39,4 +39,10 @@ test("host discovery does not require an active request database", async () => {
 
   assert.equal(typeof host.registerDevkitApiForHost, "function");
   assert.equal(typeof database.devkitDatabaseLifecycle.runSql, "function");
+  assert.deepEqual(database.devkitDatabaseLifecycle.migrations, [
+    "devkit.project-manager.sql.v4",
+    "devkit.task-manager.sql.v2",
+    "devkit.planning.sql.v1",
+    "devkit.sync.sql.v1",
+  ]);
 });

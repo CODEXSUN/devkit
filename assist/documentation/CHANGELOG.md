@@ -2,19 +2,19 @@
 
 ## Version State
 
-Current version: 1.0.49
+Current version: 1.0.51
 
-Release tag: v-1.0.49
+Release tag: v-1.0.51
 
-Changelog label: v 1.0.49
+Changelog label: v 1.0.51
 
 This changelog starts fresh from the cleaned CODEXSUN foundation. Earlier copied application history was intentionally removed because it did not represent the current workspace.
 
 New entries should keep database-facing work and application code work separate.
 
-## v-1.0.49
+## v-1.0.51
 
-### [v 1.0.49] 2026-07-29 12:50 am - version update
+### [v 1.0.51] 2026-07-29 2:42 pm - version update
 
 #### Database Changes
 
@@ -22,7 +22,52 @@ New entries should keep database-facing work and application code work separate.
 
 #### App Codebase Changes
 
+- Bumped workspace version to 1.0.51.
+
+## v-1.0.50
+
+### [v 1.0.50] 2026-07-29 11:47 am - Complete planning boards and dependency hardening
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Added the DevKit-owned Planning board schema and lifecycle ordering, including project
+  association, editable scene state, authorship, timestamps, and sync metadata.
+- Included Planning boards in snapshot synchronization and preserved package-scoped migration
+  journaling.
+
+#### App Codebase Changes
+
+- Bumped workspace version to 1.0.50.
+- Added Planning board API contracts, repository behavior, validation, routes, stack exports, and
+  public CXApp workspace registration.
+- Added the Whiteboards workspace with project-aware board creation, editing, autosave, explicit
+  save/delete controls, and lazy Excalidraw loading.
+- Updated the ESLint toolchain and safe dependency overrides, cleared the dependency audit, and
+  corrected the remaining ESLint 10 assignment warning.
+
+## v-1.0.49
+
+### [v 1.0.49] 2026-07-29 12:50 am - version update
+
+#### Database Changes
+
+- Database update: Yes (manual).
+- Added the DevKit-owned `devkit_planning_boards` migration after Task Manager and before Sync,
+  including project association, editable Excalidraw scene JSON, authorship, timestamps, and the
+  standard per-record cloud synchronization fields.
+- Added Planning boards to DevKit snapshot synchronization with tombstone deletes and preserved
+  the shared `schema_migrations` journal under the `@codexsun/devkit` package tag.
+
+#### App Codebase Changes
+
 - Bumped workspace version to 1.0.49.
+- Added the separate DevKit Planning module with validated board CRUD APIs, project relationship
+  checks, a Whiteboards sidebar workspace, and lazy-loaded Excalidraw editing.
+- Added debounced editable-scene autosave, explicit save/delete actions, board creation with an
+  optional DevKit project link, and local/cloud persistence through the existing Sync module.
+- Added `@excalidraw/excalidraw` 0.18.1, including its upstream Mermaid security patch release,
+  while keeping the editor out of the initial DevKit bundle through workspace-level lazy loading.
 
 ## v-1.0.48
 

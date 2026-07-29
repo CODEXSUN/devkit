@@ -9,6 +9,7 @@ export type TimestampColumn = ColumnType<
 export type DevkitDatabase = {
   schema_migrations: DevkitMigrationsTable;
   devkit_users: DevkitUsersTable;
+  devkit_planning_boards: PlanningBoardsTable;
   devkit_project_manager_activity: ProjectManagerActivityTable;
   devkit_project_manager_attachments: ProjectManagerAttachmentsTable;
   devkit_project_manager_items: ProjectManagerItemsTable;
@@ -23,6 +24,20 @@ export type DevkitDatabase = {
   devkit_sync_runs: DevkitSyncRunsTable;
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
+};
+
+export type PlanningBoardsTable = SyncColumns & {
+  created_at: TimestampColumn;
+  created_by: string;
+  description: string;
+  id: Generated<number>;
+  project_uuid: string | null;
+  scene_json: string;
+  status: string;
+  title: string;
+  updated_at: TimestampColumn;
+  updated_by: string;
+  uuid: string;
 };
 
 export type SyncColumns = {

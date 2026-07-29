@@ -8,6 +8,7 @@ export const syncMigration = {
 } as const;
 
 const ownedTables = [
+  "devkit_planning_boards",
   "devkit_project_manager_items",
   "devkit_project_manager_registry_platforms",
   "devkit_project_manager_registry_groups",

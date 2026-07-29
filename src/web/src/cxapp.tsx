@@ -7,6 +7,7 @@ import {
   FolderKanbanIcon,
   GitForkIcon,
   PaletteIcon,
+  PencilRulerIcon,
   WrenchIcon,
 } from "lucide-react";
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
@@ -65,6 +66,11 @@ const workspaces = Object.freeze([
       default: module.PlatformRegistryWorkspace,
     })),
   ),
+  workspace("planning", "Whiteboards", "Planning", () =>
+    import("./modules/planning").then((module) => ({
+      default: module.PlanningWorkspace,
+    })),
+  ),
   workspace("github", "GitHub Dashboard", "GitHub", () =>
     import("./modules/github-dashboard").then((module) => ({
       default: module.GithubDashboardWorkspace,
@@ -86,7 +92,7 @@ export const devkitWebBundle = Object.freeze({
   id: "devkit",
   rootPath: "/app/devkit",
   title: "DevKit",
-  version: "1.0.48",
+  version: "1.0.49",
   workspaces,
   applicationSwitcherItem(active: boolean): TopMenuWorkspaceItem {
     return {
@@ -99,6 +105,12 @@ export const devkitWebBundle = Object.freeze({
   },
   menuItems(activeWorkspaceId: string): SidemenuItem[] {
     return [
+      {
+        icon: PencilRulerIcon,
+        isActive: activeWorkspaceId === "planning",
+        title: "Planning",
+        url: "/app/devkit/planning",
+      },
       {
         icon: CalendarCheckIcon,
         isActive: activeWorkspaceId === "today",

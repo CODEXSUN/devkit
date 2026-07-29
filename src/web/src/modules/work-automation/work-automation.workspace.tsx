@@ -1509,7 +1509,7 @@ function nextRecordKey(
             : "REV";
   const used = new Set(records.map((record) => record.key.toLowerCase()));
   let number = records.length + 1;
-  let key = "";
+  let key: string;
   do {
     const sequence = String(number).padStart(4, "0");
     key = parent
