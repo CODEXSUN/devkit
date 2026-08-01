@@ -1,37 +1,62 @@
 # CODEXSUN DevKit
 
-`@codexsun/devkit` is the CXApp-pluggable owner package for CODEXSUN developer planning and
-collaboration.
+DevKit is a standalone, single-client developer planning and collaboration application. It uses
+local authentication and one MariaDB database configured by `DB_NAME`.
 
-It owns Project Manager, Task Manager, Platform Registry, Work Automation, the read-only GitHub
-Dashboard, their applicable migrations and seeds, fixed API routes, and web workspace contributions.
-It does not own authentication, client resolution, plans, subscriptions, entitlements, runtime
-registries, queues, API/web servers, or public application shells; CXApp supplies those runtime
-capabilities.
-
-## Public contracts
-
-- `@codexsun/devkit` and `@codexsun/devkit/stack` export the immutable optional stack descriptor.
-- `@codexsun/devkit/host` exports the typed CXApp host-registration adapter.
-- `@codexsun/devkit/api` exports `registerDevkitApiForHost`, `devkitDatabaseLifecycle`, module
-  definitions, migrations, seeds, and owned API types.
-- `@codexsun/devkit/database` exports the ordered owner migration and repeatable-seed lifecycle.
-- `@codexsun/devkit/web` and `@codexsun/devkit/web/cxapp` export `devkitWebBundle` and the owned
-  workspace contributions.
-
-The host resolves the trusted actor and fixed client database, then passes both to
-`registerDevkitApiForHost`. DevKit never selects a database or authenticates a request.
-CXApp may include these public contributions in a stack catalog or omit the package completely;
-DevKit has no import of CXApp internals and CXApp does not need DevKit as a foundation dependency.
+The Platform layer owns the executable API/web shell, users, roles, permissions, assignments, and
+database connection. The `src/devkit` workspaces own Project Manager, Task Manager, Platform
+Registry, Planning whiteboards, the GitHub dashboard, synchronization, migrations, seeds, routes,
+and React workspaces.
 
 ## Development
 
-Run commands from this repository root:
+Copy `.env.example` to `.env`, configure MariaDB, JWT, the initial administrator, and the DevKit
+storage/workspace paths, then run from this repository root:
 
-```powershell
-npm.cmd run check
-npm.cmd run build
+```sh
+npm install
+npm run dev
 ```
 
-DevKit is a package, not a standalone server. Runtime and browser verification belongs to the
-CXApp stack that composes it.
+Default endpoints are API `http://127.0.0.1:7050` and Web `http://127.0.0.1:7060`.
+The browser enters at `/app/devkit/today`; DevKit API routes use `/api/devkit/*`.
+
+Database commands:
+
+```sh
+npm run db:migrate
+npm run db:seed
+npm run db:migrations:list
+```
+
+## Docker deployment
+
+Create a standalone DevKit installation with:
+
+```sh
+bash setup.sh
+```
+
+After updating the repository source, validate and apply an in-place deployment update with:
+
+```sh
+bash update.sh --check
+bash update.sh
+```
+
+The updater preserves `.env`, `.container/deploy.env`, MariaDB data, credentials, ports, and named
+volumes. It refuses concurrent or dirty-source updates by default, locks source and image versions,
+requires explicit migration-compatibility approval, verifies free space, creates a SHA-256 checked
+database backup and deployment metadata, replaces only the API and Web containers, and restores
+their previous images if health verification fails. Use `--allow-dirty` only when intentionally
+deploying and recording an uncommitted checkout.
+
+## Verification
+
+```sh
+npm run check
+npm run build
+npm run test:e2e:runtime
+```
+
+Read `assist/AGENT-GUIDE.md` before changing architecture or module ownership.

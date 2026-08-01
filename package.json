@@ -1,111 +1,81 @@
 {
-  "name": "@codexsun/devkit",
-  "version": "1.0.55",
-  "private": false,
-  "packageManager": "npm@12.0.1",
-  "description": "CXApp-pluggable developer planning and collaboration package",
+  "name": "devkit",
+  "version": "1.0.22",
+  "private": true,
+  "packageManager": "npm@12.0.2",
+  "description": "Standalone CODEXSUN DevKit application",
   "type": "module",
   "workspaces": [
-    "src/api",
-    "src/web"
-  ],
-  "exports": {
-    ".": {
-      "types": "./dist/api/stack.d.ts",
-      "default": "./dist/api/stack.js"
-    },
-    "./stack": {
-      "types": "./dist/api/stack.d.ts",
-      "default": "./dist/api/stack.js"
-    },
-    "./api": {
-      "types": "./dist/api/index.d.ts",
-      "default": "./dist/api/index.js"
-    },
-    "./host": {
-      "types": "./dist/api/app.d.ts",
-      "default": "./dist/api/app.js"
-    },
-    "./database": {
-      "types": "./dist/api/database/index.d.ts",
-      "default": "./dist/api/database/index.js"
-    },
-    "./web": "./src/web/src/index.ts",
-    "./web/cxapp": "./src/web/src/cxapp.tsx"
-  },
-  "files": [
-    "dist",
-    "src/api/src",
-    "src/api/project-manager-json",
-    "src/api/task-manager-json",
-    "src/web/src",
-    "README.md",
-    "LICENSE"
+    "packages/*",
+    "src/devkit/*",
+    "src/platform/*",
+    "tools/*"
   ],
   "scripts": {
-    "build": "node tools/clean.mjs && npm run build --workspace @codexsun/devkit-api && npm run build --workspace @codexsun/devkit-web",
-    "typecheck": "npm run typecheck --workspace @codexsun/devkit-api && npm run typecheck --workspace @codexsun/devkit-web",
-    "lint": "npm run lint --workspace @codexsun/devkit-api && npm run lint --workspace @codexsun/devkit-web",
-    "check": "npm run check:text-encoding && npm run check:module-boundaries && npm run typecheck && npm run lint && npm run test:stack-contract && npm run test:sync-security && npm run test:planning-scene && npm run dependencies:check",
+    "preinstall": "node tools/enforce-root-install.mjs",
+    "postinstall": "node tools/clean-workspace-artifacts.mjs && node tools/check-root-node-modules.mjs",
+    "setup": "node tools/install-stack.mjs",
+    "dev": "node tools/dev-stack.mjs",
+    "dev:api": "node tools/preflight.mjs platform-api",
+    "dev:web": "node tools/preflight.mjs platform-web",
+    "clean": "node tools/clean-root-dist.mjs && node tools/clean-workspace-artifacts.mjs",
+    "build": "npm run clean && node tools/stack-command.mjs build",
+    "typecheck": "node tools/stack-command.mjs typecheck",
+    "lint": "node tools/stack-command.mjs lint",
+    "check": "npm run check:text-encoding && npm run check:deployment && npm run check:repository-boundary && npm run dependencies:check && npm run check:module-boundaries && npm run check:database-lifecycle && npm run typecheck && npm run lint && npm test",
     "check:text-encoding": "node tools/check-env-encoding.mjs",
     "check:env-encoding": "npm run check:text-encoding",
+    "check:deployment": "node tools/check-deployment-scripts.mjs",
+    "check:repository-boundary": "node tools/check-repository-boundary.mjs",
     "check:module-boundaries": "node tools/check-module-boundaries.mjs",
-    "test:stack-contract": "node --test test/stack-contract.test.mjs",
-    "test:sync-security": "node --import tsx --test test/sync-security.test.mjs",
-    "test:planning-scene": "node --import tsx --test test/planning-scene.test.mjs",
-    "dependencies:check": "node tools/check-root-artifacts.mjs",
-    "version:show": "node tools/version/version.mjs show",
-    "version:bump": "node tools/version-bump.mjs",
-    "changelog:append": "node tools/version/version.mjs append",
-    "check:versions": "node tools/check-versions.mjs",
-    "github:now": "node tools/github-helper.mjs",
-    "prepack": "npm run build"
-  },
-  "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/modifiers": "^9.0.0",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@tanstack/react-query": "^5.100.10",
-    "@tanstack/react-table": "^8.21.3",
-    "date-fns": "^4.4.0",
-    "fastify": "^5.2.1",
-    "kysely": "^0.29.0",
-    "lucide-react": "^1.22.0",
-    "react-is": "^19.0.0",
-    "sonner": "^2.0.7",
-    "zod": "^4.4.3"
-  },
-  "peerDependencies": {
-    "@codexsun/framework": "1.0.46",
-    "@codexsun/ui": "1.0.47",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "check:core-boundaries": "node tools/check-module-boundaries.mjs core",
+    "check:database-lifecycle": "node tools/check-database-lifecycle.mjs",
+    "dependencies:clean": "node tools/clean-workspace-artifacts.mjs",
+    "dependencies:check": "node tools/check-root-node-modules.mjs",
+    "test": "npm test --workspace @codexsun/framework && npm run test:exports --workspace @codexsun/framework && npm run package:check --workspace @codexsun/framework",
+    "test:e2e:runtime": "node tools/e2e/runtime-smoke.e2e.mjs",
+    "version:show": "node tools/repository-release.mjs version:show",
+    "version:bump": "node tools/repository-release.mjs version:bump",
+    "version-bump": "node tools/repository-release.mjs version:bump",
+    "check:versions": "node tools/repository-release.mjs check:versions",
+    "github:now": "node tools/repository-release.mjs github:now",
+    "stack:impact": "node tools/stack-impact.mjs",
+    "stack:plan": "node tools/stack-release-plan.mjs",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "db:migrate": "tsx src/platform/api/src/database/db-cli.ts migrate",
+    "db:migrations:list": "tsx src/platform/api/src/database/db-cli.ts migrations:list",
+    "db:seed": "tsx src/platform/api/src/database/db-cli.ts seed",
+    "db:drop": "tsx src/platform/api/src/database/db-cli.ts drop",
+    "dbmigrate:fresh": "tsx src/platform/api/src/database/db-cli.ts fresh",
+    "github:ssh-key": "node tools/github-ssh-key.mjs",
+    "env:jwt-secret": "node tools/env-jwt-secret.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tailwindcss/vite": "^4.3.1",
-    "@types/node": "^26.1.1",
-    "@types/react": "^19.0.2",
-    "@types/react-dom": "^19.0.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tiptap/extension-text-style": "^3.29.2",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
-    "@vitejs/plugin-react": "^6.0.3",
+    "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^10.8.0",
-    "tsx": "^4.19.2",
+    "prettier": "^3.9.6",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.1",
     "typescript": "^7.0.2",
     "typescript-eslint-compiler": "npm:typescript@6.0.3",
-    "vite": "^8.1.5"
+    "vite": "^8.2.0"
   },
   "engines": {
     "node": ">=26.5.0",
-    "npm": ">=12.0.1"
-  },
-  "overrides": {
-    "lodash-es": "4.18.1",
-    "nanoid": "5.1.6"
+    "npm": ">=12.0.2"
   },
   "allowScripts": {
-    "esbuild": true
+    "bullmq": false,
+    "esbuild": true,
+    "msgpackr-extract": false
   }
 }

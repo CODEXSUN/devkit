@@ -1,0 +1,29 @@
+﻿import { loadEnv } from "@codexsun/framework/env";
+import { z } from "zod";
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
+  AUTH_MODE: z.enum(["cookie", "jwt", "hybrid"]).default("jwt"),
+  PLATFORM_API_PORT: z.coerce.number().int().positive(),
+  PLATFORM_API_URL: z.string().url("PLATFORM_API_URL must be a valid URL"),
+  PLATFORM_WEB_PORT: z.coerce.number().int().positive().default(7060),
+  PLATFORM_WEB_ORIGIN: z.string().url("PLATFORM_WEB_ORIGIN must be a valid URL"),
+  PLATFORM_WEB_ORIGINS: z.string().default(""),
+  PLATFORM_WEB_HEALTH_URL: z.union([z.literal(""), z.string().url()]).default(""),
+  DB_HOST: z.string().default("127.0.0.1"),
+  DB_PORT: z.coerce.number().int().positive(),
+  DB_USER: z.string().min(1, "DB_USER is required"),
+  DB_PASSWORD: z.string(),
+  DB_DRIVER: z.enum(["mariadb", "mysql2"]).default("mariadb"),
+  DB_NAME: z.string().min(1, "DB_NAME is required"),
+  DEVKIT_DB_FRESH_ON_START: z.enum(["0", "1"]).default("0"),
+  DEVKIT_DB_RESET_CONFIRM: z.string().default(""),
+  DEVKIT_ALLOW_PRODUCTION_DB_RESET: z.enum(["0", "1"]).default("0"),
+  DEV_AUTO_LOGIN: z.enum(["0", "1"]).default("0"),
+  INITIAL_ADMIN_EMAIL: z.string().default(""),
+  INITIAL_ADMIN_NAME: z.string().default(""),
+  INITIAL_ADMIN_PASSWORD: z.string().default(""),
+  JWT_SECRET: z.string().min(1, "JWT_SECRET is required")
+});
+
+export const env = loadEnv(envSchema);

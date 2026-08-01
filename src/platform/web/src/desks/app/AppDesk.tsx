@@ -1,0 +1,185 @@
+import { Suspense, useEffect } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { ShieldCheckIcon } from "lucide-react";
+import { devkitWebBundle } from "@codexsun/devkit-web";
+import { GlobalLoader } from "@codexsun/ui/components/global-loader";
+import { ApplicationLayout } from "@codexsun/ui/layouts/application-layout";
+import type { SidemenuItem } from "@codexsun/ui/blocks/menu/sidemenu/sub/sidemenu-section";
+import { AuthGate } from "../../shared/auth/AuthGate";
+import { getToken, logout } from "../../shared/api/platform-api";
+import {
+  applicationEntryPath,
+  canAccessAdministratorSettings,
+  canSelectApplicationTheme
+} from "./app-shell-access";
+import { UserWorkspace } from "../../modules/user";
+import { RoleWorkspace } from "../../modules/role";
+import { PermissionWorkspace } from "../../modules/permission";
+import { UserRoleWorkspace } from "../../modules/user-role";
+import { RolePermissionWorkspace } from "../../modules/role-permission";
+import { UserProfileWorkspace } from "../../modules/user/user.profile.workspace";
+
+type IdentityPage =
+  | "identity.users"
+  | "identity.roles"
+  | "identity.permissions"
+  | "identity.user-roles"
+  | "identity.role-permissions"
+  | "identity.profile";
+
+type Claims = { email: string; name?: string; permissions?: string[]; role?: string };
+
+export function AppDesk() {
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const claims = readClaims();
+  const administrator = canAccessAdministratorSettings(claims.role);
+  const identityPage = identityPageFromPath(pathname);
+  const workspace = devkitWebBundle.resolveWorkspace(pathname);
+  const invalidIdentityPage = Boolean(identityPage && identityPage !== "identity.profile" && !administrator);
+  const invalidPath = !workspace && !identityPage;
+
+  useEffect(() => {
+    if (invalidIdentityPage || invalidPath) {
+      void navigate({ replace: true, to: applicationEntryPath() });
+    }
+  }, [invalidIdentityPage, invalidPath, navigate]);
+
+  const showingIdentity = Boolean(identityPage && !invalidIdentityPage);
+  const headerTitle = showingIdentity
+    ? identityTitle(identityPage!)
+    : workspace?.title ?? "Today";
+
+  return (
+    <AuthGate>
+      <ApplicationLayout
+        brand={{ subtitle: "developer workspace", title: "DevKit" }}
+        headerTitle={headerTitle}
+        menuItems={
+          showingIdentity
+            ? buildIdentityMenu(identityPage!, navigate, administrator)
+            : devkitWebBundle.menuItems(workspace?.id ?? "today")
+        }
+        onLogout={async () => {
+          await logout();
+          await navigate({ to: "/login" });
+        }}
+        profileHref="/app/identity/profile"
+        showHomeAction={false}
+        showSidebarUser={false}
+        showThemeAction={canSelectApplicationTheme(claims.role)}
+        subtitle={null}
+        title={null}
+        user={{
+          email: claims.email,
+          fallback: initials(claims.name ?? claims.email),
+          name: claims.name ?? claims.email
+        }}
+        versionLabel={`v ${__APP_VERSION__}`}
+        workspaceItems={[
+          devkitWebBundle.applicationSwitcherItem(!showingIdentity),
+          ...(administrator
+            ? [
+                {
+                  active: showingIdentity,
+                  description: "Local users, roles, and permissions.",
+                  icon: ShieldCheckIcon,
+                  title: "Platform",
+                  url: "/app/identity/users"
+                }
+              ]
+            : [])
+        ]}
+      >
+        <Suspense fallback={<GlobalLoader />}>
+          {showingIdentity ? (
+            <main className="mx-auto w-[calc(100%-2rem)] max-w-[92rem] space-y-5 py-4 lg:w-[calc(100%-3rem)] lg:py-5">
+              {renderIdentityPage(identityPage!, claims.email)}
+            </main>
+          ) : workspace ? (
+            <workspace.component />
+          ) : (
+            <GlobalLoader />
+          )}
+        </Suspense>
+      </ApplicationLayout>
+    </AuthGate>
+  );
+}
+
+function renderIdentityPage(page: IdentityPage, actorEmail: string) {
+  if (page === "identity.users") return <UserWorkspace actorEmail={actorEmail} />;
+  if (page === "identity.roles") return <RoleWorkspace />;
+  if (page === "identity.permissions") return <PermissionWorkspace />;
+  if (page === "identity.user-roles") return <UserRoleWorkspace />;
+  if (page === "identity.role-permissions") return <RolePermissionWorkspace />;
+  return <UserProfileWorkspace />;
+}
+
+function buildIdentityMenu(
+  page: IdentityPage,
+  navigate: ReturnType<typeof useNavigate>,
+  administrator: boolean
+): SidemenuItem[] {
+  if (!administrator) return [];
+  const item = (title: string, target: IdentityPage) => ({
+    isActive: page === target,
+    onSelect: () => void navigate({ to: `/app/${target.replaceAll(".", "/")}` }),
+    title
+  });
+  return [
+    {
+      icon: ShieldCheckIcon,
+      isActive: true,
+      items: [
+        item("Users", "identity.users"),
+        item("Roles", "identity.roles"),
+        item("Permissions", "identity.permissions"),
+        item("User Roles", "identity.user-roles"),
+        item("Role Permissions", "identity.role-permissions")
+      ],
+      title: "Platform"
+    }
+  ];
+}
+
+function identityPageFromPath(pathname: string): IdentityPage | null {
+  const value = pathname.replace(/^\/app\/?/u, "").replaceAll("/", ".");
+  const allowed: IdentityPage[] = [
+    "identity.users",
+    "identity.roles",
+    "identity.permissions",
+    "identity.user-roles",
+    "identity.role-permissions",
+    "identity.profile"
+  ];
+  return allowed.includes(value as IdentityPage) ? (value as IdentityPage) : null;
+}
+
+function identityTitle(page: IdentityPage) {
+  return page
+    .split(".")
+    .at(-1)!
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function readClaims(): Claims {
+  const token = getToken();
+  if (!token) return { email: "" };
+  try {
+    return JSON.parse(atob((token.split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/"))) as Claims;
+  } catch {
+    return { email: "" };
+  }
+}
+
+function initials(value: string) {
+  return value
+    .trim()
+    .split(/\s+/u)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}

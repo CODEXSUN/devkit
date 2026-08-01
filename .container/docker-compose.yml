@@ -1,0 +1,108 @@
+name: ${DEVKIT_COMPOSE_PROJECT:-devkit}
+
+services:
+  verify:
+    profiles: [tools]
+    build:
+      context: ..
+      dockerfile: .container/scripts/Dockerfile.stack
+      target: verify
+      args:
+        NODE_RUNTIME_VERSION: ${NODE_RUNTIME_VERSION:-26.5.0}
+        NPM_RUNTIME_VERSION: ${NPM_RUNTIME_VERSION:-12.0.2}
+    image: ${DEVKIT_IMAGE_REGISTRY:-devkit}/verify:${DEVKIT_IMAGE_TAG:-local}
+
+  mariadb:
+    image: ${MARIADB_IMAGE:-mariadb:11.8}
+    container_name: ${DEVKIT_MARIADB_CONTAINER_NAME:-devkit-mariadb}
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:?DB_NAME is required}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?MARIADB_ROOT_PASSWORD is required}
+      MARIADB_USER: ${DB_USER:?DB_USER is required}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    networks: [devkit]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  api:
+    build:
+      context: ..
+      dockerfile: .container/scripts/Dockerfile.stack
+      target: api-runtime
+      args:
+        NODE_RUNTIME_VERSION: ${NODE_RUNTIME_VERSION:-26.5.0}
+        NPM_RUNTIME_VERSION: ${NPM_RUNTIME_VERSION:-12.0.2}
+    image: ${DEVKIT_IMAGE_REGISTRY:-devkit}/api:${DEVKIT_IMAGE_TAG:-local}
+    container_name: ${DEVKIT_API_CONTAINER_NAME:-devkit-api}
+    restart: unless-stopped
+    env_file:
+      - ${DEVKIT_RUNTIME_ENV_FILE:-../.env}
+    environment:
+      DEV_AUTO_LOGIN: "0"
+      NODE_ENV: production
+      PLATFORM_API_PORT: ${DEVKIT_API_INTERNAL_PORT:-7050}
+      DEVKIT_ENV_FILE_PATH: /workspace/devkit/.env
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_API_HOST_PORT:-7050}:${DEVKIT_API_INTERNAL_PORT:-7050}"
+    volumes:
+      - ${DEVKIT_RUNTIME_ENV_FILE:-../.env}:/workspace/devkit/.env:rw
+    networks: [devkit]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+process.env.PLATFORM_API_PORT+'/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 18
+
+  web:
+    build:
+      context: ..
+      dockerfile: .container/scripts/Dockerfile.stack
+      target: web-runtime
+      args:
+        NODE_RUNTIME_VERSION: ${NODE_RUNTIME_VERSION:-26.5.0}
+        NPM_RUNTIME_VERSION: ${NPM_RUNTIME_VERSION:-12.0.2}
+    image: ${DEVKIT_IMAGE_REGISTRY:-devkit}/web:${DEVKIT_IMAGE_TAG:-local}
+    container_name: ${DEVKIT_WEB_CONTAINER_NAME:-devkit-web}
+    restart: unless-stopped
+    environment:
+      NGINX_ENVSUBST_FILTER: DEVKIT_API
+      DEVKIT_API_CONTAINER_NAME: ${DEVKIT_API_CONTAINER_NAME:-devkit-api}
+      DEVKIT_API_INTERNAL_PORT: ${DEVKIT_API_INTERNAL_PORT:-7050}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_WEB_HOST_PORT:-7060}:80"
+    networks: [devkit]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 12
+
+volumes:
+  mariadb-data:
+    name: ${DEVKIT_MARIADB_DATA_VOLUME:-devkit-mariadb-data}
+
+networks:
+  devkit:
+    name: ${DEVKIT_NETWORK:-devkit-network}
+    external: ${DEVKIT_NETWORK_EXTERNAL:-false}
