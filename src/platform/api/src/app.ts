@@ -2,10 +2,7 @@ import { createApiApp, registerHealthRoute, registerRequestLogging } from "@code
 import { AppError } from "@codexsun/framework/errors";
 import type { HealthCheck } from "@codexsun/framework/health";
 import { registerModules } from "@codexsun/framework/modules";
-import {
-  devkitApiModuleKeys,
-  registerDevkitApiForHost
-} from "@codexsun/devkit-api";
+import { devkitApiModuleKeys, registerDevkitApiForHost } from "@codexsun/devkit-api";
 import type { DevkitDatabase } from "@codexsun/devkit-api";
 import type { Kysely } from "kysely";
 import { registerAuthRoutes } from "./auth/auth.routes.js";
@@ -19,13 +16,7 @@ import { roleModule } from "./modules/role/index.js";
 import { userRoleModule } from "./modules/user-role/index.js";
 import { userModule } from "./modules/user/index.js";
 
-const modules = [
-  userModule,
-  roleModule,
-  permissionModule,
-  userRoleModule,
-  rolePermissionModule
-];
+const modules = [userModule, roleModule, permissionModule, userRoleModule, rolePermissionModule];
 
 export async function createApp() {
   console.info("[devkit.boot] bootstrap started");
@@ -128,6 +119,7 @@ function devkitPermission(request: { method: string; url: string }) {
   if (request.url.includes("/task-manager/")) return `devkit.task-manager.${action}`;
   if (request.url.includes("/planning/")) return `devkit.planning.${action}`;
   if (request.url.includes("/github-dashboard/")) return "devkit.github-dashboard.view";
+  if (request.url.includes("/orchestration/")) return `devkit.orchestration.${action}`;
   if (request.url.includes("/sync/")) return `devkit.sync.${action}`;
   if (request.url.includes("/project-manager/registry/")) return `devkit.registry.${action}`;
   return `devkit.project-manager.${action}`;

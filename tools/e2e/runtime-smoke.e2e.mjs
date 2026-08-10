@@ -22,7 +22,7 @@ for (let cycle = 1; cycle <= 2; cycle += 1) {
 }
 
 console.info(
-  "Runtime smoke passed: two API boots, single-client identity, DevKit project/task routes, and logout."
+  "Runtime smoke passed: two API boots, single-client identity, DevKit orchestration/project/task routes, and logout."
 );
 
 async function smokeCycle(cycle) {
@@ -72,6 +72,7 @@ async function smokeCycle(cycle) {
     assert.equal(login.body.data?.role, "admin");
     assert.ok(login.body.data?.permissions?.includes("identity.user.view"));
     assert.ok(login.body.data?.permissions?.includes("devkit.project-manager.view"));
+    assert.ok(login.body.data?.permissions?.includes("devkit.orchestration.view"));
 
     const session = await request(baseUrl, "/auth/session", {
       headers: { authorization: `Bearer ${login.body.data.accessToken}` }
@@ -82,6 +83,17 @@ async function smokeCycle(cycle) {
     assert.equal(session.body.data?.role, "admin");
     assert.ok(session.body.data?.permissions?.includes("identity.user.view"));
     assert.ok(session.body.data?.permissions?.includes("devkit.project-manager.view"));
+    assert.ok(session.body.data?.permissions?.includes("devkit.orchestration.view"));
+
+    const orchestration = await request(baseUrl, "/api/devkit/orchestration/catalog", {
+      headers: { authorization: `Bearer ${login.body.data.accessToken}` }
+    });
+    assert.equal(orchestration.response.status, 200);
+    assert.equal(orchestration.body.success, true);
+    assert.equal(orchestration.body.data?.externalLabel, "CodeLogicX");
+    assert.equal(orchestration.body.data?.technicalName, "devkit");
+    assert.equal(orchestration.body.data?.agentProfiles?.length, 6);
+    assert.equal(orchestration.body.data?.assistModes?.length, 9);
 
     const projects = await request(baseUrl, "/api/devkit/admin/project-manager/result", {
       headers: { authorization: `Bearer ${login.body.data.accessToken}` }

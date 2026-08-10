@@ -7,6 +7,7 @@ const setup = read(".container/setup.sh");
 const compose = read(".container/docker-compose.yml");
 const deployExample = read(".container/deploy.env.example");
 const rootUpdater = read("update.sh");
+const compatibilityUpdater = read("updat.sh");
 
 requireTokens(".container/update.sh", updater, [
   "umask 077",
@@ -35,6 +36,7 @@ requireTokens(".container/deploy.env.example", deployExample, [
   "DEVKIT_UPDATE_MIN_DOCKER_FREE_MB="
 ]);
 requireTokens("update.sh", rootUpdater, ['exec bash "$ROOT_DIR/.container/update.sh" "$@"']);
+requireTokens("updat.sh", compatibilityUpdater, ['exec bash "$ROOT_DIR/update.sh" "$@"']);
 
 for (const [file, source] of [
   [".container/update.sh", updater],

@@ -2,6 +2,7 @@ export * from "./app.js";
 export * from "./database/index.js";
 export * from "./modules/project-manager/index.js";
 export * from "./modules/task-manager/index.js";
+export * from "./modules/orchestration/index.js";
 export * from "./modules/sync/index.js";
 export * from "./request-context.js";
 export * from "./stack.js";

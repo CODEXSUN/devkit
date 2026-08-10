@@ -2,6 +2,7 @@
 
 - Keep TypeScript strict and imports package-public.
 - Platform owns identity, server startup, database connection, and composition only.
+- Use CodeLogicX for user-facing product branding and `devkit` for technical contracts.
 - Each DevKit module owns its routes, services, repositories, migration, seed, types, and web
   workspace.
 - Do not move DevKit business behavior into Platform or shared helpers.
@@ -9,3 +10,5 @@
 - Keep migrations additive and repeatable; never delete persisted records to satisfy a change.
 - Preserve unrelated dirty worktree changes.
 - Verification reports must name commands run and live checks skipped.
+- Describe planned orchestration capabilities honestly; do not present definitions as executable
+  agents or a single-client deployment as multi-user isolation.

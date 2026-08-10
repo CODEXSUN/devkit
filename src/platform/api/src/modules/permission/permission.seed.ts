@@ -35,6 +35,8 @@ const permissionKeys = [
   "devkit.registry.view",
   "devkit.registry.manage",
   "devkit.github-dashboard.view",
+  "devkit.orchestration.view",
+  "devkit.orchestration.manage",
   "devkit.sync.view",
   "devkit.sync.manage"
 ] as const;

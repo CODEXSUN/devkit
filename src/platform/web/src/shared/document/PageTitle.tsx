@@ -1,6 +1,6 @@
 ﻿import { useEffect } from "react";
 
-const applicationName = "DevKit";
+const applicationName = "CodeLogicX";
 
 export function setPlatformDocumentTitle(pageTitle: string) {
   document.title = `${applicationName} | ${pageTitle}`;

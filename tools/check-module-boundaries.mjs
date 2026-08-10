@@ -21,6 +21,7 @@ const allowed = new Set([
 const failures = [];
 const devkitApiOwned = new Set([
   "github-dashboard",
+  "orchestration",
   "planning",
   "project-manager",
   "sync",
@@ -29,6 +30,7 @@ const devkitApiOwned = new Set([
 const devkitWebOwned = new Set([
   "design-system",
   "github-dashboard",
+  "orchestration",
   "planning",
   "platform-registry",
   "project-manager",
@@ -56,10 +58,12 @@ for (const [moduleRoot, expected] of [
       .map((entry) => entry.name)
   );
   for (const name of expected) {
-    if (!actual.has(name)) failures.push(`DevKit module is missing: ${relative(root, join(moduleRoot, name))}`);
+    if (!actual.has(name))
+      failures.push(`DevKit module is missing: ${relative(root, join(moduleRoot, name))}`);
   }
   for (const name of actual) {
-    if (!expected.has(name)) failures.push(`unexpected DevKit module: ${relative(root, join(moduleRoot, name))}`);
+    if (!expected.has(name))
+      failures.push(`unexpected DevKit module: ${relative(root, join(moduleRoot, name))}`);
   }
 }
 
@@ -80,7 +84,6 @@ for (const file of sourceFiles(resolve(root, "src/platform"))) {
   }
 }
 
-
 for (const file of sourceFiles(resolve(root, "src/devkit"))) {
   const source = readFileSync(file, "utf8");
   if (/src\/platform|\.\.\/\.\.\/platform/u.test(source.replaceAll("\\", "/"))) {
@@ -89,7 +92,12 @@ for (const file of sourceFiles(resolve(root, "src/devkit"))) {
 }
 
 const apiComposition = readFileSync(resolve(root, "src/platform/api/src/app.ts"), "utf8");
-for (const legacyModule of ["bankAccountModule", "commissionModule", "depositModule", "paymentModule"]) {
+for (const legacyModule of [
+  "bankAccountModule",
+  "commissionModule",
+  "depositModule",
+  "paymentModule"
+]) {
   if (apiComposition.includes(legacyModule)) {
     failures.push(`src/platform/api/src/app.ts: composes legacy ${legacyModule}`);
   }
@@ -98,7 +106,10 @@ if (!apiComposition.includes("registerDevkitApiForHost")) {
   failures.push("src/platform/api/src/app.ts: DevKit API host registration is missing");
 }
 
-const webComposition = readFileSync(resolve(root, "src/platform/web/src/desks/app/AppDesk.tsx"), "utf8");
+const webComposition = readFileSync(
+  resolve(root, "src/platform/web/src/desks/app/AppDesk.tsx"),
+  "utf8"
+);
 if (!webComposition.includes("devkitWebBundle")) {
   failures.push("src/platform/web/src/desks/app/AppDesk.tsx: DevKit web bundle is missing");
 }
@@ -107,7 +118,9 @@ if (failures.length) {
   console.error(`Module boundary check failed:\n${failures.map((item) => `- ${item}`).join("\n")}`);
   process.exit(1);
 }
-console.info("Module boundary check passed: Platform owns identity and composes DevKit public contracts.");
+console.info(
+  "Module boundary check passed: Platform owns identity and composes DevKit public contracts."
+);
 
 function sourceFiles(directory) {
   const files = [];

@@ -8,3 +8,5 @@ There is one MariaDB database selected by `DB_NAME`. Do not add tenant selectors
 routers, external identity gateways, or a second application shell.
 
 Read `AGENT-GUIDE.md`, then the relevant architecture and governance rules before changing code.
+The planned local-first, hybrid, multi-node platform direction is recorded in
+`architecture/future-platform-blueprint.md`; it is not a description of current runtime capability.

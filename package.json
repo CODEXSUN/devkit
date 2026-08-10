@@ -3,7 +3,7 @@
   "version": "1.0.22",
   "private": true,
   "packageManager": "npm@12.0.2",
-  "description": "Standalone CODEXSUN DevKit application",
+  "description": "CodeLogicX developer and engineering orchestration workspace",
   "type": "module",
   "workspaces": [
     "packages/*",

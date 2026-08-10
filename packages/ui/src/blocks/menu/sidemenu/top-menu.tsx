@@ -111,17 +111,17 @@ export function TopMenu({
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between rounded-t-lg border-b bg-background">
-      <div className="flex h-full min-w-0 items-center">
+      <div className="flex h-full min-w-0 items-center overflow-hidden">
         <div className="flex h-full w-16 items-center justify-center rounded-tl-lg border-r bg-background">
           <SidebarTrigger className="size-8 rounded-md border bg-background shadow-none" />
         </div>
         <div className="flex min-w-0 items-center gap-3 px-4 text-sm">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-                <ActiveWorkspaceIcon className="size-4 text-muted-foreground" />
-                <span>{activeWorkspace?.title ?? "Workspace"}</span>
-                <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+              <button className="flex min-w-0 max-w-36 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground sm:max-w-none">
+                <ActiveWorkspaceIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{activeWorkspace?.title ?? "Workspace"}</span>
+                <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64 p-2">
@@ -176,8 +176,8 @@ export function TopMenu({
           </DropdownMenu>
           {showPageTitle ? (
             <>
-              <Separator orientation="vertical" className="h-4" />
-              <span className="truncate font-medium">{pageTitle}</span>
+              <Separator orientation="vertical" className="hidden h-4 sm:block" />
+              <span className="hidden truncate font-medium sm:inline">{pageTitle}</span>
             </>
           ) : null}
         </div>

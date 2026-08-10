@@ -1,18 +1,5 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  Input,
-  Label,
-  WorkspaceStatusBadge,
-} from "@codexsun/ui";
-import {
-  CloudDownloadIcon,
-  CloudUploadIcon,
-  CopyIcon,
-  KeyRoundIcon,
-  LinkIcon,
-} from "lucide-react";
+import { Button, Card, CardContent, Input, Label, WorkspaceStatusBadge } from "@codexsun/ui";
+import { CloudDownloadIcon, CloudUploadIcon, CopyIcon, KeyRoundIcon, LinkIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useSyncActions, useSyncStatus } from "./sync.hooks";
@@ -35,7 +22,7 @@ export function SyncOverview() {
     try {
       await actions.bind.mutateAsync({ instanceId, token });
       setToken("");
-      toast.success("This DevKit installation is bound to the cloud.");
+      toast.success("This CodeLogicX installation is bound to the cloud.");
     } catch (error) {
       failure(error, "Cloud binding failed.");
     }
@@ -44,21 +31,19 @@ export function SyncOverview() {
   const publish = async () => {
     try {
       const result = await actions.publish.mutateAsync();
-      toast.success(`Published revision ${result.revision} to DevKit Cloud.`);
+      toast.success(`Published revision ${result.revision} to CodeLogicX Cloud.`);
     } catch (error) {
-      failure(error, "DevKit publish failed.");
+      failure(error, "CodeLogicX publish failed.");
     }
   };
 
   const pull = async () => {
     try {
       const result = await actions.pull.mutateAsync();
-      toast.success(
-        `Pulled revision ${result.revision} with ${result.records} records.`,
-      );
+      toast.success(`Pulled revision ${result.revision} with ${result.records} records.`);
       window.location.reload();
     } catch (error) {
-      failure(error, "DevKit pull failed.");
+      failure(error, "CodeLogicX pull failed.");
     }
   };
 
@@ -78,7 +63,7 @@ export function SyncOverview() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold">DevKit Cloud</h2>
+              <h2 className="font-semibold">CodeLogicX Cloud</h2>
               <WorkspaceStatusBadge
                 label={sync?.status ?? "Loading"}
                 tone={
@@ -146,9 +131,7 @@ export function SyncOverview() {
             </div>
             <Button
               disabled={
-                actions.bind.isPending ||
-                instanceId.trim().length < 2 ||
-                token.trim().length !== 16
+                actions.bind.isPending || instanceId.trim().length < 2 || token.trim().length !== 16
               }
               icon={<LinkIcon />}
               onClick={() => void bind()}
@@ -180,9 +163,7 @@ export function SyncOverview() {
             </div>
             {generatedToken ? (
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
-                <code className="text-base font-semibold tracking-widest">
-                  {generatedToken}
-                </code>
+                <code className="text-base font-semibold tracking-widest">{generatedToken}</code>
                 <Button
                   icon={<CopyIcon />}
                   onClick={() => {

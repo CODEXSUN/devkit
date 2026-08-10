@@ -152,7 +152,7 @@ function LoginSurface({ landing }: { landing: boolean }) {
   return landing ? (
     <TradesLandingLayout>{form}</TradesLandingLayout>
   ) : (
-    <TradesAuthLayout surface="app" title="DevKit Login">
+    <TradesAuthLayout surface="app" title="CodeLogicX Login">
       {form}
     </TradesAuthLayout>
   );

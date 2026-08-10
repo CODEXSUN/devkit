@@ -32,6 +32,7 @@ export async function seedRolePermissionModule(database: Kysely<TradesDatabase>)
       "devkit.planning.view",
       "devkit.registry.view",
       "devkit.github-dashboard.view",
+      "devkit.orchestration.view",
       "devkit.sync.view"
     ],
     manager: devkitPermissions(),
@@ -43,6 +44,7 @@ export async function seedRolePermissionModule(database: Kysely<TradesDatabase>)
       "devkit.planning.view",
       "devkit.planning.manage",
       "devkit.registry.view",
+      "devkit.orchestration.view",
       "devkit.github-dashboard.view"
     ]
   };
@@ -69,7 +71,7 @@ export async function seedRolePermissionModule(database: Kysely<TradesDatabase>)
 
 function devkitPermissions() {
   return [
-    ...["project-manager", "task-manager", "planning", "registry", "sync"].flatMap(
+    ...["project-manager", "task-manager", "planning", "registry", "orchestration", "sync"].flatMap(
       (module) => ["view", "manage"].map((action) => `devkit.${module}.${action}`)
     ),
     "devkit.github-dashboard.view"

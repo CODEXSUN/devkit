@@ -1,12 +1,16 @@
-# CODEXSUN DevKit
+# CodeLogicX
 
-DevKit is a standalone, single-client developer planning and collaboration application. It uses
-local authentication and one MariaDB database configured by `DB_NAME`.
+CodeLogicX is the external product label for this developer and engineering orchestration
+workspace. Its internal technical name remains `devkit`: package IDs, routes, environment keys,
+permissions, database objects, and module ownership continue to use that stable name.
+
+The current application is standalone and single-client. It uses local authentication and one
+MariaDB database configured by `DB_NAME`.
 
 The Platform layer owns the executable API/web shell, users, roles, permissions, assignments, and
 database connection. The `src/devkit` workspaces own Project Manager, Task Manager, Platform
-Registry, Planning whiteboards, the GitHub dashboard, synchronization, migrations, seeds, routes,
-and React workspaces.
+Registry, Planning whiteboards, the GitHub dashboard, engineering orchestration, synchronization,
+migrations, seeds, routes, and React workspaces.
 
 ## Development
 
@@ -19,7 +23,7 @@ npm run dev
 ```
 
 Default endpoints are API `http://127.0.0.1:7050` and Web `http://127.0.0.1:7060`.
-The browser enters at `/app/devkit/today`; DevKit API routes use `/api/devkit/*`.
+The browser enters at `/app/devkit/orchestration`; DevKit API routes use `/api/devkit/*`.
 
 Database commands:
 
@@ -44,6 +48,9 @@ bash update.sh --check
 bash update.sh
 ```
 
+`bash updat.sh` is retained as a compatibility alias for operators using the earlier deployment
+command spelling.
+
 The updater preserves `.env`, `.container/deploy.env`, MariaDB data, credentials, ports, and named
 volumes. It refuses concurrent or dirty-source updates by default, locks source and image versions,
 requires explicit migration-compatibility approval, verifies free space, creates a SHA-256 checked
@@ -59,4 +66,5 @@ npm run build
 npm run test:e2e:runtime
 ```
 
-Read `assist/AGENT-GUIDE.md` before changing architecture or module ownership.
+Read `assist/AGENT-GUIDE.md` before changing architecture or module ownership. The product and
+technical naming boundary is defined in `assist/architecture/engineering-orchestration.md`.

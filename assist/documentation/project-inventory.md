@@ -9,10 +9,10 @@
 
 ## DevKit Owner Workspaces
 
-- `src/devkit/api`: Project Manager, Task Manager, Planning, GitHub Dashboard, Sync, database
-  lifecycle, JSON seeds, and public host contracts.
+- `src/devkit/api`: Project Manager, Task Manager, Planning, GitHub Dashboard, Orchestration, Sync,
+  database lifecycle, JSON seeds, and public host contracts.
 - `src/devkit/web`: Today, Projects, Tasks, Platform Registry, Whiteboards, GitHub Dashboard,
-  Design System, and Sync workspaces.
+  Engineering Command Center, Design System, and Sync workspaces.
 
 ## Shared Dependencies
 

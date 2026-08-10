@@ -1,4 +1,4 @@
-export const standardDeskPath = "/app/devkit/today";
+export const standardDeskPath = "/app/devkit/orchestration";
 
 export function canAccessAdministratorSettings(role: string | undefined) {
   return role === "admin";

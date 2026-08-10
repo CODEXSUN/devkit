@@ -4,13 +4,9 @@ import {
   Excalidraw,
   exportToBlob,
   exportToSvg,
-  serializeAsJSON,
+  serializeAsJSON
 } from "@excalidraw/excalidraw";
-import type {
-  AppState,
-  BinaryFiles,
-  ExcalidrawImperativeAPI,
-} from "@excalidraw/excalidraw/types";
+import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { Button } from "@codexsun/ui/components/button";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
@@ -25,7 +21,7 @@ import {
   RefreshCwIcon,
   SaveIcon,
   SearchIcon,
-  Trash2Icon,
+  Trash2Icon
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -34,13 +30,10 @@ import {
   usePlanningActions,
   usePlanningBoard,
   usePlanningBoards,
-  usePlanningComments,
+  usePlanningComments
 } from "./planning.hooks";
 import { planningSceneFromSerialized } from "./planning.scene";
-import type {
-  PlanningRecordKind,
-  PlanningScene,
-} from "./planning.types";
+import type { PlanningRecordKind, PlanningScene } from "./planning.types";
 
 export function PlanningWorkspace() {
   const uuid = window.location.pathname.split("/").filter(Boolean)[3] ?? "";
@@ -51,8 +44,7 @@ function PlanningBoardList() {
   const search = new URLSearchParams(window.location.search);
   const recordKind = search.get("recordKind") as PlanningRecordKind | null;
   const recordUuid = search.get("recordUuid");
-  const record =
-    recordKind && recordUuid ? { kind: recordKind, uuid: recordUuid } : undefined;
+  const record = recordKind && recordUuid ? { kind: recordKind, uuid: recordUuid } : undefined;
   const boards = usePlanningBoards(record);
   const projects = useProjectManagerRecordsQuery("project");
   const actions = usePlanningActions();
@@ -61,24 +53,19 @@ function PlanningBoardList() {
   const create = async () => {
     const board = await actions.create.mutateAsync({
       description: "",
-      projectUuid:
-        record?.kind === "project" ? record.uuid : projectUuid || null,
-      ...(record
-        ? { recordKind: record.kind, recordUuid: record.uuid }
-        : {}),
-      title: title.trim(),
+      projectUuid: record?.kind === "project" ? record.uuid : projectUuid || null,
+      ...(record ? { recordKind: record.kind, recordUuid: record.uuid } : {}),
+      title: title.trim()
     });
     window.location.assign(`/app/devkit/planning/${board.uuid}`);
   };
   return (
     <main className="mx-auto w-[calc(100%-2rem)] max-w-[92rem] space-y-4 py-5">
       <header className="rounded-md border bg-card p-5 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-muted-foreground">
-          Planning
-        </p>
+        <p className="text-sm font-semibold uppercase text-muted-foreground">Planning</p>
         <h1 className="text-2xl font-semibold">Whiteboards</h1>
         <p className="text-sm text-muted-foreground">
-          Visual plans connected to DevKit work and synchronized with cloud.
+          Visual plans connected to CodeLogicX work and synchronized with cloud.
         </p>
         {record ? (
           <p className="mt-2 text-xs font-medium text-primary">
@@ -105,10 +92,7 @@ function PlanningBoardList() {
             </option>
           ))}
         </select>
-        <Button
-          disabled={!title.trim() || actions.create.isPending}
-          onClick={() => void create()}
-        >
+        <Button disabled={!title.trim() || actions.create.isPending} onClick={() => void create()}>
           <PlusIcon /> Create board
         </Button>
       </section>
@@ -120,9 +104,7 @@ function PlanningBoardList() {
             <button
               key={board.uuid}
               className="rounded-md border bg-card p-4 text-left shadow-sm hover:border-primary"
-              onClick={() =>
-                window.location.assign(`/app/devkit/planning/${board.uuid}`)
-              }
+              onClick={() => window.location.assign(`/app/devkit/planning/${board.uuid}`)}
             >
               <h2 className="font-semibold">{board.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -150,9 +132,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
   const pendingFingerprint = useRef<string | null>(null);
   const persistedFingerprint = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [saveState, setSaveState] = useState<
-    "failed" | "saved" | "saving" | "unsaved"
-  >("saved");
+  const [saveState, setSaveState] = useState<"failed" | "saved" | "saving" | "unsaved">("saved");
   const [commentBody, setCommentBody] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(true);
   const save = async (notify = false) => {
@@ -170,14 +150,13 @@ function PlanningEditor({ uuid }: { uuid: string }) {
       } else setSaveState("unsaved");
       if (notify)
         toast.success("Planning board saved", {
-          description: board.data?.title,
+          description: board.data?.title
         });
       return true;
     } catch (error) {
       setSaveState("failed");
       toast.error("Planning board could not be saved", {
-        description:
-          error instanceof Error ? error.message : "Unknown save error.",
+        description: error instanceof Error ? error.message : "Unknown save error."
       });
       return false;
     }
@@ -186,7 +165,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     () => () => {
       if (timer.current) clearTimeout(timer.current);
     },
-    [],
+    []
   );
   if (board.isLoading || !board.data) return <GlobalLoader />;
   if (persistedFingerprint.current === null)
@@ -202,7 +181,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
   const currentScene = (): PlanningScene => ({
     appState: api.current?.getAppState() as unknown as Record<string, unknown>,
     elements: api.current?.getSceneElements() ?? [],
-    files: api.current?.getFiles() as unknown as Record<string, unknown>,
+    files: api.current?.getFiles() as unknown as Record<string, unknown>
   });
   const download = (content: Blob, extension: string) => {
     const anchor = document.createElement("a");
@@ -221,29 +200,28 @@ function PlanningEditor({ uuid }: { uuid: string }) {
               type: "excalidraw",
               version: 2,
               source: window.location.origin,
-              ...current,
-            }),
+              ...current
+            })
           ],
-          { type: "application/json" },
+          { type: "application/json" }
         ),
-        "excalidraw",
+        "excalidraw"
       );
       return;
     }
     const options = {
       appState: current.appState as Partial<AppState>,
       elements: current.elements as readonly ExcalidrawElement[],
-      files: current.files as BinaryFiles,
+      files: current.files as BinaryFiles
     };
     if (format === "png")
       download(await exportToBlob({ ...options, mimeType: "image/png" }), "png");
     else
       download(
-        new Blob(
-          [new XMLSerializer().serializeToString(await exportToSvg(options))],
-          { type: "image/svg+xml" },
-        ),
-        "svg",
+        new Blob([new XMLSerializer().serializeToString(await exportToSvg(options))], {
+          type: "image/svg+xml"
+        }),
+        "svg"
       );
   };
   const importScene = async (file: File) => {
@@ -252,15 +230,13 @@ function PlanningEditor({ uuid }: { uuid: string }) {
       api.current?.updateScene({
         appState: imported.appState as unknown as AppState,
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-        elements: imported.elements as readonly ExcalidrawElement[],
+        elements: imported.elements as readonly ExcalidrawElement[]
       });
-      api.current?.addFiles(
-        Object.values((imported.files ?? {}) as BinaryFiles),
-      );
+      api.current?.addFiles(Object.values((imported.files ?? {}) as BinaryFiles));
       toast.success("Excalidraw scene imported");
     } catch (error) {
       toast.error("Could not import this Excalidraw file", {
-        description: error instanceof Error ? error.message : "Invalid scene.",
+        description: error instanceof Error ? error.message : "Invalid scene."
       });
     }
   };
@@ -274,22 +250,20 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     api.current.updateScene({
       appState: result.data.scene.appState as unknown as AppState,
       captureUpdate: CaptureUpdateAction.NEVER,
-      elements: result.data.scene.elements as readonly ExcalidrawElement[],
+      elements: result.data.scene.elements as readonly ExcalidrawElement[]
     });
-    api.current.addFiles(
-      Object.values((result.data.scene.files ?? {}) as BinaryFiles),
-    );
+    api.current.addFiles(Object.values((result.data.scene.files ?? {}) as BinaryFiles));
     api.current.history.clear();
     persistedFingerprint.current = JSON.stringify(result.data.scene);
     toast.success("Latest synchronized scene loaded");
   };
   const addComment = async () => {
-    const elementId = Object.entries(
-      api.current?.getAppState().selectedElementIds ?? {},
-    ).find(([, selected]) => selected)?.[0];
+    const elementId = Object.entries(api.current?.getAppState().selectedElementIds ?? {}).find(
+      ([, selected]) => selected
+    )?.[0];
     await comments.create.mutateAsync({
       body: commentBody.trim(),
-      ...(elementId ? { elementId } : {}),
+      ...(elementId ? { elementId } : {})
     });
     setCommentBody("");
   };
@@ -340,11 +314,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
             }}
           />
           {(["excalidraw", "png", "svg"] as const).map((format) => (
-            <Button
-              key={format}
-              variant="outline"
-              onClick={() => void exportScene(format)}
-            >
+            <Button key={format} variant="outline" onClick={() => void exportScene(format)}>
               <DownloadIcon /> {format.toUpperCase()}
             </Button>
           ))}
@@ -352,17 +322,12 @@ function PlanningEditor({ uuid }: { uuid: string }) {
             variant="outline"
             title="Scene search is also available with Ctrl+F."
             onClick={() =>
-              document.dispatchEvent(
-                new KeyboardEvent("keydown", { ctrlKey: true, key: "f" }),
-              )
+              document.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true, key: "f" }))
             }
           >
             <SearchIcon /> Search
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => api.current?.setActiveTool({ type: "frame" })}
-          >
+          <Button variant="outline" onClick={() => api.current?.setActiveTool({ type: "frame" })}>
             <FrameIcon /> Frame
           </Button>
           <Button
@@ -387,14 +352,13 @@ function PlanningEditor({ uuid }: { uuid: string }) {
               api.current = value;
             }}
             initialData={{
-              elements:
-                board.data.scene.elements as readonly ExcalidrawElement[],
+              elements: board.data.scene.elements as readonly ExcalidrawElement[],
               appState: board.data.scene.appState as Partial<AppState>,
-              files: board.data.scene.files as BinaryFiles,
+              files: board.data.scene.files as BinaryFiles
             }}
             onChange={(elements, appState, files) => {
               const nextScene = planningSceneFromSerialized(
-                serializeAsJSON(elements, appState, files, "database"),
+                serializeAsJSON(elements, appState, files, "database")
               );
               const nextFingerprint = JSON.stringify(nextScene);
               if (nextFingerprint === persistedFingerprint.current) return;
@@ -410,8 +374,8 @@ function PlanningEditor({ uuid }: { uuid: string }) {
           <aside className="overflow-y-auto border-l bg-card p-3">
             <h2 className="font-semibold">Board comments</h2>
             <p className="mb-3 text-xs text-muted-foreground">
-              Select an element before commenting to anchor it. Use @name or
-              @email to mention someone.
+              Select an element before commenting to anchor it. Use @name or @email to mention
+              someone.
             </p>
             <div className="flex gap-2">
               <Input
@@ -419,8 +383,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
                 placeholder="Add a comment…"
                 onChange={(event) => setCommentBody(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && commentBody.trim())
-                    void addComment();
+                  if (event.key === "Enter" && commentBody.trim()) void addComment();
                 }}
               />
               <Button
@@ -446,14 +409,12 @@ function PlanningEditor({ uuid }: { uuid: string }) {
                       const element = api.current
                         ?.getSceneElements()
                         .find((entry) => entry.id === comment.elementId);
-                      if (element)
-                        api.current?.scrollToContent(element, { animate: true });
+                      if (element) api.current?.scrollToContent(element, { animate: true });
                     }}
                   >
                     <p className="text-sm">{comment.body}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {comment.createdBy} ·{" "}
-                      {new Date(comment.createdAt).toLocaleString()}
+                      {comment.createdBy} · {new Date(comment.createdAt).toLocaleString()}
                       {comment.elementId ? " · Anchored" : ""}
                     </p>
                   </button>
@@ -466,16 +427,12 @@ function PlanningEditor({ uuid }: { uuid: string }) {
                         onClick={() =>
                           comments.react.mutate({
                             commentUuid: comment.uuid,
-                            reaction,
+                            reaction
                           })
                         }
                       >
                         {reaction}{" "}
-                        {
-                          comment.reactions.filter(
-                            (entry) => entry.reaction === reaction,
-                          ).length
-                        }
+                        {comment.reactions.filter((entry) => entry.reaction === reaction).length}
                       </Button>
                     ))}
                     <Button
@@ -484,7 +441,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
                       onClick={() =>
                         comments.resolve.mutate({
                           commentUuid: comment.uuid,
-                          resolved: comment.status !== "resolved",
+                          resolved: comment.status !== "resolved"
                         })
                       }
                     >
@@ -504,7 +461,9 @@ function PlanningEditor({ uuid }: { uuid: string }) {
 
 function safeFileName(value: string) {
   return (
-    value.trim().replace(/[^\w.-]+/gu, "-").replace(/^-+|-+$/gu, "") ||
-    "devkit-board"
+    value
+      .trim()
+      .replace(/[^\w.-]+/gu, "-")
+      .replace(/^-+|-+$/gu, "") || "devkit-board"
   );
 }

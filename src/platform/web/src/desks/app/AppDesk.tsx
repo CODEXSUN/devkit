@@ -36,7 +36,9 @@ export function AppDesk() {
   const administrator = canAccessAdministratorSettings(claims.role);
   const identityPage = identityPageFromPath(pathname);
   const workspace = devkitWebBundle.resolveWorkspace(pathname);
-  const invalidIdentityPage = Boolean(identityPage && identityPage !== "identity.profile" && !administrator);
+  const invalidIdentityPage = Boolean(
+    identityPage && identityPage !== "identity.profile" && !administrator
+  );
   const invalidPath = !workspace && !identityPage;
 
   useEffect(() => {
@@ -48,17 +50,17 @@ export function AppDesk() {
   const showingIdentity = Boolean(identityPage && !invalidIdentityPage);
   const headerTitle = showingIdentity
     ? identityTitle(identityPage!)
-    : workspace?.title ?? "Today";
+    : (workspace?.title ?? "Engineering Command Center");
 
   return (
     <AuthGate>
       <ApplicationLayout
-        brand={{ subtitle: "developer workspace", title: "DevKit" }}
+        brand={{ subtitle: "engineering orchestration", title: "CodeLogicX" }}
         headerTitle={headerTitle}
         menuItems={
           showingIdentity
             ? buildIdentityMenu(identityPage!, navigate, administrator)
-            : devkitWebBundle.menuItems(workspace?.id ?? "today")
+            : devkitWebBundle.menuItems(workspace?.id ?? "orchestration")
         }
         onLogout={async () => {
           await logout();
@@ -169,7 +171,9 @@ function readClaims(): Claims {
   const token = getToken();
   if (!token) return { email: "" };
   try {
-    return JSON.parse(atob((token.split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/"))) as Claims;
+    return JSON.parse(
+      atob((token.split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/"))
+    ) as Claims;
   } catch {
     return { email: "" };
   }

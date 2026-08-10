@@ -30,7 +30,7 @@ import {
   WorkspacePage,
   designSystemVariants,
   isDesignSystemVariantId,
-  type DesignSystemVariantId,
+  type DesignSystemVariantId
 } from "@codexsun/ui";
 import { InfoIcon, SearchIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -49,9 +49,7 @@ function PreviewCard({ description, preview, title }: ComponentGroup) {
         <CardTitle className="text-base">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex min-h-28 flex-wrap items-center gap-3">
-        {preview}
-      </CardContent>
+      <CardContent className="flex min-h-28 flex-wrap items-center gap-3">{preview}</CardContent>
     </Card>
   );
 }
@@ -59,17 +57,14 @@ function PreviewCard({ description, preview, title }: ComponentGroup) {
 export function DesignSystemComponentsWorkspace() {
   const [query, setQuery] = useState("");
   const [variantId, setVariantId] = useState<DesignSystemVariantId>(() => {
-    const stored = window.localStorage.getItem(
-      DESIGN_SYSTEM_DEFAULT_STORAGE_KEY,
-    );
+    const stored = window.localStorage.getItem(DESIGN_SYSTEM_DEFAULT_STORAGE_KEY);
     return stored && isDesignSystemVariantId(stored) ? stored : "default";
   });
 
   const groups = useMemo<ComponentGroup[]>(
     () => [
       {
-        description:
-          "Primary, secondary, outline, ghost, and destructive actions.",
+        description: "Primary, secondary, outline, ghost, and destructive actions.",
         id: "actions",
         preview: (
           <>
@@ -80,7 +75,7 @@ export function DesignSystemComponentsWorkspace() {
             <Button variant="destructive">Destructive</Button>
           </>
         ),
-        title: "Buttons",
+        title: "Buttons"
       },
       {
         description: "Compact semantic labels for workflow and system state.",
@@ -93,7 +88,7 @@ export function DesignSystemComponentsWorkspace() {
             <Badge variant="destructive">Attention</Badge>
           </>
         ),
-        title: "Badges",
+        title: "Badges"
       },
       {
         description: "Text, long-form, boolean, and selection controls.",
@@ -131,7 +126,7 @@ export function DesignSystemComponentsWorkspace() {
             </Label>
           </div>
         ),
-        title: "Form controls",
+        title: "Form controls"
       },
       {
         description: "Notices, progress, loading, and contextual feedback.",
@@ -142,7 +137,7 @@ export function DesignSystemComponentsWorkspace() {
               <InfoIcon className="size-4" />
               <AlertTitle>Shared presentation contract</AlertTitle>
               <AlertDescription>
-                DevKit consumes these components from the public UI package.
+                CodeLogicX consumes these components from the public UI package.
               </AlertDescription>
             </Alert>
             <Progress value={64} />
@@ -155,7 +150,7 @@ export function DesignSystemComponentsWorkspace() {
             </div>
           </div>
         ),
-        title: "Feedback",
+        title: "Feedback"
       },
       {
         description: "Tabbed surfaces for related views without route changes.",
@@ -166,24 +161,18 @@ export function DesignSystemComponentsWorkspace() {
               <TabsTrigger value="preview">Preview</TabsTrigger>
               <TabsTrigger value="usage">Usage</TabsTrigger>
             </TabsList>
-            <TabsContent value="preview">
-              Rendered component preview.
-            </TabsContent>
-            <TabsContent value="usage">
-              Use the public @codexsun/ui export.
-            </TabsContent>
+            <TabsContent value="preview">Rendered component preview.</TabsContent>
+            <TabsContent value="usage">Use the public @codexsun/ui export.</TabsContent>
           </Tabs>
         ),
-        title: "Tabs",
-      },
+        title: "Tabs"
+      }
     ],
-    [],
+    []
   );
 
   const visibleGroups = groups.filter((group) =>
-    `${group.title} ${group.description}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+    `${group.title} ${group.description}`.toLowerCase().includes(query.toLowerCase())
   );
 
   const selectVariant = (nextId: string) => {

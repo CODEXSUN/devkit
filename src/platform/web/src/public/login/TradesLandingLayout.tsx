@@ -14,7 +14,7 @@ export function TradesLandingLayout({ children }: { children: ReactNode }) {
 
   return (
     <main className="trades-login-page">
-      <section className="trades-login-shell" aria-label="DevKit Login">
+      <section className="trades-login-shell" aria-label="CodeLogicX Login">
         <div className="trades-login-story">
           <div className="trades-login-brand">
             <span className="auth-surface-mark" data-surface="app">
@@ -24,8 +24,8 @@ export function TradesLandingLayout({ children }: { children: ReactNode }) {
               </span>
             </span>
             <span>
-              <strong>DevKit</strong>
-              <small>Developer planning and delivery workspace</small>
+              <strong>CodeLogicX</strong>
+              <small>Developer and engineering orchestration workspace</small>
             </span>
           </div>
           <div className="trades-login-slider" aria-live="polite">
@@ -46,13 +46,13 @@ export function TradesLandingLayout({ children }: { children: ReactNode }) {
         <div className="trades-login-panel">
           <div className="trades-login-panel-brand" aria-hidden="true">
             <Logo />
-            <span>DevKit</span>
+            <span>CodeLogicX</span>
           </div>
           <div className="auth-card-frame auth-card-frame-app trades-login-card-frame">
             <div className="auth-card trades-login-card">
               <header className="auth-card-header">
                 <h1>Welcome back</h1>
-                <p>Access DevKit with your registered credentials.</p>
+                <p>Access CodeLogicX with your registered credentials.</p>
               </header>
               {children}
             </div>

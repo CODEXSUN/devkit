@@ -2,7 +2,7 @@ import {
   AlertTriangleIcon,
   CheckCircle2Icon,
   CircleGaugeIcon,
-  FolderKanbanIcon,
+  FolderKanbanIcon
 } from "lucide-react";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
 import { WorkspaceStatusBadge } from "@codexsun/ui/workspace/status";
@@ -11,7 +11,7 @@ import type { ProjectManagerRecord } from "./project-manager.types";
 import { SyncOverview } from "../sync";
 
 export function ProjectManagerOverview({
-  onOpenProject,
+  onOpenProject
 }: {
   onOpenProject: (projectId: string) => void;
 }) {
@@ -19,10 +19,10 @@ export function ProjectManagerOverview({
   const projects = projectsQuery.data ?? [];
   const activeProjects = projects.filter((project) => project.active);
   const completedProjects = activeProjects.filter((project) =>
-    ["approved", "completed", "released"].includes(project.status),
+    ["approved", "completed", "released"].includes(project.status)
   );
   const atRiskProjects = activeProjects.filter((project) =>
-    ["blocked", "on-hold"].includes(project.status),
+    ["blocked", "on-hold"].includes(project.status)
   );
   const recentProjects = activeProjects.slice(0, 4);
 
@@ -33,10 +33,9 @@ export function ProjectManagerOverview({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Developer workspace
           </p>
-          <h1 className="mt-1 text-2xl font-semibold">DevKit</h1>
+          <h1 className="mt-1 text-2xl font-semibold">CodeLogicX</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Projects, delivery status, planning, and developer operations in one
-            view.
+            Projects, delivery status, planning, and developer operations in one view.
           </p>
         </div>
         <WorkspaceStatusBadge
@@ -46,21 +45,9 @@ export function ProjectManagerOverview({
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <OverviewMetric
-          icon={FolderKanbanIcon}
-          label="All projects"
-          value={projects.length}
-        />
-        <OverviewMetric
-          icon={CircleGaugeIcon}
-          label="Active"
-          value={activeProjects.length}
-        />
-        <OverviewMetric
-          icon={AlertTriangleIcon}
-          label="At risk"
-          value={atRiskProjects.length}
-        />
+        <OverviewMetric icon={FolderKanbanIcon} label="All projects" value={projects.length} />
+        <OverviewMetric icon={CircleGaugeIcon} label="Active" value={activeProjects.length} />
+        <OverviewMetric icon={AlertTriangleIcon} label="At risk" value={atRiskProjects.length} />
         <OverviewMetric
           icon={CheckCircle2Icon}
           label="Completed"
@@ -94,9 +81,7 @@ export function ProjectManagerOverview({
             {projectsQuery.error.message}
           </div>
         ) : null}
-        {!projectsQuery.isLoading &&
-        !projectsQuery.error &&
-        !projects.length ? (
+        {!projectsQuery.isLoading && !projectsQuery.error && !projects.length ? (
           <div className="rounded-md border bg-card p-8 text-center">
             <FolderKanbanIcon className="mx-auto size-8 text-muted-foreground" />
             <h3 className="mt-3 font-semibold">No projects yet</h3>
@@ -124,7 +109,7 @@ export function ProjectManagerOverview({
 function OverviewMetric({
   icon: Icon,
   label,
-  value,
+  value
 }: {
   icon: typeof FolderKanbanIcon;
   label: string;
@@ -145,13 +130,7 @@ function OverviewMetric({
   );
 }
 
-function ProjectCard({
-  onOpen,
-  project,
-}: {
-  onOpen: () => void;
-  project: ProjectManagerRecord;
-}) {
+function ProjectCard({ onOpen, project }: { onOpen: () => void; project: ProjectManagerRecord }) {
   return (
     <button
       className="group rounded-md border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -169,12 +148,8 @@ function ProjectCard({
       </div>
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-xs text-muted-foreground">
-            {project.key}
-          </p>
-          <h3 className="mt-0.5 font-semibold group-hover:text-primary">
-            {project.title}
-          </h3>
+          <p className="font-mono text-xs text-muted-foreground">{project.key}</p>
+          <h3 className="mt-0.5 font-semibold group-hover:text-primary">{project.title}</h3>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
@@ -208,6 +183,6 @@ function formatDate(value: string) {
     : new Intl.DateTimeFormat("en-IN", {
         day: "2-digit",
         month: "short",
-        year: "numeric",
+        year: "numeric"
       }).format(date);
 }

@@ -9,7 +9,7 @@ type TradesAuthLayoutProps = {
 
 export function TradesAuthLayout({ children, surface, title }: TradesAuthLayoutProps) {
   const Icon = Building2;
-  const description = "Access DevKit with your registered credentials.";
+  const description = "Access CodeLogicX with your registered credentials.";
 
   return (
     <main className="auth-page">
@@ -32,7 +32,7 @@ export function TradesAuthLayout({ children, surface, title }: TradesAuthLayoutP
               <Icon size={13} strokeWidth={2.25} />
             </span>
           </span>
-          <strong>DevKit</strong>
+          <strong>CodeLogicX</strong>
         </div>
         <div className={`auth-card-frame auth-card-frame-${surface}`}>
           <div className="auth-card">
