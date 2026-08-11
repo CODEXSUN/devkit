@@ -34,6 +34,24 @@ export class AgentWorktreeService {
     return { baseRevision, branchName, mode: "worktree", path: target, sourceRoot, status: "clean" };
   }
 
+  async prepareChild(input: { access: AgentAccessMode; runId: string; sourceRoot: string }) {
+    const sourceRoot = resolve(input.sourceRoot);
+    if (!allowedRoots().some((allowed) => contains(allowed, sourceRoot))) {
+      throw new AppError({ code: "AGENT_REPOSITORY_NOT_ALLOWED", message: "The parent repository is outside DEVKIT_AGENT_ALLOWED_ROOTS.", statusCode: 403 });
+    }
+    const baseRevision = await git(sourceRoot, ["rev-parse", "HEAD"]);
+    if (!needsWorktree(input.access)) {
+      return { baseRevision, branchName: null, mode: "source" as const, path: sourceRoot, sourceRoot, status: "source" as const };
+    }
+    const root = worktreeRoot();
+    await mkdir(root, { recursive: true });
+    const branchName = `codex/run-${input.runId}`;
+    const target = resolve(root, safeSegment(basename(sourceRoot)), input.runId);
+    requireInside(root, target);
+    await git(sourceRoot, ["worktree", "add", "-b", branchName, target, baseRevision], 60_000);
+    return { baseRevision, branchName, mode: "worktree" as const, path: target, sourceRoot, status: "clean" as const };
+  }
+
   async inspect(workspace: Pick<AgentWorkspace, "mode" | "path" | "sourceRoot">) {
     if (workspace.mode !== "worktree") return { changedFiles: [], clean: true, status: "source" as const };
     this.requireManagedPath(workspace.path);

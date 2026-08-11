@@ -149,3 +149,23 @@ export type AgentRunDetail = AgentRunSummary & {
 };
 
 export type AgentRunStatus = "awaiting_approval" | "cancelled" | "completed" | "failed" | "planning" | "running";
+
+export type AgentTaskGraph = {
+  parentRunUuid: string;
+  reviews: Array<{ createdAt: string; decision: "approved" | "rework"; note: string; uuid: string }>;
+  tasks: Array<{
+    agentProfile: string;
+    childRunUuid: string | null;
+    completedAt: string | null;
+    dependsOn: string[];
+    key: string;
+    objective: string;
+    resultSummary: string | null;
+    scopePaths: string[];
+    sequence: number;
+    startedAt: string | null;
+    status: "blocked" | "ready" | "running" | "completed" | "failed";
+    title: string;
+    uuid: string;
+  }>;
+};

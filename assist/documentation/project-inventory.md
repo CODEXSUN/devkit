@@ -23,6 +23,9 @@
   calls. The Project Agent Run Control lane shows this evidence for the selected project.
 - Orchestration owns the local Git worktree executor. Writable runs use isolated branches under the
   managed worktree root. Cleanup rejects dirty worktrees and keeps each branch for review.
+- Orchestration owns parent task graphs, task dependencies, agent profiles, file scopes, child runs,
+  child worktrees, and parent review evidence. The scheduler starts only dependency-ready tasks and
+  rejects concurrent scopes that overlap.
 - Orchestration owns registered verification commands, verification attempts, rework state, and
   approved local commits. It does not push Agent branches.
 

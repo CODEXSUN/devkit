@@ -4,6 +4,34 @@ Current version: 1.0.23
 Release tag: v-1.0.23
 Changelog label: v 1.0.23
 
+### [Session] 2026-08-11 - Parent run task decomposition
+
+#### Database Changes
+
+- Database update: Yes.
+- Added durable Agent tasks, task dependencies, and parent review records.
+- Linked each scoped task to its parent run and optional child run.
+
+#### App Codebase Changes
+
+- Added validated acyclic task decomposition for parent Agent runs.
+- Added dependency-ready task scheduling and explicit task states.
+- Added agent profiles and normalized file scopes for each child task.
+- Rejected parallel task starts when declared file scopes overlap.
+- Created a durable child run and isolated worktree for each started writable task.
+- Added parent review approval after all child tasks complete.
+- Added a Task Graph panel with task state, scope, dispatch, completion, rework, and approval controls.
+- Kept automatic sub-agent prompt execution as planned work.
+
+#### Verification
+
+- Passed the full repository check.
+- Passed the full production build.
+- Added isolated parallel child worktree coverage.
+- Applied the additive migration to `devkit_db`.
+- Verified task creation and dependency release through the live Project Agent API and UI.
+- Verified the Task Graph panel at a 1920 by 1080 viewport with no browser console errors.
+
 ## Unreleased - Trades conversion
 
 - Renamed the standalone application and deployment surface to Trades.

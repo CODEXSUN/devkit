@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { cleanupAgentRunWorkspace, getAgentRun, listAgentRuns } from "./agent-ide.services";
 import type { AgentRunDetail, AgentRunStatus } from "./agent-ide.types";
 import { AgentIdeQualityGates } from "./agent-ide.quality-gates";
+import { AgentIdeTaskGraph } from "./agent-ide.task-graph";
 
 export function AgentIdeRunConsole({ activeRunId, projectUuid }: { activeRunId: string | null; projectUuid: string }) {
   const queryClient = useQueryClient();
@@ -76,6 +77,7 @@ export function AgentIdeRunConsole({ activeRunId, projectUuid }: { activeRunId: 
             </div>
           </section>
           <Pipeline status={run.status} />
+          <AgentIdeTaskGraph run={run} />
           <WorkspaceEvidence onCleanup={() => void cleanup()} run={run} />
           <AgentIdeQualityGates projectUuid={projectUuid} run={run} />
           <section className="grid grid-cols-3 divide-x rounded-lg border py-3 text-center">

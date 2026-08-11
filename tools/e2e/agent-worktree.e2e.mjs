@@ -83,6 +83,21 @@ try {
   });
   assert.equal(workspace.mode, "worktree");
   assert.equal(workspace.branchName, "codex/run-writable-test");
+  const firstChild = await service.prepareChild({
+    access: "full-access",
+    runId: "child-backend",
+    sourceRoot: repository
+  });
+  const secondChild = await service.prepareChild({
+    access: "full-access",
+    runId: "child-frontend",
+    sourceRoot: repository
+  });
+  assert.notEqual(firstChild.path, secondChild.path);
+  assert.equal(firstChild.branchName, "codex/run-child-backend");
+  assert.equal(secondChild.branchName, "codex/run-child-frontend");
+  await service.cleanup({ ...firstChild, status: "completed" });
+  await service.cleanup({ ...secondChild, status: "completed" });
 
   const readmePath = join(workspace.path, "README.md");
   const original = await readFile(readmePath, "utf8");
@@ -125,7 +140,7 @@ try {
   await service.cleanup({ ...workspace, status: "completed" });
   const branches = await git(repository, ["branch", "--list", workspace.branchName]);
   assert.match(branches.stdout, /codex\/run-writable-test/u);
-  console.info("Agent executor E2E passed: isolation, registered verification, local commit, cleanup, and branch retention verified.");
+  console.info("Agent executor E2E passed: parent isolation, parallel child worktrees, verification, local commit, cleanup, and branch retention verified.");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
 }

@@ -11,6 +11,7 @@ import type {
   AgentIdeSettings
 } from "./agent-ide.types";
 import type { AgentRunDetail, AgentRunSummary } from "./agent-ide.types";
+import type { AgentTaskGraph } from "./agent-ide.types";
 
 export const getAgentIdeSettings = () =>
   apiGet<AgentIdeSettings>("/orchestration/agent-ide/settings");
@@ -38,6 +39,27 @@ export const listAgentRuns = (projectUuid: string) =>
 
 export const getAgentRun = (uuid: string) =>
   apiGet<AgentRunDetail>(`/orchestration/agent-ide/runs/${uuid}`);
+
+export const getAgentTaskGraph = (uuid: string) =>
+  apiGet<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`);
+
+export const saveAgentTaskGraph = (uuid: string, tasks: Array<{
+  agentProfile: string;
+  dependsOn: string[];
+  key: string;
+  objective: string;
+  scopePaths: string[];
+  title: string;
+}>) => apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, { tasks });
+
+export const startAgentTask = (uuid: string) =>
+  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/start`);
+
+export const finishAgentTask = (uuid: string, status: "completed" | "failed", resultSummary = "") =>
+  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/finish`, { resultSummary, status });
+
+export const reviewAgentTaskGraph = (uuid: string, decision: "approved" | "rework", note: string) =>
+  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/parent-review`, { decision, note });
 
 export const cleanupAgentRunWorkspace = (uuid: string) =>
   apiPost<{ branchName: string; cleaned: boolean; path: string }>(

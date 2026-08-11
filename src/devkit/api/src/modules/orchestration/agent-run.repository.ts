@@ -83,6 +83,47 @@ export class AgentRunRepository {
     return uuid;
   }
 
+  async createChild(parentUuid: string, actorId: string, input: { agentProfile: string; objective: string }) {
+    const parent = await this.requireRun(parentUuid, actorId);
+    const uuid = id();
+    await this.database.insertInto("devkit_agent_runs").values({
+      access_mode: parent.access_mode,
+      actor_id: actorId,
+      agent_profile: input.agentProfile,
+      assist_mode: "Develop",
+      base_revision: null,
+      branch_name: null,
+      budget_json: parent.budget_json,
+      chat_thread_uuid: parent.chat_thread_uuid,
+      codex_thread_id: null,
+      codex_turn_id: null,
+      commit_hash: null,
+      committed_at: null,
+      completed_at: null,
+      error_message: null,
+      model: parent.model,
+      objective: input.objective,
+      project_key: parent.project_key,
+      project_title: parent.project_title,
+      project_uuid: parent.project_uuid,
+      result_summary: null,
+      review_status: "child_pending",
+      source_root: null,
+      started_at: null,
+      status: "planning",
+      uuid,
+      verification_completed_at: null,
+      verification_fingerprint: null,
+      verification_status: "not_run",
+      workspace_cleaned_at: null,
+      workspace_mode: "source",
+      workspace_path: null,
+      workspace_status: "source"
+    }).executeTakeFirstOrThrow();
+    await this.event(uuid, actorId, "run.child.created", { parentUuid });
+    return { access: parent.access_mode as AgentAccessMode, sourceRoot: parent.source_root, uuid };
+  }
+
   async start(uuid: string, actorId: string, threadId: string, turnId: string) {
     await this.updateOwned(uuid, actorId, {
       codex_thread_id: threadId,
@@ -91,6 +132,11 @@ export class AgentRunRepository {
       status: "running"
     });
     await this.event(uuid, actorId, "run.started", { threadId, turnId });
+  }
+
+  async markDispatched(uuid: string, actorId: string, parentUuid: string) {
+    await this.updateOwned(uuid, actorId, { started_at: new Date(), status: "running" });
+    await this.event(uuid, actorId, "run.child.dispatched", { parentUuid });
   }
 
   async setWorkspace(uuid: string, actorId: string, workspace: {

@@ -14,7 +14,67 @@ export async function migrateAgentRuns(database: Kysely<DevkitDatabase>) {
   await createArtifacts(database);
   await createToolCalls(database);
   await createVerifications(database);
+  await createTaskGraph(database);
   return agentRunMigration;
+}
+
+async function createTaskGraph(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_tasks (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      parent_run_uuid CHAR(16) NOT NULL,
+      child_run_uuid CHAR(16) NULL,
+      actor_id VARCHAR(160) NOT NULL,
+      task_key VARCHAR(80) NOT NULL,
+      sequence_no INT UNSIGNED NOT NULL,
+      title VARCHAR(240) NOT NULL,
+      objective TEXT NOT NULL,
+      agent_profile VARCHAR(80) NOT NULL,
+      scope_json LONGTEXT NOT NULL,
+      status VARCHAR(32) NOT NULL DEFAULT 'blocked',
+      result_summary LONGTEXT NULL,
+      started_at DATETIME NULL,
+      completed_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_tasks_uuid (uuid),
+      UNIQUE KEY uq_devkit_agent_tasks_key (parent_run_uuid, task_key),
+      KEY idx_devkit_agent_tasks_parent (parent_run_uuid, sequence_no),
+      CONSTRAINT fk_devkit_agent_tasks_parent FOREIGN KEY (parent_run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE,
+      CONSTRAINT fk_devkit_agent_tasks_child FOREIGN KEY (child_run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_task_dependencies (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      task_uuid CHAR(16) NOT NULL,
+      depends_on_task_uuid CHAR(16) NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_task_dependency (task_uuid, depends_on_task_uuid),
+      CONSTRAINT fk_devkit_agent_dependency_task FOREIGN KEY (task_uuid)
+        REFERENCES devkit_agent_tasks (uuid) ON DELETE CASCADE,
+      CONSTRAINT fk_devkit_agent_dependency_required FOREIGN KEY (depends_on_task_uuid)
+        REFERENCES devkit_agent_tasks (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_parent_reviews (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      parent_run_uuid CHAR(16) NOT NULL,
+      actor_id VARCHAR(160) NOT NULL,
+      decision VARCHAR(32) NOT NULL,
+      note TEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_parent_reviews_uuid (uuid),
+      KEY idx_devkit_agent_parent_reviews_run (parent_run_uuid, created_at),
+      CONSTRAINT fk_devkit_agent_parent_reviews_run FOREIGN KEY (parent_run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
 }
 
 async function createRuns(database: Kysely<DevkitDatabase>) {

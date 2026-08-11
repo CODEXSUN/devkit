@@ -5,7 +5,10 @@ import { OrchestrationService } from "./orchestration.service.js";
 import {
   agentIdePlanInputSchema,
   agentCommitInputSchema,
+  agentDecompositionInputSchema,
+  agentParentReviewInputSchema,
   agentReworkInputSchema,
+  agentTaskStatusInputSchema,
   codexApprovalInputSchema,
   codexChatInputSchema,
   codexLoginCancelSchema
@@ -22,6 +25,7 @@ import { agentPolicyService } from "./agent-run.policy.js";
 import { agentWorktreeService } from "./agent-worktree.service.js";
 import { agentVerificationService } from "./agent-verification.service.js";
 import { agentIntegrationService } from "./agent-integration.service.js";
+import { agentTaskGraphRepository } from "./agent-task-graph.repository.js";
 
 const service = new OrchestrationService();
 const planningGateway = new OpenAiPlanningGateway();
@@ -70,6 +74,29 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   app.get("/orchestration/agent-ide/runs/:uuid", async (request) => {
     const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
     return ok(await agentRunRepository.find(uuid, requireDevkitActor().id), { requestId: request.id });
+  });
+  app.get("/orchestration/agent-ide/runs/:uuid/tasks", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    return ok(await agentTaskGraphRepository.find(uuid, requireDevkitActor().id), { requestId: request.id });
+  });
+  app.put("/orchestration/agent-ide/runs/:uuid/tasks", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const input = agentDecompositionInputSchema.parse(request.body);
+    return ok(await agentTaskGraphRepository.replace(uuid, requireDevkitActor().id, input), { requestId: request.id });
+  });
+  app.post("/orchestration/agent-ide/tasks/:uuid/start", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    return ok(await agentTaskGraphRepository.start(uuid, requireDevkitActor().id), { requestId: request.id });
+  });
+  app.post("/orchestration/agent-ide/tasks/:uuid/finish", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const input = agentTaskStatusInputSchema.parse(request.body);
+    return ok(await agentTaskGraphRepository.finish(uuid, requireDevkitActor().id, input.status, input.resultSummary), { requestId: request.id });
+  });
+  app.post("/orchestration/agent-ide/runs/:uuid/parent-review", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const input = agentParentReviewInputSchema.parse(request.body);
+    return ok(await agentTaskGraphRepository.review(uuid, requireDevkitActor().id, input.decision, input.note), { requestId: request.id });
   });
   app.post("/orchestration/agent-ide/runs/:uuid/workspace/cleanup", async (request) => {
     const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);

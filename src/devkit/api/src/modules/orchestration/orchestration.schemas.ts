@@ -149,3 +149,28 @@ export const agentCommitInputSchema = z.object({
   approved: z.literal(true),
   message: z.string().trim().min(3).max(240)
 }).strict();
+
+const agentTaskInputSchema = z.object({
+  agentProfile: z.string().trim().min(1).max(80),
+  dependsOn: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
+  key: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/u).max(80),
+  objective: z.string().trim().min(3).max(4_000),
+  scopePaths: z.array(z.string().trim().min(1).max(500)).min(1).max(50),
+  title: z.string().trim().min(1).max(240)
+}).strict();
+
+export const agentDecompositionInputSchema = z.object({
+  tasks: z.array(agentTaskInputSchema).min(1).max(20)
+}).strict();
+
+export const agentTaskStatusInputSchema = z.object({
+  resultSummary: z.string().trim().max(8_000).default(""),
+  status: z.enum(["completed", "failed"])
+}).strict();
+
+export const agentParentReviewInputSchema = z.object({
+  decision: z.enum(["approved", "rework"]),
+  note: z.string().trim().min(3).max(4_000)
+}).strict();
+
+export type AgentDecompositionInput = z.infer<typeof agentDecompositionInputSchema>;

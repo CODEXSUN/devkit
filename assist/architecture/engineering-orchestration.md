@@ -24,6 +24,10 @@ The current orchestration slice provides these implemented controls:
 - the orchestration API publishes schema-validated lifecycle stages, Assist modes, initial agent
   profiles, permission ceilings, and human-approval boundaries;
 - each Codex turn creates a durable Agent run with actor and project ownership;
+- a parent run owns a durable task graph with dependency and file-scope contracts;
+- dependency-ready child tasks create durable child runs and isolated Git worktrees;
+- parallel task dispatch rejects overlapping declared file scopes;
+- the parent review gate accepts a graph only after every child task completes;
 - Agent runs record steps, events, observed tool activity, approvals, changed-file artifacts,
   budgets, results, and failures;
 - the Project Agent shows persisted run state and evidence beside the chat;
@@ -41,6 +45,7 @@ The current orchestration slice provides these implemented controls:
 - the tool catalog defines capability, access, and risk metadata for future executors;
 - agent profiles remain definitions, while Codex supplies the current executable runtime;
 - preview, deployment, provider routing, and Codex command interception remain planned.
+- automatic sub-agent prompt execution remains planned. The current scheduler prepares dispatch-ready child runs and worktrees.
 
 Orchestration owns runtime persistence through an additive migration and actor-scoped repositories.
 The local executor enforces the recorded run limits through the Codex turn interrupt contract.

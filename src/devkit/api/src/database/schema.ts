@@ -22,6 +22,9 @@ export type DevkitDatabase = {
   devkit_agent_artifacts: AgentArtifactsTable;
   devkit_agent_tool_calls: AgentToolCallsTable;
   devkit_agent_verifications: AgentVerificationsTable;
+  devkit_agent_tasks: AgentTasksTable;
+  devkit_agent_task_dependencies: AgentTaskDependenciesTable;
+  devkit_agent_parent_reviews: AgentParentReviewsTable;
   devkit_project_manager_activity: ProjectManagerActivityTable;
   devkit_project_manager_attachments: ProjectManagerAttachmentsTable;
   devkit_project_manager_items: ProjectManagerItemsTable;
@@ -38,6 +41,43 @@ export type DevkitDatabase = {
   devkit_sync_runs: DevkitSyncRunsTable;
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
+};
+
+export type AgentTasksTable = {
+  actor_id: string;
+  agent_profile: string;
+  child_run_uuid: string | null;
+  completed_at: TimestampColumn | null;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  objective: string;
+  parent_run_uuid: string;
+  result_summary: string | null;
+  scope_json: string;
+  sequence_no: number;
+  started_at: TimestampColumn | null;
+  status: string;
+  task_key: string;
+  title: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type AgentTaskDependenciesTable = {
+  created_at: TimestampColumn;
+  depends_on_task_uuid: string;
+  id: Generated<number>;
+  task_uuid: string;
+};
+
+export type AgentParentReviewsTable = {
+  actor_id: string;
+  created_at: TimestampColumn;
+  decision: string;
+  id: Generated<number>;
+  note: string;
+  parent_run_uuid: string;
+  uuid: string;
 };
 
 export type AgentRunsTable = {
