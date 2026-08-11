@@ -21,12 +21,12 @@ const apps = {
     args: [
       nodePackageBin("tsx", "dist/cli.mjs"),
       "watch",
-      "src/platform/api/src/server.ts"
+      "apps/platform/api/src/server.ts"
     ]
   },
   "platform-web": {
     displayName: "web",
-    cwd: "src/platform/web",
+    cwd: "apps/platform/web",
     envKey: "PLATFORM_WEB_PORT",
     host: "127.0.0.1",
     command: process.execPath,
@@ -138,7 +138,7 @@ function parseRequiredPort(value, envKey) {
 function ensurePlatformApiDependencies() {
   console.log("  - Checking API package builds");
   ensureLinkedPackageBuild("@codexsun/framework", "packages/framework");
-  ensureLinkedPackageBuild("@codexsun/devkit-api", "src/devkit/api");
+  ensureLinkedPackageBuild("@codexsun/devkit-api", "apps/devkit/api");
 }
 
 function ensureLinkedPackageBuild(packageName, packagePath) {

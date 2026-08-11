@@ -8,8 +8,8 @@ const root = resolve(import.meta.dirname, "..");
 const packages = [
   "packages/framework",
   "packages/ui",
-  "src/devkit/api",
-  "src/devkit/web"
+  "apps/devkit/api",
+  "apps/devkit/web"
 ];
 
 for (const packagePath of packages) {

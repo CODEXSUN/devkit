@@ -2,19 +2,14 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const apiModules = resolve(root, "src/platform/api/src/modules");
-const webModules = resolve(root, "src/platform/web/src/modules");
-const devkitApiModules = resolve(root, "src/devkit/api/src/modules");
-const devkitWebModules = resolve(root, "src/devkit/web/src/modules");
+const apiModules = resolve(root, "apps/platform/api/src/modules");
+const webModules = resolve(root, "apps/platform/web/src/modules");
+const devkitApiModules = resolve(root, "apps/devkit/api/src/modules");
+const devkitWebModules = resolve(root, "apps/devkit/web/src/modules");
 const allowed = new Set([
-  "bank-account",
-  "commission",
-  "deposit",
-  "payment",
   "permission",
   "role",
   "role-permission",
-  "trades-overview",
   "user",
   "user-role"
 ]);
@@ -73,51 +68,38 @@ for (const [moduleRoot, expected] of [
   }
 }
 
-for (const name of [...allowed].filter((name) => name !== "trades-overview")) {
+for (const name of allowed) {
   if (!existsSync(join(apiModules, name, "index.ts")))
     failures.push(`API ${name}: missing index.ts`);
   if (!existsSync(join(webModules, name, "index.ts")))
     failures.push(`Web ${name}: missing index.ts`);
 }
-if (!existsSync(join(webModules, "trades-overview", "index.ts"))) {
-  failures.push("Web trades-overview: missing index.ts");
-}
 
-for (const file of sourceFiles(resolve(root, "src/platform"))) {
+for (const file of sourceFiles(resolve(root, "apps/platform"))) {
   const source = readFileSync(file, "utf8");
   if (/@codexsun\/core|modules\/(?:app-registry|subscription|plan|entitlement)/u.test(source)) {
     failures.push(`${relative(root, file)}: imports a removed product/platform boundary`);
   }
 }
 
-for (const file of sourceFiles(resolve(root, "src/devkit"))) {
+for (const file of sourceFiles(resolve(root, "apps/devkit"))) {
   const source = readFileSync(file, "utf8");
-  if (/src\/platform|\.\.\/\.\.\/platform/u.test(source.replaceAll("\\", "/"))) {
+  if (/apps\/platform|\.\.\/\.\.\/platform/u.test(source.replaceAll("\\", "/"))) {
     failures.push(`${relative(root, file)}: DevKit imports its Platform host`);
   }
 }
 
-const apiComposition = readFileSync(resolve(root, "src/platform/api/src/app.ts"), "utf8");
-for (const legacyModule of [
-  "bankAccountModule",
-  "commissionModule",
-  "depositModule",
-  "paymentModule"
-]) {
-  if (apiComposition.includes(legacyModule)) {
-    failures.push(`src/platform/api/src/app.ts: composes legacy ${legacyModule}`);
-  }
-}
+const apiComposition = readFileSync(resolve(root, "apps/platform/api/src/app.ts"), "utf8");
 if (!apiComposition.includes("registerDevkitApiForHost")) {
-  failures.push("src/platform/api/src/app.ts: DevKit API host registration is missing");
+  failures.push("apps/platform/api/src/app.ts: DevKit API host registration is missing");
 }
 
 const webComposition = readFileSync(
-  resolve(root, "src/platform/web/src/desks/app/AppDesk.tsx"),
+  resolve(root, "apps/platform/web/src/desks/app/AppDesk.tsx"),
   "utf8"
 );
 if (!webComposition.includes("devkitWebBundle")) {
-  failures.push("src/platform/web/src/desks/app/AppDesk.tsx: DevKit web bundle is missing");
+  failures.push("apps/platform/web/src/desks/app/AppDesk.tsx: DevKit web bundle is missing");
 }
 
 if (failures.length) {

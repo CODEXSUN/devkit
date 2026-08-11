@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const databaseFile = "src/platform/api/src/database/trades-database.ts";
-const devkitDatabaseFile = "src/devkit/api/src/database/devkit-database.ts";
-const schemaFile = "src/platform/api/src/database/schema.ts";
+const databaseFile = "apps/platform/api/src/database/platform-database.ts";
+const devkitDatabaseFile = "apps/devkit/api/src/database/devkit-database.ts";
+const schemaFile = "apps/platform/api/src/database/schema.ts";
 const database = readFileSync(resolve(root, databaseFile), "utf8");
 const devkitDatabase = readFileSync(resolve(root, devkitDatabaseFile), "utf8");
 const schema = readFileSync(resolve(root, schemaFile), "utf8");
@@ -22,8 +22,7 @@ assertOrdered(databaseFile, database, [
   "seedPermissionModule(db)",
   "seedUserModule(db)",
   "seedUserRoleModule(db)",
-  "seedRolePermissionModule(db)",
-  "seedDevkitDatabase(db as unknown as Kysely<DevkitDatabase>)"
+  "seedRolePermissionModule(db)"
 ]);
 
 assertOrdered(devkitDatabaseFile, devkitDatabase, [
@@ -32,10 +31,9 @@ assertOrdered(devkitDatabaseFile, devkitDatabase, [
   "migrate: migratePlanningModule",
   "migrate: migrateSyncModule"
 ]);
-assertOrdered(devkitDatabaseFile, devkitDatabase, [
-  'name: "devkit.project-manager", seed: seedProjectManagerModule',
-  'name: "devkit.task-manager", seed: seedTaskManagerModule'
-]);
+if (!devkitDatabase.includes("seeders: Object.freeze([])")) {
+  throw new Error(`${devkitDatabaseFile}: DevKit must not load JSON seed databases`);
+}
 
 const expectedTables = [
   "permissions",
@@ -52,7 +50,7 @@ const declaredTables = Array.from(
 if (declaredTables.join(",") !== expectedTables.join(",")) {
   throw new Error(`${schemaFile}: unexpected table ownership: ${declaredTables.join(", ")}`);
 }
-if (!database.includes("tradesDatabaseName()")) {
+if (!database.includes("platformDatabaseName()")) {
   throw new Error(`${databaseFile}: single database selection is missing`);
 }
 

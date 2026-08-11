@@ -7,7 +7,7 @@ const installDirectory = resolve(process.env.INIT_CWD ?? process.cwd());
 const userAgent = process.env.npm_config_user_agent ?? "";
 
 if (!userAgent.startsWith("npm/")) {
-  console.error("TRADES uses npm only. pnpm, yarn, and other package managers are not allowed.");
+  console.error("DevKit uses npm only. pnpm, yarn, and other package managers are not allowed.");
   console.error(`Run: cd "${root}" && npm install`);
   process.exit(1);
 }

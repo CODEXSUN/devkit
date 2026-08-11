@@ -4,7 +4,7 @@ import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const workspaceRoots = ["apps", "packages", "src", "tools"].map((dir) => join(root, dir));
+const workspaceRoots = ["apps", "packages", "tools"].map((dir) => join(root, dir));
 const removableNames = new Set([".turbo", "dist", "dist-types", "node_modules"]);
 
 function removeNestedArtifacts(dir) {
@@ -32,4 +32,4 @@ for (const workspaceRoot of workspaceRoots) {
   removeNestedArtifacts(workspaceRoot);
 }
 
-console.log("Cleaned nested workspace artifacts under packages, src, and tools");
+console.log("Cleaned nested workspace artifacts under apps, packages, and tools");

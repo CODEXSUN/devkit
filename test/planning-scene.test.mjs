@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   normalizePlanningScene,
   planningSceneFromSerialized
-} from "../src/devkit/web/src/modules/planning/planning.scene.ts";
+} from "../apps/devkit/web/src/modules/planning/planning.scene.ts";
 
 test("removes transient Excalidraw collaborators from stored scenes", () => {
   const scene = normalizePlanningScene({

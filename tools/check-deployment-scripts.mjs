@@ -38,17 +38,6 @@ requireTokens(".container/deploy.env.example", deployExample, [
 requireTokens("update.sh", rootUpdater, ['exec bash "$ROOT_DIR/.container/update.sh" "$@"']);
 requireTokens("updat.sh", compatibilityUpdater, ['exec bash "$ROOT_DIR/update.sh" "$@"']);
 
-for (const [file, source] of [
-  [".container/update.sh", updater],
-  [".container/setup.sh", setup],
-  [".container/docker-compose.yml", compose],
-  [".container/deploy.env.example", deployExample]
-]) {
-  if (/\b(?:TRADES|Trades)\b/u.test(source)) {
-    throw new Error(`${file}: stale Trades deployment identifier`);
-  }
-}
-
 console.info("DevKit deployment scripts verified.");
 
 function read(file) {

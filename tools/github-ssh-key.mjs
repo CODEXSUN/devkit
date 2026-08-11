@@ -21,9 +21,9 @@ mkdirSync(repositoryTemp, { mode: 0o700, recursive: true });
 chmodSync(repositoryTemp, 0o700);
 
 const directory = mkdtempSync(join(repositoryTemp, "github-ssh-key-"));
-const privateKeyPath = join(directory, "github_trades");
+const privateKeyPath = join(directory, "github_devkit");
 const publicKeyPath = `${privateKeyPath}.pub`;
-const comment = options.comment ?? `trades-server@${hostname()}`;
+const comment = options.comment ?? `devkit-server@${hostname()}`;
 
 try {
   chmodSync(directory, 0o700);
@@ -97,11 +97,11 @@ function fail(message) {
 }
 
 function printHelp() {
-  output.log(`Generate a temporary ED25519 keypair for TRADES server access to GitHub.
+  output.log(`Generate a temporary ED25519 keypair for DevKit server access to GitHub.
 
 Usage:
   npm run github:ssh-key
-  npm run github:ssh-key -- --comment "trades-server"
+  npm run github:ssh-key -- --comment "devkit-server"
   npm run github:ssh-key -- --json
 
 The keypair is created under this repository's ignored .temp directory. It is never

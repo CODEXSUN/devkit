@@ -8,7 +8,7 @@ The current application is standalone and single-client. It uses local authentic
 MariaDB database configured by `DB_NAME`.
 
 The Platform layer owns the executable API/web shell, users, roles, permissions, assignments, and
-database connection. The `src/devkit` workspaces own Project Manager, Task Manager, Platform
+database connection. The `apps/devkit` workspaces own Project Manager, Task Manager, Platform
 Registry, Planning whiteboards, the GitHub dashboard, engineering orchestration, synchronization,
 migrations, seeds, routes, and React workspaces.
 

@@ -1,15 +1,13 @@
 {
   "name": "devkit",
-  "version": "1.0.23",
+  "version": "1.0.25",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
   "type": "module",
   "workspaces": [
-    "apps/*",
+    "apps/*/*",
     "packages/*",
-    "src/devkit/*",
-    "src/platform/*",
     "tools/*"
   ],
   "scripts": {
@@ -50,11 +48,11 @@
     "stack:plan": "node tools/stack-release-plan.mjs",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "db:migrate": "tsx src/platform/api/src/database/db-cli.ts migrate",
-    "db:migrations:list": "tsx src/platform/api/src/database/db-cli.ts migrations:list",
-    "db:seed": "tsx src/platform/api/src/database/db-cli.ts seed",
-    "db:drop": "tsx src/platform/api/src/database/db-cli.ts drop",
-    "dbmigrate:fresh": "tsx src/platform/api/src/database/db-cli.ts fresh",
+    "db:migrate": "tsx apps/platform/api/src/database/db-cli.ts migrate",
+    "db:migrations:list": "tsx apps/platform/api/src/database/db-cli.ts migrations:list",
+    "db:seed": "tsx apps/platform/api/src/database/db-cli.ts seed",
+    "db:drop": "tsx apps/platform/api/src/database/db-cli.ts drop",
+    "dbmigrate:fresh": "tsx apps/platform/api/src/database/db-cli.ts fresh",
     "github:ssh-key": "node tools/github-ssh-key.mjs",
     "env:jwt-secret": "node tools/env-jwt-secret.mjs"
   },

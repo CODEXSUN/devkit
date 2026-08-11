@@ -1,0 +1,19 @@
+{
+  "name": "@devkit/platform-api",
+  "version": "1.0.25",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@codexsun/devkit-api": "1.0.25",
+    "@codexsun/framework": "1.0.25",
+    "fastify": "^5.11.0",
+    "kysely": "^0.29.4",
+    "mysql2": "^3.23.2",
+    "zod": "^4.4.3"
+  }
+}

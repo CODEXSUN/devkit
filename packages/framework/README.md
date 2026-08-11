@@ -1,12 +1,12 @@
 # CODEXSUN Framework
 
-The internal runtime used to compose Trades into one API and one web platform.
+The internal runtime used to compose DevKit into one API and one web platform.
 
 ## Package exports
 
 `@codexsun/framework` provides stable framework and application contracts, with public subpath exports for API composition, configuration, database, environment, errors, events, health, HTTP, logging, modules, queues, and storage.
 
-Business behavior remains in Trades's owning application modules and is not placed here.
+Business behavior remains in owning application modules and is not placed here.
 
 ## Development
 

@@ -252,7 +252,7 @@ function updatePackage(file, currentVersion, nextVersion) {
   ]) {
     for (const [name, value] of Object.entries(pkg[field] ?? {})) {
       if (
-        (name.startsWith("@trades/") || name.startsWith("@codexsun/")) &&
+        (name.startsWith("@codexsun/") || name.startsWith("@devkit/")) &&
         (value === currentVersion || value === `^${currentVersion}`)
       ) {
         pkg[field][name] = value.startsWith("^") ? `^${nextVersion}` : nextVersion;
@@ -411,7 +411,7 @@ function askWindowsModal(question, defaultValue = "") {
       "Add-Type -AssemblyName System.Windows.Forms",
       `$answer = [System.Windows.Forms.MessageBox]::Show(${quotePowerShell(
         question.replace(/\s*\[[Yy]\/[Nn]\]\s*$/u, "")
-      )}, 'Trades GitHub Release', 'YesNo', 'Question')`,
+      )}, 'DevKit GitHub Release', 'YesNo', 'Question')`,
       "if ($answer -eq 'Yes') { 'yes' } else { 'no' }"
     ].join("; ");
     return powershellModal(script);
@@ -421,7 +421,7 @@ function askWindowsModal(question, defaultValue = "") {
     "Add-Type -AssemblyName Microsoft.VisualBasic",
     `[Microsoft.VisualBasic.Interaction]::InputBox(${quotePowerShell(
       question
-    )}, 'Trades GitHub Release', ${quotePowerShell(defaultValue)})`
+    )}, 'DevKit GitHub Release', ${quotePowerShell(defaultValue)})`
   ].join("; ");
   return powershellModal(script);
 }

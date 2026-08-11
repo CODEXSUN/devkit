@@ -5,8 +5,8 @@ const root = resolve(import.meta.dirname, "..");
 const internalPackages = new Map([
   ["@codexsun/framework", "packages/framework"],
   ["@codexsun/ui", "packages/ui"],
-  ["@codexsun/devkit-api", "src/devkit/api"],
-  ["@codexsun/devkit-web", "src/devkit/web"]
+  ["@codexsun/devkit-api", "apps/devkit/api"],
+  ["@codexsun/devkit-web", "apps/devkit/web"]
 ]);
 const failures = [];
 
@@ -49,12 +49,12 @@ const boundaryFiles = [
   "components.json",
   "package.json",
   "package-lock.json",
-  "src/platform/api/package.json",
-  "src/platform/web/package.json",
-  "src/devkit/api/package.json",
-  "src/devkit/web/package.json",
-  "src/platform/web/tsconfig.json",
-  "src/platform/web/vite.config.ts",
+  "apps/platform/api/package.json",
+  "apps/platform/web/package.json",
+  "apps/devkit/api/package.json",
+  "apps/devkit/web/package.json",
+  "apps/platform/web/tsconfig.json",
+  "apps/platform/web/vite.config.ts",
   "tools/preflight.mjs",
   "tools/install-stack.mjs",
   "tools/stack-command.mjs",

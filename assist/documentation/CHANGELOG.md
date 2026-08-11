@@ -1,8 +1,35 @@
 # Changelog
 
-Current version: 1.0.23
-Release tag: v-1.0.23
-Changelog label: v 1.0.23
+Current version: 1.0.25
+Release tag: v-1.0.25
+Changelog label: v 1.0.25
+
+### [Session] 2026-08-11 - CODEXSUN application workspace layout
+
+#### Database Changes
+
+- Database update: No.
+- Kept the existing Platform and DevKit migration order and database ownership.
+
+#### App Codebase Changes
+
+- Moved Platform API and web workspaces to `apps/platform`.
+- Moved DevKit API and web workspaces to `apps/devkit`.
+- Moved the Tauri desktop workspace to `apps/devkit/desktop`.
+- Changed the root workspace pattern to `apps/*/*`.
+- Kept Framework and UI in `packages`.
+- Updated scripts, checks, tests, source paths, seed paths, and documentation.
+- Removed the obsolete root `src` application tree.
+
+#### Verification
+
+- Passed repository-boundary, dependency-layout, module-boundary, and database-lifecycle checks.
+- Passed all workspace TypeScript and lint checks.
+- Passed the Framework test and package-contract suites.
+- Passed the full production build for API, web, and desktop workspaces.
+- Applied the MariaDB migration from `apps/platform/api`.
+- Passed two composed API runtime smoke cycles.
+- The aggregate check remains blocked by the unrelated deleted root `updat.sh` file.
 
 ### [Session] 2026-08-11 - Parent run task decomposition
 
@@ -140,6 +167,67 @@ Changelog label: v 1.0.23
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.25
+
+### [v 1.0.25] 2026-08-11 5:04 pm - Repository connection catalog and workspace mapping
+
+#### Database Changes
+
+- Database update: Yes.
+- Added the `devkit_repository_connections` table.
+- Added repository display names, provider types, private base URLs, repository paths, and availability states.
+- Applied the `devkit.project-manager.sql.v7` migration to `devkit_db`.
+
+#### App Codebase Changes
+
+- Bumped the repository and all workspace packages to 1.0.25.
+- Added a Repository Connections settings page for GitHub and private Git repositories.
+- Added support for multiple named repository connections.
+- Kept Git base URLs in the settings page and removed them from the developer workspace flow.
+- Changed project workspace setup to use local folders or approved repository names.
+- Added a native Windows folder picker for local repositories and clone destinations.
+- Added repository configuration and developer-safe repository list API routes.
+- Added repository mapping, Git status, branch, changed-file, and package-version information.
+- Kept repository cloning under Project Agent approval.
+
+#### Verification
+
+- Passed all workspace TypeScript and lint checks.
+- Passed the full production build for the API, web, and desktop workspaces.
+- Passed the database lifecycle check.
+- Passed two composed API runtime smoke cycles.
+- Passed the repository text encoding and Git diff checks.
+
+## v-1.0.24
+
+### [v 1.0.24] 2026-08-11 3:00 pm - Remove legacy business modules
+
+#### Database Changes
+
+- Database update: No.
+- Kept existing database tables and records unchanged.
+
+#### App Codebase Changes
+
+- Removed the Deposit, Payment, Commission, Bank Account, and Trades Overview module surfaces.
+- Kept only identity modules in the Platform API and web module roots.
+- Renamed the host database, login, JWT, health, release, and SSH contracts to DevKit or Platform names.
+- Removed unused compatibility clients, request context code, form code, and obsolete queue test code.
+- Removed the Project Manager and Task Manager JSON seed databases and their boot-time import code.
+- Made both modules start with empty MariaDB tables and use their APIs for all new records.
+- Updated module boundaries, database lifecycle checks, package documentation, and project inventory.
+- Bumped the repository and all workspace packages to 1.0.24.
+
+#### Verification
+
+- Passed the module-boundary and database-lifecycle checks.
+- Passed all workspace TypeScript checks.
+- Passed the Framework tests and package-contract checks.
+- Passed the production build.
+- Passed two composed API runtime smoke cycles.
+- Confirmed that active source and tooling contain no removed module references.
+- Confirmed that no Project Manager or Task Manager JSON database references remain.
 
 ## v-1.0.23
 
