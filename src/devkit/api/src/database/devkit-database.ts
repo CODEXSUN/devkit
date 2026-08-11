@@ -19,6 +19,15 @@ import {
   migratePlanningModule,
   planningMigration,
 } from "../modules/planning/planning.migration.js";
+import { migrateTelegramSupportModule, telegramSupportMigration } from "../modules/telegram-support/telegram-support.migration.js";
+import {
+  migrateOrchestrationChat,
+  orchestrationChatMigration
+} from "../modules/orchestration/orchestration-chat.migration.js";
+import {
+  agentRunMigration,
+  migrateAgentRuns
+} from "../modules/orchestration/agent-run.migration.js";
 
 const databaseContext = new AsyncLocalStorage<Kysely<DevkitDatabase>>();
 const bootstrapPromises = new WeakMap<
@@ -52,6 +61,9 @@ const migrationSteps = [
     migrate: migrateSyncModule,
     name: syncMigration.key,
   },
+  { migrate: migrateTelegramSupportModule, name: telegramSupportMigration.key },
+  { migrate: migrateOrchestrationChat, name: orchestrationChatMigration.key },
+  { migrate: migrateAgentRuns, name: agentRunMigration.key },
 ] as const;
 
 const seedSteps = [

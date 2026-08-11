@@ -17,19 +17,33 @@ The current application is a standalone, single-client modular monolith backed b
 database. Platform owns authentication, identity, executable servers, database connection, and
 composition. DevKit modules own all engineering product behavior.
 
-The first orchestration slice is deliberately operationally honest:
+The current orchestration slice provides these implemented controls:
 
 - the Engineering Command Center combines live project, task, review, repository, and check
   signals already owned by DevKit;
 - the orchestration API publishes schema-validated lifecycle stages, Assist modes, initial agent
   profiles, permission ceilings, and human-approval boundaries;
-- agent profiles are definitions, not executable autonomous agents;
-- preview, deployment, model routing, budgets, and isolated execution remain visibly planned until
-  their runtimes and evidence exist.
+- each Codex turn creates a durable Agent run with actor and project ownership;
+- Agent runs record steps, events, observed tool activity, approvals, changed-file artifacts,
+  budgets, results, and failures;
+- the Project Agent shows persisted run state and evidence beside the chat;
+- writable runs use isolated Git worktrees under a managed runtime root;
+- Plan and read-only runs stay on the source checkout;
+- the executor limits repository roots through `DEVKIT_AGENT_ALLOWED_ROOTS`;
+- DevKit interrupts Codex when a run exceeds its time, tool, file, or sub-agent budget;
+- reviewers can remove a clean terminal worktree while they keep its branch;
+- DevKit runs only registered quality-gate commands without a shell;
+- each verification attempt records its command, result, output, duration, and required status;
+- failed verification can return a run for rework and a later verification attempt;
+- a passed run requires a separate human action before DevKit creates a local commit;
+- the commit gate rejects a worktree that changed after its last passed verification attempt;
+- DevKit does not push Agent commits or change protected branches;
+- the tool catalog defines capability, access, and risk metadata for future executors;
+- agent profiles remain definitions, while Codex supplies the current executable runtime;
+- preview, deployment, provider routing, and Codex command interception remain planned.
 
-No new persistence is required for this read-only catalog. Runtime records must receive an owning
-module, additive migration, repository, authorization rules, and repeatable seed only when a later
-phase makes them executable.
+Orchestration owns runtime persistence through an additive migration and actor-scoped repositories.
+The local executor enforces the recorded run limits through the Codex turn interrupt contract.
 
 ## Target Architecture
 

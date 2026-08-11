@@ -1,6 +1,7 @@
 import type { SidemenuItem } from "@codexsun/ui/blocks/menu/sidemenu/sub/sidemenu-section";
 import type { TopMenuWorkspaceItem } from "@codexsun/ui/blocks/menu/sidemenu/top-menu";
 import {
+  BotIcon,
   CircleGaugeIcon,
   CalendarCheckIcon,
   DatabaseIcon,
@@ -8,6 +9,7 @@ import {
   GitForkIcon,
   PaletteIcon,
   PencilRulerIcon,
+  SendIcon,
   WorkflowIcon,
   WrenchIcon
 } from "lucide-react";
@@ -38,6 +40,21 @@ const workspaces = Object.freeze([
       default: module.OrchestrationWorkspace
     }))
   ),
+  workspace("agent-ide", "Project Agent", "Agents", () =>
+    import("./modules/agent-ide").then((module) => ({
+      default: module.AgentIdeWorkspace
+    }))
+  ),
+  workspace("launch-desk", "Codex Runtime", "Agents", () =>
+    import("./modules/launch-desk").then((module) => ({
+      default: module.LaunchDeskWorkspace
+    }))
+  ),
+  workspace("skills", "Skill Library", "Agents", () =>
+    import("./modules/skill-library").then((module) => ({
+      default: module.SkillLibraryWorkspace
+    }))
+  ),
   workspace("today", "Today", "Development", () =>
     import("./modules/today").then((module) => ({
       default: module.TodayWorkspace
@@ -66,6 +83,12 @@ const workspaces = Object.freeze([
     import("./modules/task-manager").then((module) => ({
       default: module.TaskManagerWorkspace
     }))
+  ),
+  workspace("telegram-connect", "Connect Telegram", "Telegram", () =>
+    import("./modules/telegram-support").then((module) => ({ default: module.TelegramConnectWorkspace }))
+  ),
+  workspace("telegram-chat", "Telegram Chat", "Telegram", () =>
+    import("./modules/telegram-support").then((module) => ({ default: module.TelegramChatWorkspace }))
   ),
   workspace("registry", "Platform Registry", "Development", () =>
     import("./modules/platform-registry").then((module) => ({
@@ -118,6 +141,32 @@ export const devkitWebBundle = Object.freeze({
         url: "/app/devkit/orchestration"
       },
       {
+        icon: BotIcon,
+        isActive:
+          activeWorkspaceId === "agent-ide" ||
+          activeWorkspaceId === "launch-desk" ||
+          activeWorkspaceId === "skills",
+        items: [
+          {
+            isActive: activeWorkspaceId === "agent-ide",
+            title: "Project Agent",
+            url: "/app/devkit/agent-ide"
+          },
+          {
+            isActive: activeWorkspaceId === "launch-desk",
+            title: "Codex Runtime",
+            url: "/app/devkit/launch-desk"
+          },
+          {
+            isActive: activeWorkspaceId === "skills",
+            title: "Skill Library",
+            url: "/app/devkit/skills"
+          }
+        ],
+        title: "Agents",
+        url: "/app/devkit/agent-ide"
+      },
+      {
         icon: PencilRulerIcon,
         isActive: activeWorkspaceId === "planning",
         title: "Planning",
@@ -160,6 +209,16 @@ export const devkitWebBundle = Object.freeze({
         ],
         title: "Development",
         url: "/app/devkit/projects"
+      },
+      {
+        icon: SendIcon,
+        isActive: activeWorkspaceId === "telegram-connect" || activeWorkspaceId === "telegram-chat",
+        items: [
+          { isActive: activeWorkspaceId === "telegram-connect", title: "Connect Mobile", url: "/app/devkit/telegram-connect" },
+          { isActive: activeWorkspaceId === "telegram-chat", title: "Chat", url: "/app/devkit/telegram-chat" }
+        ],
+        title: "Telegram",
+        url: "/app/devkit/telegram-connect"
       },
       {
         icon: DatabaseIcon,

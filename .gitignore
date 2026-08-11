@@ -160,3 +160,31 @@ vite.config.ts.timestamp-*
 # Runtime and build artifacts
 /.turbo/
 /storage/
+
+# Rust and Tauri build output
+**/target/
+**/src-tauri/gen/schemas/
+
+# Test and browser-runner output
+**/coverage/
+**/playwright-report/
+**/test-results/
+**/.vitest/
+
+# Local databases, dumps, and runtime snapshots
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sql.gz
+*.dump
+
+# Temporary and operating-system files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

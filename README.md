@@ -22,8 +22,18 @@ npm install
 npm run dev
 ```
 
-Default endpoints are API `http://127.0.0.1:7050` and Web `http://127.0.0.1:7060`.
+Default endpoints are API `http://127.0.0.1:9050` and Web `http://127.0.0.1:9060`.
 The browser enters at `/app/devkit/orchestration`; DevKit API routes use `/api/devkit/*`.
+
+Writable Project Agent runs use isolated Git worktrees. The current repository is allowed by
+default. Set `DEVKIT_AGENT_ALLOWED_ROOTS` to allow other repository roots. Set
+`DEVKIT_AGENT_WORKTREE_ROOT` to change the managed worktree location.
+
+The built-in quality gate runs `git diff --check`. Set
+`DEVKIT_AGENT_VERIFICATION_COMMANDS` to a JSON array of approved commands. Each entry needs an ID,
+label, executable, argument array, required flag, and timeout. DevKit executes these commands
+without a shell. Set `DEVKIT_AGENT_GIT_NAME` and `DEVKIT_AGENT_GIT_EMAIL` for approved local
+commits. DevKit never pushes an Agent commit.
 
 Database commands:
 
@@ -64,6 +74,8 @@ deploying and recording an uncommitted checkout.
 npm run check
 npm run build
 npm run test:e2e:runtime
+npm run test:e2e:agent-worktree
+npm run test:e2e:codex-chat
 ```
 
 Read `assist/AGENT-GUIDE.md` before changing architecture or module ownership. The product and

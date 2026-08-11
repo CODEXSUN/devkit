@@ -1,0 +1,209 @@
+import { sql, type Kysely } from "kysely";
+import type { DevkitDatabase } from "../../database/schema.js";
+
+export const agentRunMigration = {
+  description: "Durable Agent runs, steps, events, approvals, artifacts, and tool calls.",
+  key: "devkit.agent-runs.sql.v1"
+} as const;
+
+export async function migrateAgentRuns(database: Kysely<DevkitDatabase>) {
+  await createRuns(database);
+  await createSteps(database);
+  await createEvents(database);
+  await createApprovals(database);
+  await createArtifacts(database);
+  await createToolCalls(database);
+  await createVerifications(database);
+  return agentRunMigration;
+}
+
+async function createRuns(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_runs (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      actor_id VARCHAR(160) NOT NULL,
+      project_uuid VARCHAR(160) NOT NULL,
+      project_key VARCHAR(160) NOT NULL,
+      project_title VARCHAR(240) NOT NULL,
+      chat_thread_uuid CHAR(16) NOT NULL,
+      codex_thread_id VARCHAR(240) NULL,
+      codex_turn_id VARCHAR(240) NULL,
+      agent_profile VARCHAR(80) NOT NULL,
+      assist_mode VARCHAR(32) NOT NULL,
+      access_mode VARCHAR(32) NOT NULL,
+      model VARCHAR(80) NOT NULL,
+      objective TEXT NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      budget_json TEXT NOT NULL,
+      result_summary LONGTEXT NULL,
+      error_message TEXT NULL,
+      started_at DATETIME NULL,
+      completed_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      workspace_mode VARCHAR(24) NOT NULL DEFAULT 'source',
+      workspace_status VARCHAR(24) NOT NULL DEFAULT 'source',
+      source_root VARCHAR(1000) NULL,
+      workspace_path VARCHAR(1000) NULL,
+      branch_name VARCHAR(240) NULL,
+      base_revision VARCHAR(80) NULL,
+      workspace_cleaned_at DATETIME NULL,
+      verification_status VARCHAR(24) NOT NULL DEFAULT 'not_run',
+      verification_completed_at DATETIME NULL,
+      verification_fingerprint CHAR(64) NULL,
+      review_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+      commit_hash VARCHAR(80) NULL,
+      committed_at DATETIME NULL,
+      UNIQUE KEY uq_devkit_agent_runs_uuid (uuid),
+      KEY idx_devkit_agent_runs_actor_project (actor_id, project_uuid, updated_at),
+      CONSTRAINT fk_devkit_agent_runs_chat
+        FOREIGN KEY (chat_thread_uuid) REFERENCES devkit_orchestration_chat_threads (uuid)
+        ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS workspace_mode VARCHAR(24) NOT NULL DEFAULT 'source' AFTER updated_at`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS workspace_status VARCHAR(24) NOT NULL DEFAULT 'source' AFTER workspace_mode`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS source_root VARCHAR(1000) NULL AFTER workspace_status`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS workspace_path VARCHAR(1000) NULL AFTER source_root`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS branch_name VARCHAR(240) NULL AFTER workspace_path`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS base_revision VARCHAR(80) NULL AFTER branch_name`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS workspace_cleaned_at DATETIME NULL AFTER base_revision`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS verification_status VARCHAR(24) NOT NULL DEFAULT 'not_run' AFTER workspace_cleaned_at`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS verification_completed_at DATETIME NULL AFTER verification_status`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS verification_fingerprint CHAR(64) NULL AFTER verification_completed_at`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS review_status VARCHAR(32) NOT NULL DEFAULT 'pending' AFTER verification_fingerprint`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS commit_hash VARCHAR(80) NULL AFTER review_status`.execute(database);
+  await sql`ALTER TABLE devkit_agent_runs ADD COLUMN IF NOT EXISTS committed_at DATETIME NULL AFTER commit_hash`.execute(database);
+}
+
+async function createSteps(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_run_steps (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      run_uuid CHAR(16) NOT NULL,
+      sequence_no INT UNSIGNED NOT NULL,
+      kind VARCHAR(80) NOT NULL,
+      label VARCHAR(240) NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      output_json LONGTEXT NOT NULL,
+      started_at DATETIME NULL,
+      completed_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_steps_uuid (uuid),
+      KEY idx_devkit_agent_steps_run (run_uuid, sequence_no),
+      CONSTRAINT fk_devkit_agent_steps_run FOREIGN KEY (run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+}
+
+async function createEvents(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_events (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      run_uuid CHAR(16) NOT NULL,
+      actor_id VARCHAR(160) NOT NULL,
+      event_type VARCHAR(120) NOT NULL,
+      payload_json LONGTEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_events_uuid (uuid),
+      KEY idx_devkit_agent_events_run (run_uuid, created_at),
+      CONSTRAINT fk_devkit_agent_events_run FOREIGN KEY (run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+}
+
+async function createApprovals(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_approvals (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      run_uuid CHAR(16) NOT NULL,
+      actor_id VARCHAR(160) NOT NULL,
+      thread_id VARCHAR(240) NOT NULL,
+      request_id INT UNSIGNED NOT NULL,
+      reason TEXT NOT NULL,
+      status VARCHAR(24) NOT NULL,
+      decision VARCHAR(32) NULL,
+      decided_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_approvals_uuid (uuid),
+      UNIQUE KEY uq_devkit_agent_approvals_request (actor_id, thread_id, request_id),
+      KEY idx_devkit_agent_approvals_run (run_uuid, created_at),
+      CONSTRAINT fk_devkit_agent_approvals_run FOREIGN KEY (run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+}
+
+async function createArtifacts(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_artifacts (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      run_uuid CHAR(16) NOT NULL,
+      artifact_type VARCHAR(80) NOT NULL,
+      label VARCHAR(240) NOT NULL,
+      path VARCHAR(1000) NOT NULL,
+      metadata_json LONGTEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_artifacts_uuid (uuid),
+      UNIQUE KEY uq_devkit_agent_artifacts_path (run_uuid, path(500)),
+      CONSTRAINT fk_devkit_agent_artifacts_run FOREIGN KEY (run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+}
+
+async function createToolCalls(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_tool_calls (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      run_uuid CHAR(16) NOT NULL,
+      tool_name VARCHAR(160) NOT NULL,
+      risk_level VARCHAR(24) NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      input_json LONGTEXT NOT NULL,
+      output_json LONGTEXT NOT NULL,
+      started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_tool_calls_uuid (uuid),
+      KEY idx_devkit_agent_tool_calls_run (run_uuid, created_at),
+      CONSTRAINT fk_devkit_agent_tool_calls_run FOREIGN KEY (run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+}
+
+async function createVerifications(database: Kysely<DevkitDatabase>) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS devkit_agent_verifications (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      uuid CHAR(16) NOT NULL,
+      run_uuid CHAR(16) NOT NULL,
+      attempt_no INT UNSIGNED NOT NULL,
+      command_id VARCHAR(120) NOT NULL,
+      label VARCHAR(240) NOT NULL,
+      command_name VARCHAR(500) NOT NULL,
+      args_json LONGTEXT NOT NULL,
+      required_gate TINYINT(1) NOT NULL DEFAULT 1,
+      status VARCHAR(24) NOT NULL,
+      exit_code INT NULL,
+      stdout_text LONGTEXT NOT NULL,
+      stderr_text LONGTEXT NOT NULL,
+      duration_ms INT UNSIGNED NOT NULL,
+      completed_at DATETIME NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_devkit_agent_verifications_uuid (uuid),
+      KEY idx_devkit_agent_verifications_run (run_uuid, attempt_no, created_at),
+      CONSTRAINT fk_devkit_agent_verifications_run FOREIGN KEY (run_uuid)
+        REFERENCES devkit_agent_runs (uuid) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+}

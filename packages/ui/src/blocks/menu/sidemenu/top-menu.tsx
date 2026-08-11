@@ -38,6 +38,7 @@ import { TopUserMenu, type TopUserMenuUser } from "./top-user-menu";
 
 export type TopMenuWorkspaceItem = {
   active?: boolean;
+  avatar?: boolean;
   description: string;
   icon: LucideIcon;
   onSelect?: () => void;
@@ -101,13 +102,6 @@ export function TopMenu({
 }: TopMenuProps) {
   const activeWorkspace = workspaceItems.find((item) => item.active) ?? workspaceItems[0];
   const ActiveWorkspaceIcon = activeWorkspace?.icon ?? BriefcaseBusinessIcon;
-  const [activeVariantId, setActiveVariantId] = useState<DesignSystemVariantId>(() =>
-    getStoredTheme()
-  );
-
-  useEffect(() => {
-    applyTheme(activeVariantId);
-  }, [activeVariantId]);
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between rounded-t-lg border-b bg-background">
@@ -200,50 +194,65 @@ export function TopMenu({
           {...(profileHref ? { profileHref } : {})}
           user={user}
         />
-        {showThemeAction ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button aria-label="Theme" size="icon" variant="outline" className="size-8">
-                <PaletteIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 rounded-md p-2">
-              <DropdownMenuLabel className="px-2 text-xs font-medium text-muted-foreground">
-                Design theme
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {designSystemVariants.map((variant) => {
-                const active = variant.id === activeVariantId;
-                return (
-                  <DropdownMenuItem
-                    key={variant.id}
-                    className="gap-3 rounded-md p-2"
-                    onSelect={() => setActiveVariantId(variant.id)}
-                  >
-                    <div className="flex -space-x-1">
-                      {variant.palette.slice(0, 4).map((color) => (
-                        <span
-                          key={color}
-                          className="size-4 rounded-full border border-background shadow-sm"
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{variant.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {variant.density}
-                      </div>
-                    </div>
-                    {active ? <CheckIcon className="size-4" /> : null}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+        {showThemeAction ? <DesignThemeMenu /> : null}
       </div>
     </header>
+  );
+}
+
+export function DesignThemeMenu({ rounded = false }: { rounded?: boolean }) {
+  const [activeVariantId, setActiveVariantId] = useState<DesignSystemVariantId>(() =>
+    getStoredTheme()
+  );
+
+  useEffect(() => {
+    applyTheme(activeVariantId);
+  }, [activeVariantId]);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label="Theme"
+          className={rounded ? "size-9 rounded-full" : "size-8"}
+          size="icon"
+          variant="outline"
+        >
+          <PaletteIcon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72 rounded-md p-2">
+        <DropdownMenuLabel className="px-2 text-xs font-medium text-muted-foreground">
+          Design theme
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {designSystemVariants.map((variant) => {
+          const active = variant.id === activeVariantId;
+          return (
+            <DropdownMenuItem
+              key={variant.id}
+              className="gap-3 rounded-md p-2"
+              onSelect={() => setActiveVariantId(variant.id)}
+            >
+              <div className="flex -space-x-1">
+                {variant.palette.slice(0, 4).map((color) => (
+                  <span
+                    key={color}
+                    className="size-4 rounded-full border border-background shadow-sm"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{variant.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{variant.density}</div>
+              </div>
+              {active ? <CheckIcon className="size-4" /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

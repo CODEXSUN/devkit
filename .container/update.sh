@@ -565,8 +565,8 @@ probe_address="$bind_address"
 case "$probe_address" in
   0.0.0.0|::|"[::]") probe_address=127.0.0.1 ;;
 esac
-api_url="http://${probe_address}:$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 7050)/health"
-web_url="http://${probe_address}:$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 7060)/health"
+api_url="http://${probe_address}:$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 9050)/health"
+web_url="http://${probe_address}:$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 9060)/health"
 
 if ! curl --fail --silent --show-error --max-time 15 \
   --retry 5 --retry-delay 2 --retry-connrefused "$api_url" >/dev/null; then
@@ -583,8 +583,8 @@ write_deployment_metadata "completed" "$new_api_image" "$new_web_image"
 
 echo
 echo "DevKit Docker update completed."
-echo "Web: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 7060)/"
-echo "API health: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 7050)/health"
+echo "Web: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 9060)/"
+echo "API health: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 9050)/health"
 echo "Validated database backup: $backup_file"
 echo "Backup SHA-256: $backup_checksum"
 echo "Deployment metadata: $metadata_file"

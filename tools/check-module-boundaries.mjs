@@ -24,17 +24,23 @@ const devkitApiOwned = new Set([
   "orchestration",
   "planning",
   "project-manager",
+  "skills",
   "sync",
+  "telegram-support",
   "task-manager"
 ]);
 const devkitWebOwned = new Set([
+  "agent-ide",
   "design-system",
   "github-dashboard",
+  "launch-desk",
   "orchestration",
   "planning",
   "platform-registry",
   "project-manager",
+  "skill-library",
   "sync",
+  "telegram-support",
   "task-manager",
   "today",
   "work-automation"

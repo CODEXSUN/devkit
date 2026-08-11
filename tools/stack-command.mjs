@@ -25,6 +25,7 @@ if (command === "typecheck") {
 runNpm(["run", command, "--workspace", "@codexsun/devkit-web"]);
 runNpm(["run", command, "--workspace", "@devkit/platform-api"]);
 runNpm(["run", command, "--workspace", "@devkit/platform-web"]);
+runNpm(["run", command, "--workspace", "@devkit/desktop"]);
 
 function runNpm(args) {
   const executable = process.env.npm_execpath ? process.execPath : "npm";

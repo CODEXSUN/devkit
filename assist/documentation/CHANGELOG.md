@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.22
-Release tag: v-1.0.22
-Changelog label: v 1.0.22
+Current version: 1.0.23
+Release tag: v-1.0.23
+Changelog label: v 1.0.23
 
 ## Unreleased - Trades conversion
 
@@ -10,6 +10,143 @@ Changelog label: v 1.0.22
 - Retained Platform local users, roles, permissions, and assignments.
 - Composed Deposit, Payment, Bank Account, and Commission from migration through UI.
 - Removed the copied external sales and identity integration features.
+
+### [Session] 2026-08-11 10:35 am - Project Agent quality gates
+
+#### Database Changes
+
+- Database update: Yes.
+- Added verification, review, commit, and completion fields to Agent runs.
+- Added durable Agent verification attempts with command, result, output, and duration evidence.
+
+#### App Codebase Changes
+
+- Added a shell-free registered verification command runner.
+- Added a built-in Git whitespace and conflict check.
+- Added environment-based command registration for project quality gates.
+- Added repeatable verification attempts and a return-for-rework review state.
+- Required all registered gates to pass before local commit approval.
+- Added a worktree fingerprint that rejects changes made after a passed verification attempt.
+- Added a two-step local commit approval in Run Control.
+- Kept Agent commits local and disabled automatic remote pushes.
+- Added quality-gate results, status, rework, and commit evidence to Run Control.
+
+#### Verification
+
+- Added executor tests for registered commands, missing executables, local commits, and branch retention.
+- Added runtime smoke coverage for the verification command catalog.
+- Added live Codex coverage for the read-only verification boundary.
+
+### [Session] 2026-08-11 9:50 am - Isolated Project Agent executor
+
+#### Database Changes
+
+- Database update: Yes.
+- Added workspace mode, status, source root, path, branch, revision, and cleanup fields to Agent runs.
+- Added safe in-place column upgrades for an existing Agent run table.
+
+#### App Codebase Changes
+
+- Added one isolated Git branch and worktree for each writable Project Agent run.
+- Kept Plan and read-only runs on the source checkout.
+- Added repository allowlist and managed worktree root settings.
+- Added runtime, tool-call, changed-file, and sub-agent budget enforcement.
+- Added Codex turn interruption when a run exceeds a budget.
+- Added workspace, branch, revision, and cleanup evidence to Run Control.
+- Refused cleanup for active, unregistered, or dirty worktrees.
+- Kept the run branch after clean worktree removal.
+
+#### Verification
+
+- Passed the full repository build.
+- Passed the additive MariaDB migration and two API restart cycles.
+- Passed the isolated worktree test with dirty cleanup refusal and branch retention.
+- Passed a real Codex stream with durable history, workspace evidence, feedback, and actor isolation.
+- Verified the Project Agent and Run Control layout at a 1920 by 1080 viewport.
+
+### [Session] 2026-08-11 9:13 am - Durable Project Agent prototype
+
+#### Database Changes
+
+- Database update: Yes.
+- Added Agent run, step, event, approval, artifact, and tool-call tables.
+- Added actor and project indexes for Agent run history.
+- Added foreign keys from runtime evidence to its owning Agent run.
+
+#### App Codebase Changes
+
+- Created one durable Agent run for each Codex turn.
+- Added an explicit Agent run state machine.
+- Added a provider-neutral tool catalog with access and risk metadata.
+- Recorded Codex activity, approvals, changed files, completion, and failure evidence.
+- Added actor-scoped Agent run list and detail APIs.
+- Added the Project Agent Run Control lane with pipeline, budgets, approvals, activity, and files.
+- Added a scale roadmap for worktrees, verification, delegation, models, nodes, and delivery.
+
+#### Verification
+
+- Added live end-to-end assertions for durable runs and actor isolation.
+- Added runtime smoke assertions for the tool catalog.
+
+### [Session] 2026-08-11 12:40 am - Skill Library references
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Added the Skill Library workspace for repository-owned prompting and review knowledge.
+- Added physical skill folders under `assist/skills/library`.
+- Made `SKILL.md` an internal generated manifest and removed it from the file editor.
+- Linked each user-managed reference file from the generated skill manifest.
+- Added clear conflict errors for duplicate reference file names.
+- Removed the floating Compact and Comfortable display control.
+- Replaced manual reference file names with a local drive file picker.
+- Copied selected Markdown content into the skill `references` folder without changing the source file.
+- Limited imported reference files to 1 MB and kept duplicate uploads from overwriting existing files.
+- Added the skill root to Agent IDE context so the agent can locate linked references.
+
+#### Verification
+
+- Passed DevKit API and web type checks, lint checks, and builds.
+- Passed the module boundary check.
+- Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.23
+
+### [v 1.0.23] 2026-08-11 10:16 am - Project Agent execution and quality gates
+
+#### Database Changes
+
+- Database update: Yes.
+- Added durable Agent runs, steps, events, approvals, artifacts, tool calls, and verification attempts.
+- Added workspace, branch, revision, cleanup, verification, review, fingerprint, and commit state to Agent runs.
+- Kept the migration additive for existing MariaDB installations.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.23.
+- Added project-aware Codex chat with actor-isolated history, feedback, attachments, access modes, and streamed activity.
+- Added an isolated Git branch and worktree for each writable Agent run.
+- Kept Plan and read-only runs on the source checkout.
+- Added repository allowlists, managed worktree storage, cleanup guards, and retained review branches.
+- Added runtime, tool-call, changed-file, and sub-agent budgets with Codex turn interruption.
+- Added shell-free registered quality gates with repeatable attempts and durable command evidence.
+- Added return-for-rework state and a worktree fingerprint that blocks stale commit approval.
+- Added a two-step human approval before local commits and kept all remote pushes manual.
+- Added Run Control views for pipeline, workspace, approvals, activity, files, verification, review, and commit evidence.
+- Added the Skill Library with hidden generated manifests, linked reference files, and local drive imports.
+- Matched the CXApp `github:now` review flow with changelog subjects, optional version bump, Windows dialogs, and final Git confirmation.
+
+#### Verification
+
+- Passed the full repository build and repository check suite.
+- Passed the additive MariaDB migration and two API restart cycles.
+- Passed executor tests for isolation, budgets, registered commands, fingerprints, local commits, cleanup, and branch retention.
+- Passed a real Codex stream with durable history, feedback, workspace evidence, and actor isolation.
+- Verified Project Agent and Run Control at a 1920 by 1080 browser viewport.
+- Passed the CXApp-pattern `github:now` dry run without Git mutation.
 
 ## v-1.0.22
 

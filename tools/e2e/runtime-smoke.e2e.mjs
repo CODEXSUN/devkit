@@ -37,7 +37,7 @@ async function smokeCycle(cycle) {
       NODE_ENV: "test",
       PLATFORM_API_PORT: String(port),
       PLATFORM_API_URL: baseUrl,
-      PLATFORM_WEB_ORIGIN: "http://127.0.0.1:7060"
+      PLATFORM_WEB_ORIGIN: "http://127.0.0.1:9060"
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
@@ -94,6 +94,19 @@ async function smokeCycle(cycle) {
     assert.equal(orchestration.body.data?.technicalName, "devkit");
     assert.equal(orchestration.body.data?.agentProfiles?.length, 6);
     assert.equal(orchestration.body.data?.assistModes?.length, 9);
+
+    const tools = await request(baseUrl, "/api/devkit/orchestration/agent-ide/tools", {
+      headers: { authorization: `Bearer ${login.body.data.accessToken}` }
+    });
+    assert.equal(tools.response.status, 200);
+    assert.ok(tools.body.data?.some((tool) => tool.id === "repository.read"));
+    assert.ok(tools.body.data?.some((tool) => tool.id === "deployment.execute" && tool.risk === "critical"));
+
+    const verificationCommands = await request(baseUrl, "/api/devkit/orchestration/agent-ide/verification/commands", {
+      headers: { authorization: `Bearer ${login.body.data.accessToken}` }
+    });
+    assert.equal(verificationCommands.response.status, 200);
+    assert.ok(verificationCommands.body.data?.some((command) => command.id === "git.diff-check" && command.required));
 
     const projects = await request(baseUrl, "/api/devkit/admin/project-manager/result", {
       headers: { authorization: `Bearer ${login.body.data.accessToken}` }

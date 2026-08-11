@@ -13,6 +13,15 @@ export type DevkitDatabase = {
   devkit_planning_board_links: PlanningBoardLinksTable;
   devkit_planning_comments: PlanningCommentsTable;
   devkit_planning_reactions: PlanningReactionsTable;
+  devkit_orchestration_chat_messages: OrchestrationChatMessagesTable;
+  devkit_orchestration_chat_threads: OrchestrationChatThreadsTable;
+  devkit_agent_runs: AgentRunsTable;
+  devkit_agent_run_steps: AgentRunStepsTable;
+  devkit_agent_events: AgentEventsTable;
+  devkit_agent_approvals: AgentApprovalsTable;
+  devkit_agent_artifacts: AgentArtifactsTable;
+  devkit_agent_tool_calls: AgentToolCallsTable;
+  devkit_agent_verifications: AgentVerificationsTable;
   devkit_project_manager_activity: ProjectManagerActivityTable;
   devkit_project_manager_attachments: ProjectManagerAttachmentsTable;
   devkit_project_manager_items: ProjectManagerItemsTable;
@@ -22,11 +31,187 @@ export type DevkitDatabase = {
   devkit_task_manager_activity: TaskManagerActivityTable;
   devkit_task_manager_lookups: TaskManagerLookupsTable;
   devkit_task_manager_todos: TaskManagerTodosTable;
+  devkit_telegram_connections: TelegramConnectionsTable;
+  devkit_telegram_messages: TelegramMessagesTable;
   devkit_sync_conflicts: DevkitSyncConflictsTable;
   devkit_sync_connections: DevkitSyncConnectionsTable;
   devkit_sync_runs: DevkitSyncRunsTable;
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
+};
+
+export type AgentRunsTable = {
+  access_mode: string;
+  actor_id: string;
+  agent_profile: string;
+  assist_mode: string;
+  budget_json: string;
+  chat_thread_uuid: string;
+  codex_thread_id: string | null;
+  codex_turn_id: string | null;
+  completed_at: TimestampColumn | null;
+  created_at: TimestampColumn;
+  error_message: string | null;
+  id: Generated<number>;
+  model: string;
+  objective: string;
+  project_key: string;
+  project_title: string;
+  project_uuid: string;
+  result_summary: string | null;
+  started_at: TimestampColumn | null;
+  status: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+  base_revision: string | null;
+  branch_name: string | null;
+  commit_hash: string | null;
+  committed_at: TimestampColumn | null;
+  review_status: string;
+  source_root: string | null;
+  verification_completed_at: TimestampColumn | null;
+  verification_fingerprint: string | null;
+  verification_status: string;
+  workspace_cleaned_at: TimestampColumn | null;
+  workspace_mode: string;
+  workspace_path: string | null;
+  workspace_status: string;
+};
+
+export type AgentVerificationsTable = {
+  args_json: string;
+  attempt_no: number;
+  command_id: string;
+  command_name: string;
+  completed_at: TimestampColumn;
+  created_at: TimestampColumn;
+  duration_ms: number;
+  exit_code: number | null;
+  id: Generated<number>;
+  label: string;
+  required_gate: number;
+  run_uuid: string;
+  status: string;
+  stderr_text: string;
+  stdout_text: string;
+  uuid: string;
+};
+
+export type AgentRunStepsTable = {
+  completed_at: TimestampColumn | null;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  kind: string;
+  label: string;
+  output_json: string;
+  run_uuid: string;
+  sequence_no: number;
+  started_at: TimestampColumn | null;
+  status: string;
+  uuid: string;
+};
+
+export type AgentEventsTable = {
+  actor_id: string;
+  created_at: TimestampColumn;
+  event_type: string;
+  id: Generated<number>;
+  payload_json: string;
+  run_uuid: string;
+  uuid: string;
+};
+
+export type AgentApprovalsTable = {
+  actor_id: string;
+  created_at: TimestampColumn;
+  decision: string | null;
+  decided_at: TimestampColumn | null;
+  id: Generated<number>;
+  reason: string;
+  request_id: number;
+  run_uuid: string;
+  status: string;
+  thread_id: string;
+  uuid: string;
+};
+
+export type AgentArtifactsTable = {
+  artifact_type: string;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  label: string;
+  metadata_json: string;
+  path: string;
+  run_uuid: string;
+  uuid: string;
+};
+
+export type AgentToolCallsTable = {
+  completed_at: TimestampColumn | null;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  input_json: string;
+  output_json: string;
+  risk_level: string;
+  run_uuid: string;
+  started_at: TimestampColumn;
+  status: string;
+  tool_name: string;
+  uuid: string;
+};
+
+export type OrchestrationChatThreadsTable = {
+  access_mode: string;
+  actor_id: string;
+  codex_thread_id: string | null;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  model: string;
+  project_key: string;
+  project_title: string;
+  project_uuid: string;
+  status: string;
+  title: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type OrchestrationChatMessagesTable = {
+  actor_id: string;
+  attachments_json: string;
+  body: string;
+  created_at: TimestampColumn;
+  duration_ms: number | null;
+  feedback: string | null;
+  files_json: string;
+  id: Generated<number>;
+  role: string;
+  thread_uuid: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type TelegramConnectionsTable = {
+  chat_id: string | null;
+  connected_at: TimestampColumn | null;
+  created_at: TimestampColumn;
+  display_name: string;
+  id: Generated<number>;
+  link_token_hash: string;
+  status: string;
+  telegram_username: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type TelegramMessagesTable = {
+  body: string;
+  chat_id: string;
+  created_at: TimestampColumn;
+  direction: string;
+  id: Generated<number>;
+  telegram_message_id: string | null;
+  uuid: string;
 };
 
 export type PlanningBoardsTable = SyncColumns & {

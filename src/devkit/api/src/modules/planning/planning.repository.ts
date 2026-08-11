@@ -2,15 +2,12 @@ import { randomBytes } from "node:crypto";
 import { AppError } from "@codexsun/framework/errors";
 import type { Selectable } from "kysely";
 import { getDevkitDatabase } from "../../database/devkit-database.js";
-import type {
-  PlanningBoardsTable,
-  PlanningCommentsTable,
-} from "../../database/schema.js";
+import type { PlanningBoardsTable, PlanningCommentsTable } from "../../database/schema.js";
 import type {
   PlanningBoard,
   PlanningComment,
   PlanningRecordKind,
-  PlanningScene,
+  PlanningScene
 } from "./planning.types.js";
 
 const emptyScene: PlanningScene = { elements: [] };
@@ -30,7 +27,7 @@ export class PlanningRepository {
           .select("board_uuid")
           .where("record_kind", "=", record.kind)
           .where("record_uuid", "=", record.uuid)
-          .where("sync_status", "!=", "deleted"),
+          .where("sync_status", "!=", "deleted")
       );
     return (await query.orderBy("updated_at", "desc").execute()).map(mapBoard);
   }
@@ -54,7 +51,7 @@ export class PlanningRepository {
       recordUuid?: string | undefined;
       title: string;
     },
-    actor: string,
+    actor: string
   ) {
     const record =
       input.recordKind && input.recordUuid
@@ -74,19 +71,14 @@ export class PlanningRepository {
         status: "active",
         title: input.title,
         updated_by: actor,
-        uuid,
+        uuid
       })
       .executeTakeFirstOrThrow();
     if (record) await this.link(uuid, record.kind, record.uuid, actor);
     return this.find(uuid);
   }
 
-  async link(
-    boardUuid: string,
-    kind: PlanningRecordKind,
-    recordUuid: string,
-    actor: string,
-  ) {
+  async link(boardUuid: string, kind: PlanningRecordKind, recordUuid: string, actor: string) {
     await this.find(boardUuid);
     await this.requireRecord(kind, recordUuid);
     await this.database
@@ -96,7 +88,7 @@ export class PlanningRepository {
         created_by: actor,
         record_kind: kind,
         record_uuid: recordUuid,
-        uuid: randomBytes(4).toString("hex"),
+        uuid: randomBytes(4).toString("hex")
       })
       .onDuplicateKeyUpdate({ sync_status: "pending" })
       .executeTakeFirst();
@@ -115,11 +107,7 @@ export class PlanningRepository {
     const reactions = await this.database
       .selectFrom("devkit_planning_reactions")
       .selectAll()
-      .where(
-        "comment_uuid",
-        "in",
-        rows.length ? rows.map((row) => row.uuid) : [""],
-      )
+      .where("comment_uuid", "in", rows.length ? rows.map((row) => row.uuid) : [""])
       .where("sync_status", "!=", "deleted")
       .execute();
     return rows.map((row) =>
@@ -130,21 +118,21 @@ export class PlanningRepository {
           .map((reaction) => ({
             createdBy: reaction.created_by,
             reaction: reaction.reaction,
-            uuid: reaction.uuid,
-          })),
-      ),
+            uuid: reaction.uuid
+          }))
+      )
     );
   }
 
   async createComment(
     boardUuid: string,
     input: { body: string; elementId?: string | undefined },
-    actor: string,
+    actor: string
   ) {
     await this.find(boardUuid);
     const commentUuid = randomBytes(4).toString("hex");
     const mentions = [
-      ...new Set(input.body.match(/@[A-Za-z0-9._%+-]+(?:@[A-Za-z0-9.-]+)?/gu) ?? []),
+      ...new Set(input.body.match(/@[A-Za-z0-9._%+-]+(?:@[A-Za-z0-9.-]+)?/gu) ?? [])
     ].map((mention) => mention.slice(1));
     await this.database
       .insertInto("devkit_planning_comments")
@@ -158,19 +146,13 @@ export class PlanningRepository {
         resolved_by: null,
         status: "open",
         updated_by: actor,
-        uuid: commentUuid,
+        uuid: commentUuid
       })
       .executeTakeFirstOrThrow();
-    return (await this.comments(boardUuid)).find(
-      (comment) => comment.uuid === commentUuid,
-    );
+    return (await this.comments(boardUuid)).find((comment) => comment.uuid === commentUuid);
   }
 
-  async setCommentResolved(
-    commentUuid: string,
-    resolved: boolean,
-    actor: string,
-  ) {
+  async setCommentResolved(commentUuid: string, resolved: boolean, actor: string) {
     const row = await this.requireComment(commentUuid);
     await this.database
       .updateTable("devkit_planning_comments")
@@ -182,13 +164,11 @@ export class PlanningRepository {
         sync_updated_at: new Date(),
         sync_version: (eb) => eb("sync_version", "+", 1),
         updated_at: new Date(),
-        updated_by: actor,
+        updated_by: actor
       })
       .where("uuid", "=", commentUuid)
       .executeTakeFirst();
-    return (await this.comments(row.board_uuid)).find(
-      (comment) => comment.uuid === commentUuid,
-    );
+    return (await this.comments(row.board_uuid)).find((comment) => comment.uuid === commentUuid);
   }
 
   async toggleReaction(commentUuid: string, reaction: string, actor: string) {
@@ -206,7 +186,7 @@ export class PlanningRepository {
         .set({
           sync_status: existing.sync_status === "deleted" ? "pending" : "deleted",
           sync_updated_at: new Date(),
-          sync_version: (eb) => eb("sync_version", "+", 1),
+          sync_version: (eb) => eb("sync_version", "+", 1)
         })
         .where("uuid", "=", existing.uuid)
         .executeTakeFirst();
@@ -217,12 +197,10 @@ export class PlanningRepository {
           comment_uuid: commentUuid,
           created_by: actor,
           reaction,
-          uuid: randomBytes(4).toString("hex"),
+          uuid: randomBytes(4).toString("hex")
         })
         .executeTakeFirst();
-    return (await this.comments(comment.board_uuid)).find(
-      (entry) => entry.uuid === commentUuid,
-    );
+    return (await this.comments(comment.board_uuid)).find((entry) => entry.uuid === commentUuid);
   }
 
   async update(
@@ -233,31 +211,26 @@ export class PlanningRepository {
       scene?: PlanningScene | undefined;
       title?: string | undefined;
     },
-    actor: string,
+    actor: string
   ) {
     await this.find(uuid);
     if (input.projectUuid !== undefined)
-      if (input.projectUuid)
-        await this.requireRecord("project", input.projectUuid);
+      if (input.projectUuid) await this.requireRecord("project", input.projectUuid);
     await this.database
       .updateTable("devkit_planning_boards")
       .set({
-        ...(input.description === undefined
-          ? {}
-          : { description: input.description }),
-        ...(input.projectUuid === undefined
-          ? {}
-          : { project_uuid: input.projectUuid }),
+        ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.projectUuid === undefined ? {} : { project_uuid: input.projectUuid }),
         ...(input.scene === undefined
           ? {}
-          : { scene_json: JSON.stringify(input.scene) }),
+          : { scene_json: JSON.stringify(sanitizeScene(input.scene)) }),
         ...(input.title === undefined ? {} : { title: input.title }),
         sync_direction: "local",
         sync_status: "pending",
         sync_updated_at: new Date(),
         sync_version: (eb) => eb("sync_version", "+", 1),
         updated_at: new Date(),
-        updated_by: actor,
+        updated_by: actor
       })
       .where("uuid", "=", uuid)
       .executeTakeFirst();
@@ -280,7 +253,7 @@ export class PlanningRepository {
         sync_updated_at: new Date(),
         sync_version: (eb) => eb("sync_version", "+", 1),
         updated_at: new Date(),
-        updated_by: actor,
+        updated_by: actor
       })
       .where("uuid", "=", uuid)
       .executeTakeFirst();
@@ -289,7 +262,7 @@ export class PlanningRepository {
       .set({
         sync_status: "deleted",
         sync_updated_at: new Date(),
-        sync_version: (eb) => eb("sync_version", "+", 1),
+        sync_version: (eb) => eb("sync_version", "+", 1)
       })
       .where("board_uuid", "=", uuid)
       .execute();
@@ -301,7 +274,7 @@ export class PlanningRepository {
         sync_updated_at: new Date(),
         sync_version: (eb) => eb("sync_version", "+", 1),
         updated_at: new Date(),
-        updated_by: actor,
+        updated_by: actor
       })
       .where("board_uuid", "=", uuid)
       .execute();
@@ -311,12 +284,12 @@ export class PlanningRepository {
         .set({
           sync_status: "deleted",
           sync_updated_at: new Date(),
-          sync_version: (eb) => eb("sync_version", "+", 1),
+          sync_version: (eb) => eb("sync_version", "+", 1)
         })
         .where(
           "comment_uuid",
           "in",
-          commentUuids.map((comment) => comment.uuid),
+          commentUuids.map((comment) => comment.uuid)
         )
         .execute();
     return { deleted: true, uuid: board.uuid };
@@ -331,8 +304,7 @@ export class PlanningRepository {
       .where("active", "=", 1)
       .where("sync_status", "!=", "deleted")
       .executeTakeFirst();
-    if (!record)
-      throw AppError.validation(`Selected DevKit ${kind} was not found.`);
+    if (!record) throw AppError.validation(`Selected DevKit ${kind} was not found.`);
   }
 
   private async requireComment(uuid: string) {
@@ -353,19 +325,34 @@ function mapBoard(row: Selectable<PlanningBoardsTable>): PlanningBoard {
     createdBy: row.created_by,
     description: row.description,
     projectUuid: row.project_uuid,
-    scene: JSON.parse(row.scene_json) as PlanningScene,
+    scene: sanitizeScene(JSON.parse(row.scene_json)),
     status: row.status,
     title: row.title,
     updatedAt: new Date(row.updated_at).toISOString(),
     updatedBy: row.updated_by,
     uuid: row.uuid,
-    syncVersion: row.sync_version,
+    syncVersion: row.sync_version
   };
+}
+
+function sanitizeScene(value: unknown): PlanningScene {
+  const scene = isRecord(value) ? value : {};
+  const appState = isRecord(scene.appState) ? { ...scene.appState } : {};
+  delete appState.collaborators;
+  return {
+    appState,
+    elements: Array.isArray(scene.elements) ? scene.elements : [],
+    files: isRecord(scene.files) ? scene.files : {}
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function mapComment(
   row: Selectable<PlanningCommentsTable>,
-  reactions: PlanningComment["reactions"],
+  reactions: PlanningComment["reactions"]
 ): PlanningComment {
   return {
     body: row.body,
@@ -374,12 +361,10 @@ function mapComment(
     elementId: row.element_id,
     mentions: JSON.parse(row.mentions_json) as string[],
     reactions,
-    resolvedAt: row.resolved_at
-      ? new Date(row.resolved_at).toISOString()
-      : null,
+    resolvedAt: row.resolved_at ? new Date(row.resolved_at).toISOString() : null,
     resolvedBy: row.resolved_by,
     status: row.status === "resolved" ? "resolved" : "open",
     updatedAt: new Date(row.updated_at).toISOString(),
-    uuid: row.uuid,
+    uuid: row.uuid
   };
 }

@@ -1,14 +1,21 @@
 import type { PlanningScene } from "./planning.types";
 
 export function planningSceneFromSerialized(serialized: string): PlanningScene {
-  const value = JSON.parse(serialized) as {
-    appState?: Record<string, unknown>;
-    elements?: unknown[];
-    files?: Record<string, unknown>;
-  };
+  return normalizePlanningScene(JSON.parse(serialized));
+}
+
+export function normalizePlanningScene(value: unknown): PlanningScene {
+  const scene = isRecord(value) ? value : {};
+  const appState = isRecord(scene.appState) ? { ...scene.appState } : {};
+  delete appState.collaborators;
+
   return {
-    appState: value.appState ?? {},
-    elements: value.elements ?? [],
-    files: value.files ?? {},
+    appState,
+    elements: Array.isArray(scene.elements) ? scene.elements : [],
+    files: isRecord(scene.files) ? scene.files : {}
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,0 +1,100 @@
+use std::fs;
+
+use serde::Serialize;
+use tauri::State;
+
+use crate::commands::{display_name, workspace_path, workspace_root};
+use crate::error::{DesktopError, DesktopResult};
+use crate::state::DesktopState;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Workspace {
+    name: String,
+    path: String,
+    branch: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntry {
+    name: String,
+    path: String,
+    kind: String,
+}
+
+#[tauri::command]
+pub fn open_workspace(
+    path: Option<String>,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<Workspace> {
+    let selected = path
+        .map(Into::into)
+        .or_else(|| rfd::FileDialog::new().pick_folder())
+        .ok_or_else(|| DesktopError::Policy("Workspace selection was canceled.".into()))?;
+    let root = selected.canonicalize()?;
+    if !root.is_dir() {
+        return Err(DesktopError::Policy(
+            "The workspace must be a directory.".into(),
+        ));
+    }
+    *state
+        .workspace
+        .lock()
+        .map_err(|_| DesktopError::Policy("Workspace state is unavailable.".into()))? =
+        Some(root.clone());
+    let branch = super::git::current_branch(&root).unwrap_or_else(|_| "no branch".into());
+    Ok(Workspace {
+        name: display_name(&root),
+        path: root.display().to_string(),
+        branch,
+    })
+}
+
+#[tauri::command]
+pub fn list_files(path: String, state: State<'_, DesktopState>) -> DesktopResult<Vec<FileEntry>> {
+    let root = workspace_root(&state)?;
+    let directory = workspace_path(&state, &path)?;
+    let mut entries = fs::read_dir(directory)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name() != ".git")
+        .map(|entry| {
+            let absolute = entry.path();
+            let relative = absolute
+                .strip_prefix(&root)
+                .unwrap_or(&absolute)
+                .display()
+                .to_string();
+            FileEntry {
+                name: entry.file_name().to_string_lossy().into_owned(),
+                path: relative,
+                kind: if absolute.is_dir() {
+                    "directory".into()
+                } else {
+                    "file".into()
+                },
+            }
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|a, b| {
+        a.kind
+            .cmp(&b.kind)
+            .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(entries)
+}
+
+#[tauri::command]
+pub fn read_text_file(path: String, state: State<'_, DesktopState>) -> DesktopResult<String> {
+    Ok(fs::read_to_string(workspace_path(&state, &path)?)?)
+}
+
+#[tauri::command]
+pub fn write_text_file(
+    path: String,
+    content: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<()> {
+    fs::write(workspace_path(&state, &path)?, content)?;
+    Ok(())
+}

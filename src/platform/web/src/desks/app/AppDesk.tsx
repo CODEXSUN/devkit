@@ -15,7 +15,6 @@ import {
 import { UserWorkspace } from "../../modules/user";
 import { RoleWorkspace } from "../../modules/role";
 import { PermissionWorkspace } from "../../modules/permission";
-import { UserRoleWorkspace } from "../../modules/user-role";
 import { RolePermissionWorkspace } from "../../modules/role-permission";
 import { UserProfileWorkspace } from "../../modules/user/user.profile.workspace";
 
@@ -23,8 +22,7 @@ type IdentityPage =
   | "identity.users"
   | "identity.roles"
   | "identity.permissions"
-  | "identity.user-roles"
-  | "identity.role-permissions"
+  | "identity.access"
   | "identity.profile";
 
 type Claims = { email: string; name?: string; permissions?: string[]; role?: string };
@@ -56,6 +54,7 @@ export function AppDesk() {
     <AuthGate>
       <ApplicationLayout
         brand={{ subtitle: "engineering orchestration", title: "CodeLogicX" }}
+        deskVariant="techmedia"
         headerTitle={headerTitle}
         menuItems={
           showingIdentity
@@ -113,8 +112,7 @@ function renderIdentityPage(page: IdentityPage, actorEmail: string) {
   if (page === "identity.users") return <UserWorkspace actorEmail={actorEmail} />;
   if (page === "identity.roles") return <RoleWorkspace />;
   if (page === "identity.permissions") return <PermissionWorkspace />;
-  if (page === "identity.user-roles") return <UserRoleWorkspace />;
-  if (page === "identity.role-permissions") return <RolePermissionWorkspace />;
+  if (page === "identity.access") return <RolePermissionWorkspace />;
   return <UserProfileWorkspace />;
 }
 
@@ -137,8 +135,7 @@ function buildIdentityMenu(
         item("Users", "identity.users"),
         item("Roles", "identity.roles"),
         item("Permissions", "identity.permissions"),
-        item("User Roles", "identity.user-roles"),
-        item("Role Permissions", "identity.role-permissions")
+        item("Access controls", "identity.access")
       ],
       title: "Platform"
     }
@@ -151,8 +148,7 @@ function identityPageFromPath(pathname: string): IdentityPage | null {
     "identity.users",
     "identity.roles",
     "identity.permissions",
-    "identity.user-roles",
-    "identity.role-permissions",
+    "identity.access",
     "identity.profile"
   ];
   return allowed.includes(value as IdentityPage) ? (value as IdentityPage) : null;

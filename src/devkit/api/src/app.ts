@@ -9,6 +9,8 @@ import { githubDashboardModule } from "./modules/github-dashboard/index.js";
 import { syncModule } from "./modules/sync/index.js";
 import { planningModule } from "./modules/planning/index.js";
 import { orchestrationModule } from "./modules/orchestration/index.js";
+import { skillsModule } from "./modules/skills/index.js";
+import { telegramSupportModule } from "./modules/telegram-support/index.js";
 import { runWithDevkitActor, type DevkitActor } from "./request-context.js";
 
 export const devkitApiModuleKeys = [
@@ -17,6 +19,8 @@ export const devkitApiModuleKeys = [
   githubDashboardModule.key,
   planningModule.key,
   orchestrationModule.key,
+  skillsModule.key,
+  telegramSupportModule.key,
   syncModule.key
 ] as const;
 
@@ -34,14 +38,18 @@ export type DevkitHostAdapter = {
   resolveCloudSync?(
     request: FastifyRequest
   ): Promise<DevkitHostRequestContext> | DevkitHostRequestContext;
+  resolvePublicWebhook?(
+    request: FastifyRequest
+  ): Promise<DevkitHostRequestContext> | DevkitHostRequestContext;
 };
 
 export async function registerDevkitApiForHost(app: FastifyInstance, adapter: DevkitHostAdapter) {
   await app.register(async (devkitApp) => {
     const contexts = new WeakMap<FastifyRequest, DevkitHostRequestContext>();
     devkitApp.addHook("onRequest", (request, _reply, done) => {
-      const resolve =
-        request.url.includes("/sync/cloud/") && adapter.resolveCloudSync
+      const resolve = request.url.includes("/telegram/webhook") && adapter.resolvePublicWebhook
+        ? adapter.resolvePublicWebhook
+        : request.url.includes("/sync/cloud/") && adapter.resolveCloudSync
           ? adapter.resolveCloudSync
           : adapter.resolve;
       void Promise.resolve(resolve.call(adapter, request))
@@ -62,6 +70,8 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
     await githubDashboardModule.register({ app: devkitApp });
     await planningModule.register({ app: devkitApp });
     await orchestrationModule.register({ app: devkitApp });
+    await skillsModule.register({ app: devkitApp });
+    await telegramSupportModule.register({ app: devkitApp });
     await syncModule.register({ app: devkitApp });
   });
 }

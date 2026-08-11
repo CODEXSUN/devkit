@@ -1,6 +1,7 @@
 @import "@codexsun/ui/styles.css";
 
 @source ".";
+@source "../../../devkit/web/src";
 @source "../../../../../core/web/src";
 
 .simple-page {

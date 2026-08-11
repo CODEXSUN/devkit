@@ -59,7 +59,7 @@ export async function createApp() {
     async (devkitApp) =>
       registerDevkitApiForHost(devkitApp, {
         async authorize({ request }) {
-          if (request.url.includes("/sync/cloud/")) return;
+          if (request.url.includes("/sync/cloud/") || request.url.includes("/telegram/webhook")) return;
           await identityContext(request).authorize(devkitPermission(request));
         },
         async resolve(request) {
@@ -83,6 +83,12 @@ export async function createApp() {
               permissions: [],
               roles: ["system"]
             },
+            database: getTradesDatabase() as unknown as Kysely<DevkitDatabase>
+          };
+        },
+        resolvePublicWebhook() {
+          return {
+            actor: { id: "telegram-webhook", permissions: [], roles: ["system"] },
             database: getTradesDatabase() as unknown as Kysely<DevkitDatabase>
           };
         }

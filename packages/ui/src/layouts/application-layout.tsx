@@ -17,6 +17,7 @@ type ApplicationLayoutProps = {
   actions?: ReactNode;
   brand?: SidebarBrand;
   children: ReactNode;
+  deskVariant?: "standard" | "techmedia";
   menuItems?: SidemenuItem[];
   headerTitle?: ReactNode;
   homeHref?: string;
@@ -86,6 +87,7 @@ export function ApplicationLayout({
   actions,
   brand,
   children,
+  deskVariant = "standard",
   headerTitle = "Overview",
   homeHref = "/",
   menuItems = applicationMenuItems,
@@ -108,6 +110,7 @@ export function ApplicationLayout({
         subtitle: brand?.subtitle ?? "application workspace",
         title: brand?.title ?? "Application Desk"
       }}
+      deskVariant={deskVariant}
       headerTitle={headerTitle}
       homeHref={homeHref}
       logoutHref="/login"

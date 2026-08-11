@@ -185,8 +185,8 @@ configure_deploy_environment() {
   prompt_setting "$DEPLOY_ENV" DEVKIT_API_CONTAINER_NAME "API container name" devkit-api
   prompt_setting "$DEPLOY_ENV" DEVKIT_WEB_CONTAINER_NAME "Web container name" devkit-web
   prompt_setting "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS "Host bind address" 127.0.0.1
-  prompt_setting "$DEPLOY_ENV" DEVKIT_API_HOST_PORT "API host port" 7050
-  prompt_setting "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT "Web host port" 7060
+  prompt_setting "$DEPLOY_ENV" DEVKIT_API_HOST_PORT "API host port" 9050
+  prompt_setting "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT "Web host port" 9060
   prompt_setting "$DEPLOY_ENV" DB_NAME "Application database name" devkit_db
   prompt_setting "$DEPLOY_ENV" DB_USER "Application database user" devkit
   prompt_secret "$DEPLOY_ENV" DB_PASSWORD "Application database password"
@@ -212,9 +212,9 @@ prepare_runtime_environment() {
   set_file_value "$RUNTIME_ENV" DB_PASSWORD "$(file_value "$DEPLOY_ENV" DB_PASSWORD)"
   set_file_value "$RUNTIME_ENV" DB_NAME "$(file_value "$DEPLOY_ENV" DB_NAME)"
   set_file_value "$RUNTIME_ENV" PLATFORM_API_PORT \
-    "$(file_value "$DEPLOY_ENV" DEVKIT_API_INTERNAL_PORT 7050)"
+    "$(file_value "$DEPLOY_ENV" DEVKIT_API_INTERNAL_PORT 9050)"
   set_file_value "$RUNTIME_ENV" PLATFORM_WEB_PORT \
-    "$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 7060)"
+    "$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 9060)"
   set_file_value "$RUNTIME_ENV" DEVKIT_DB_FRESH_ON_START 0
   set_file_value "$RUNTIME_ENV" DEVKIT_DB_RESET_CONFIRM ""
   set_file_value "$RUNTIME_ENV" DEVKIT_ALLOW_PRODUCTION_DB_RESET 0
@@ -626,5 +626,5 @@ fi
 
 echo
 echo "DevKit standalone installation completed."
-echo "Web: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 7060)/"
-echo "API health: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 7050)/health"
+echo "Web: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 9060)/"
+echo "API health: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 9050)/health"

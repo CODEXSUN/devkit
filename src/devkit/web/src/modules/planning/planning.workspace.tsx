@@ -32,7 +32,7 @@ import {
   usePlanningBoards,
   usePlanningComments
 } from "./planning.hooks";
-import { planningSceneFromSerialized } from "./planning.scene";
+import { normalizePlanningScene, planningSceneFromSerialized } from "./planning.scene";
 import type { PlanningRecordKind, PlanningScene } from "./planning.types";
 
 export function PlanningWorkspace() {
@@ -168,8 +168,9 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     []
   );
   if (board.isLoading || !board.data) return <GlobalLoader />;
+  const initialScene = normalizePlanningScene(board.data.scene);
   if (persistedFingerprint.current === null)
-    persistedFingerprint.current = JSON.stringify(board.data.scene);
+    persistedFingerprint.current = JSON.stringify(initialScene);
   const leave = async () => {
     if (timer.current) clearTimeout(timer.current);
     if (await save()) window.location.assign("/app/devkit/planning");
@@ -178,11 +179,12 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     await actions.delete.mutateAsync(uuid);
     window.location.assign("/app/devkit/planning");
   };
-  const currentScene = (): PlanningScene => ({
-    appState: api.current?.getAppState() as unknown as Record<string, unknown>,
-    elements: api.current?.getSceneElements() ?? [],
-    files: api.current?.getFiles() as unknown as Record<string, unknown>
-  });
+  const currentScene = (): PlanningScene =>
+    normalizePlanningScene({
+      appState: api.current?.getAppState(),
+      elements: api.current?.getSceneElements() ?? [],
+      files: api.current?.getFiles()
+    });
   const download = (content: Blob, extension: string) => {
     const anchor = document.createElement("a");
     anchor.href = URL.createObjectURL(content);
@@ -247,14 +249,15 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     }
     const result = await board.refetch();
     if (!result.data || !api.current) return;
+    const remoteScene = normalizePlanningScene(result.data.scene);
     api.current.updateScene({
-      appState: result.data.scene.appState as unknown as AppState,
+      appState: remoteScene.appState as unknown as AppState,
       captureUpdate: CaptureUpdateAction.NEVER,
-      elements: result.data.scene.elements as readonly ExcalidrawElement[]
+      elements: remoteScene.elements as readonly ExcalidrawElement[]
     });
-    api.current.addFiles(Object.values((result.data.scene.files ?? {}) as BinaryFiles));
+    api.current.addFiles(Object.values((remoteScene.files ?? {}) as BinaryFiles));
     api.current.history.clear();
-    persistedFingerprint.current = JSON.stringify(result.data.scene);
+    persistedFingerprint.current = JSON.stringify(remoteScene);
     toast.success("Latest synchronized scene loaded");
   };
   const addComment = async () => {
@@ -268,7 +271,7 @@ function PlanningEditor({ uuid }: { uuid: string }) {
     setCommentBody("");
   };
   return (
-    <main className="flex h-[calc(100vh-3.5rem)] flex-col p-4">
+    <main className="flex h-[calc(100dvh-3.5rem)] min-h-0 w-full flex-col overflow-hidden p-4">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-4 py-3">
         <div>
           <button
@@ -346,15 +349,15 @@ function PlanningEditor({ uuid }: { uuid: string }) {
           commentsOpen ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""
         }`}
       >
-        <div className="min-h-0">
+        <div className="h-full min-h-0 w-full">
           <Excalidraw
             excalidrawAPI={(value) => {
               api.current = value;
             }}
             initialData={{
-              elements: board.data.scene.elements as readonly ExcalidrawElement[],
-              appState: board.data.scene.appState as Partial<AppState>,
-              files: board.data.scene.files as BinaryFiles
+              elements: initialScene.elements as readonly ExcalidrawElement[],
+              appState: initialScene.appState as Partial<AppState>,
+              files: initialScene.files as BinaryFiles
             }}
             onChange={(elements, appState, files) => {
               const nextScene = planningSceneFromSerialized(

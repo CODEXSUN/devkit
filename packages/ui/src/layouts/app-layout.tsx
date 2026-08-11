@@ -22,12 +22,14 @@ import {
   type SidebarUserMenuItem
 } from "../blocks/menu/sidemenu/app-sidebar";
 import { TopMenu, type TopMenuWorkspaceItem } from "../blocks/menu/sidemenu/top-menu";
+import { TechmediaTopMenu } from "../blocks/menu/sidemenu/techmedia-top-menu";
 import type { SidemenuItem } from "../blocks/menu/sidemenu/sub/sidemenu-section";
 import { SidebarInset, SidebarProvider } from "../components/sidebar";
 
 type AppLayoutProps = {
   brand?: SidebarBrand;
   children: ReactNode;
+  deskVariant?: "standard" | "techmedia";
   headerTitle?: ReactNode;
   homeHref?: string;
   logoutHref?: string;
@@ -172,6 +174,7 @@ export const defaultUserMenuItems: SidebarUserMenuItem[] = [
 export function AppLayout({
   brand = defaultSidebarBrand,
   children,
+  deskVariant = "standard",
   headerTitle = "Documents",
   homeHref = "/workspace",
   logoutHref = "/login",
@@ -189,6 +192,42 @@ export function AppLayout({
   workspaceItems = defaultWorkspaceItems,
   showPageTitle = true
 }: AppLayoutProps) {
+  if (deskVariant === "techmedia") {
+    return (
+      <SidebarProvider className="flex-col" style={{ "--sidebar-width": "19rem" } as CSSProperties}>
+        <TechmediaTopMenu
+          homeHref={homeHref}
+          logoutHref={logoutHref}
+          {...(onLogout ? { onLogout } : {})}
+          pageTitle={String(headerTitle)}
+          {...(profileHref ? { profileHref } : {})}
+          showHomeAction={showHomeAction}
+          showPageTitle={showPageTitle}
+          showThemeAction={showThemeAction}
+          user={user}
+          workspaceItems={workspaceItems}
+        />
+        <div className="flex min-h-0 flex-1">
+          <AppSidebar
+            brand={brand}
+            className="md:!bottom-auto md:!top-14 md:!h-[calc(100svh-3.5rem)] md:!p-1"
+            items={menuItems}
+            showUserMenu={showSidebarUser}
+            user={user}
+            userMenuItems={userMenuItems}
+            variant="inset"
+            versionLabel={versionLabel}
+          />
+          <SidebarInset className="md:!m-1 md:!ml-0">
+            <AppLayoutContent subtitle={subtitle} title={title}>
+              {children}
+            </AppLayoutContent>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
   return (
     <SidebarProvider
       style={
@@ -219,20 +258,30 @@ export function AppLayout({
           user={user}
           workspaceItems={workspaceItems}
         />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            {title || subtitle ? (
-              <div className="border-b bg-background px-4 py-5 lg:px-6">
-                {title ? (
-                  <h2 className="m-0 text-2xl font-semibold leading-tight">{title}</h2>
-                ) : null}
-                {subtitle ? <p className="mt-1 text-muted-foreground">{subtitle}</p> : null}
-              </div>
-            ) : null}
-            {children}
-          </div>
-        </div>
+        <AppLayoutContent subtitle={subtitle} title={title}>
+          {children}
+        </AppLayoutContent>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function AppLayoutContent({
+  children,
+  subtitle,
+  title
+}: Pick<AppLayoutProps, "children" | "subtitle" | "title">) {
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="@container/main flex flex-1 flex-col gap-2">
+        {title || subtitle ? (
+          <div className="border-b bg-background px-4 py-5 lg:px-6">
+            {title ? <h2 className="m-0 text-2xl font-semibold leading-tight">{title}</h2> : null}
+            {subtitle ? <p className="mt-1 text-muted-foreground">{subtitle}</p> : null}
+          </div>
+        ) : null}
+        {children}
+      </div>
+    </div>
   );
 }

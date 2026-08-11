@@ -47,13 +47,13 @@ services:
     environment:
       DEV_AUTO_LOGIN: "0"
       NODE_ENV: production
-      PLATFORM_API_PORT: ${DEVKIT_API_INTERNAL_PORT:-7050}
+      PLATFORM_API_PORT: ${DEVKIT_API_INTERNAL_PORT:-9050}
       DEVKIT_ENV_FILE_PATH: /workspace/devkit/.env
     depends_on:
       mariadb:
         condition: service_healthy
     ports:
-      - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_API_HOST_PORT:-7050}:${DEVKIT_API_INTERNAL_PORT:-7050}"
+      - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_API_HOST_PORT:-9050}:${DEVKIT_API_INTERNAL_PORT:-9050}"
     volumes:
       - ${DEVKIT_RUNTIME_ENV_FILE:-../.env}:/workspace/devkit/.env:rw
     networks: [devkit]
@@ -84,12 +84,12 @@ services:
     environment:
       NGINX_ENVSUBST_FILTER: DEVKIT_API
       DEVKIT_API_CONTAINER_NAME: ${DEVKIT_API_CONTAINER_NAME:-devkit-api}
-      DEVKIT_API_INTERNAL_PORT: ${DEVKIT_API_INTERNAL_PORT:-7050}
+      DEVKIT_API_INTERNAL_PORT: ${DEVKIT_API_INTERNAL_PORT:-9050}
     depends_on:
       api:
         condition: service_healthy
     ports:
-      - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_WEB_HOST_PORT:-7060}:80"
+      - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_WEB_HOST_PORT:-9060}:80"
     networks: [devkit]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]

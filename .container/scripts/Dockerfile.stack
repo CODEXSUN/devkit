@@ -23,7 +23,7 @@ RUN npm install --global npm@${NPM_RUNTIME_VERSION} && \
   rm -rf /var/lib/apt/lists/*
 COPY --chown=node:node --from=build /workspace/devkit /workspace/devkit
 USER node
-EXPOSE 7050
+EXPOSE 9050
 CMD ["node", "dist/platform/api/server.js"]
 
 FROM nginx:1.28-alpine AS web-runtime
