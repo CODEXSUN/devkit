@@ -502,6 +502,7 @@ if ! MSYS_NO_PATHCONV=1 docker exec \
   -e MYSQL_PWD="$database_password" \
   "$mariadb_container" \
   mariadb-dump \
+  --no-defaults \
   --user="$database_user" \
   --single-transaction \
   --quick \

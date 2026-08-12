@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.29
-Release tag: v-1.0.29
-Changelog label: v 1.0.29
+Current version: 1.0.30
+Release tag: v-1.0.30
+Changelog label: v 1.0.30
 
 ### [Session] 2026-08-11 - CODEXSUN application workspace layout
 
@@ -167,6 +167,24 @@ Changelog label: v 1.0.29
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.30
+
+### [v 1.0.30] 2026-08-12 12:37 pm - MariaDB deployment backup compatibility
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.30.
+- Prevented `mariadb-dump` from loading unsupported client defaults during deployment backups.
+
+#### Verification
+
+- Passed the deployment script check and version check.
+- Confirmed the failed `1.0.29` update did not replace the running containers.
 
 ## v-1.0.29
 
