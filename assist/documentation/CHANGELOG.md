@@ -170,15 +170,18 @@ Changelog label: v 1.0.28
 
 ## v-1.0.28
 
-### [v 1.0.28] 2026-08-12 11:49 am - version update
+### [v 1.0.28] 2026-08-12 11:49 am - Honey assistant, Telegram connection, and deployment runtime
 
 #### Database Changes
 
 - Database update: Yes.
+- Published the Honey persistence and Telegram MTProto migrations described in the v 1.0.27 preparation record below.
 
 #### App Codebase Changes
 
 - Bumped repository version to 1.0.28.
+- Published the complete Honey, Telegram, Hostinger, Project Agent, dashboard, navigation, branding, and container runtime change set.
+- Kept the detailed codebase and verification record in the adjacent v 1.0.27 preparation entry.
 
 ## v-1.0.27
 
