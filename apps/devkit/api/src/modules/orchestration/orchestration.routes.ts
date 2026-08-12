@@ -28,11 +28,19 @@ import { agentIntegrationService } from "./agent-integration.service.js";
 import { agentTaskGraphRepository } from "./agent-task-graph.repository.js";
 import { hostingerMcpService } from "./hostinger-mcp.service.js";
 import { hostingerDashboardService } from "./hostinger-dashboard.service.js";
+import { hostingerSshService } from "./hostinger-ssh.service.js";
 
 const service = new OrchestrationService();
 const planningGateway = new OpenAiPlanningGateway();
 const launchDesk = new LaunchDeskAgent();
 const codexChat = new CodexChatService();
+const hostingerSshTargetSchema = z.object({
+  host: z.string().trim().min(1).max(253).regex(/^[a-z0-9.:-]+$/iu),
+  name: z.string().trim().min(3).max(80).regex(/^[a-z0-9._-]+$/iu),
+  port: z.coerce.number().int().min(1).max(65535),
+  user: z.string().trim().min(1).max(32).regex(/^[a-z_][a-z0-9_-]*$/iu),
+  virtualMachineId: z.coerce.number().int().positive()
+}).strict();
 
 export async function registerOrchestrationRoutes(app: FastifyInstance) {
   app.get("/orchestration/catalog", async (request) =>
@@ -257,6 +265,15 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   );
   app.get("/orchestration/integrations/hostinger/dashboard", async (request) =>
     ok(await hostingerDashboardService.dashboard(), { requestId: request.id })
+  );
+  app.get("/orchestration/integrations/hostinger/ssh", async (request) =>
+    ok(await hostingerSshService.status(hostingerSshTargetSchema.parse(request.query)), { requestId: request.id })
+  );
+  app.post("/orchestration/integrations/hostinger/ssh/generate", async (request) =>
+    ok(await hostingerSshService.generateAndAttach(hostingerSshTargetSchema.parse(request.body)), { requestId: request.id })
+  );
+  app.post("/orchestration/integrations/hostinger/ssh/test", async (request) =>
+    ok(await hostingerSshService.test(hostingerSshTargetSchema.parse(request.body)), { requestId: request.id })
   );
   app.post("/orchestration/launch-desk/stream", async (request, reply) => {
     const input = launchDeskInputSchema.parse(request.body);

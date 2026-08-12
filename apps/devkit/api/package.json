@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit-api",
-  "version": "1.0.28",
+  "version": "1.0.29",
   "private": true,
   "type": "module",
   "exports": {
@@ -15,11 +15,12 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@codexsun/framework": "1.0.28",
+    "@codexsun/framework": "1.0.29",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/agents": "^0.14.3",
     "@openai/codex": "^0.147.0",
     "fastify": "^5.11.0",
+    "hostinger-api-mcp": "1.33.1",
     "kysely": "^0.29.4",
     "openai": "^7.4.0",
     "teleproto": "^1.228.5",

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { HostingerDashboard } from "./hostinger-dashboard";
+import { HostingerSshPanel } from "./hostinger-ssh-panel";
 import {
   configureHostingerMcp,
   getHostingerDashboard,
@@ -73,7 +74,7 @@ export function HostingerMcpWorkspace() {
       </header>
 
       {dashboard.data ? (
-        <HostingerDashboard dashboard={dashboard.data} />
+        <><HostingerDashboard dashboard={dashboard.data} />{dashboard.data.nodes[0] ? <HostingerSshPanel node={dashboard.data.nodes[0]} /> : null}</>
       ) : (
         <ConnectionState
           configured={status.data?.configured ?? false}

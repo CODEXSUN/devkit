@@ -1,12 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { createRequire } from "node:module";
 import { AppError } from "@codexsun/framework/errors";
 import { z } from "zod";
-import {
-  hostingerApiToken,
-  hostingerMcpCommand,
-  hostingerMcpPackage
-} from "./hostinger-mcp.config.js";
+import { hostingerApiToken } from "./hostinger-mcp.config.js";
+
+const require = createRequire(import.meta.url);
 
 export class HostingerMcpClient {
   private client: Client | null = null;
@@ -46,10 +45,10 @@ export class HostingerMcpClient {
     if (!token) {
       throw AppError.validation("Set HOSTINGER_API_TOKEN in the server .env.");
     }
-    const client = new Client({ name: "codelogicx-devkit", version: "1.0.25" });
+    const client = new Client({ name: "codelogicx-devkit", version: "1.0.28" });
     const transport = new StdioClientTransport({
-      command: hostingerMcpCommand(),
-      args: ["--yes", `--package=${hostingerMcpPackage()}`, "hostinger-vps-mcp"],
+      command: process.execPath,
+      args: [require.resolve("hostinger-api-mcp/src/servers/vps.js")],
       env: processEnvironment(token),
       stderr: "pipe"
     });

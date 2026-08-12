@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.28
-Release tag: v-1.0.28
-Changelog label: v 1.0.28
+Current version: 1.0.29
+Release tag: v-1.0.29
+Changelog label: v 1.0.29
 
 ### [Session] 2026-08-11 - CODEXSUN application workspace layout
 
@@ -167,6 +167,31 @@ Changelog label: v 1.0.28
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.29
+
+### [v 1.0.29] 2026-08-12 12:25 pm - Hostinger SSH connection
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.29.
+- Added a module-owned Hostinger SSH key generator and connection tester.
+- Kept each private key in DevKit storage and sent only its public key to Hostinger.
+- Added Hostinger VPS address discovery, attachment status, fingerprints, and connection evidence.
+- Added the Hostinger SSH connection panel with key generation and live test controls.
+- Used the installed Hostinger MCP package directly to avoid a slow command launcher.
+- Restored the `updat.sh` compatibility alias required by the deployment check.
+
+#### Verification
+
+- Passed the DevKit API and web type checks and lint checks.
+- Passed the module boundary check and Git diff validation.
+- Created and attached the Ed25519 public key to VPS `914719`.
+- Connected to `srv914719` as `root` and verified `/home/devkit` exists.
 
 ## v-1.0.28
 

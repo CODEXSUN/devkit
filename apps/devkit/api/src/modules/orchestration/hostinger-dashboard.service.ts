@@ -11,6 +11,7 @@ const virtualMachineSchema = z.object({
   disk: z.number(),
   bandwidth: z.number(),
   created_at: z.string(),
+  ipv4: z.array(z.object({ address: z.string() })),
   template: z.object({ name: z.string() })
 });
 
@@ -106,6 +107,7 @@ function buildNode(
     state: virtualMachine.state,
     plan: virtualMachine.plan,
     operatingSystem: virtualMachine.template.name,
+    ipv4: virtualMachine.ipv4[0]?.address ?? "",
     createdAt: virtualMachine.created_at,
     capacity: {
       cpuCores: virtualMachine.cpus,

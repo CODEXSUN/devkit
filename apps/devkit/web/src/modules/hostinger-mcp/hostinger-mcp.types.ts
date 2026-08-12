@@ -36,6 +36,7 @@ export type HostingerProject = {
 export type HostingerNode = {
   id: number;
   hostname: string;
+  ipv4: string;
   state: string;
   plan: string;
   operatingSystem: string;
@@ -62,6 +63,24 @@ export type HostingerNode = {
     unhealthyCount: number;
   };
   projects: HostingerProject[];
+};
+
+export type HostingerSshTarget = {
+  host: string;
+  name: string;
+  port: number;
+  user: string;
+  virtualMachineId: number;
+};
+
+export type HostingerSshStatus = HostingerSshTarget & {
+  attached: boolean;
+  connected: boolean;
+  evidence?: Record<string, string> | null;
+  fingerprint: string | null;
+  generated: boolean;
+  keyName: string;
+  lastError: string | null;
 };
 
 export type HostingerDashboard = {
