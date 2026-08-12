@@ -1,6 +1,6 @@
 "use client";
 
-import { BellIcon, CheckIcon, GripIcon, HomeIcon, SearchIcon, XIcon } from "lucide-react";
+import { BellIcon, BugIcon, CheckIcon, GripIcon, HomeIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../../../components/avatar";
@@ -12,17 +12,22 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger
 } from "../../../components/dropdown-menu";
-import { Input } from "../../../components/input";
 import { Separator } from "../../../components/separator";
 import { SidebarTrigger } from "../../../components/sidebar";
+import { Switch } from "../../../components/switch";
+import { GlobalSearch, type GlobalSearchItem } from "./global-search";
 import { DesignThemeMenu, type TopMenuWorkspaceItem } from "./top-menu";
 import type { TopUserMenuUser } from "./top-user-menu";
 import { TechmediaUserMenu } from "./techmedia-user-menu";
 
 type TechmediaTopMenuProps = {
+  companionLabel?: string;
+  companionVisible?: boolean;
   homeHref?: string;
+  globalSearchItems?: GlobalSearchItem[];
   logoutHref?: string;
   onLogout?: () => void | Promise<void>;
+  onCompanionVisibleChange?: (visible: boolean) => void;
   pageTitle?: string;
   profileHref?: string;
   searchPlaceholder?: string;
@@ -34,9 +39,13 @@ type TechmediaTopMenuProps = {
 };
 
 export function TechmediaTopMenu({
+  companionLabel,
+  companionVisible = false,
   homeHref = "/workspace",
+  globalSearchItems = [],
   logoutHref = "/login",
   onLogout,
+  onCompanionVisibleChange,
   pageTitle = "Workspace",
   profileHref,
   searchPlaceholder = "Search CodeLogicX",
@@ -46,12 +55,11 @@ export function TechmediaTopMenu({
   user,
   workspaceItems
 }: TechmediaTopMenuProps) {
-  const [search, setSearch] = useState("");
   const activeWorkspace = workspaceItems.find((item) => item.active) ?? workspaceItems[0];
   const ActiveWorkspaceIcon = activeWorkspace?.icon;
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
+    <header className="relative sticky top-0 z-30 flex h-14 w-full shrink-0 items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
       <div className="flex h-full shrink-0 items-center">
         <div className="flex h-full w-16 items-center justify-center border-r bg-background">
           <SidebarTrigger className="size-9 rounded-full border-0 bg-transparent shadow-none" />
@@ -71,17 +79,9 @@ export function TechmediaTopMenu({
           ) : null}
         </div>
       </div>
-      <div className="mx-3 flex min-w-24 max-w-3xl flex-1 items-center sm:mx-6">
-        <div className="relative w-full">
-          <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            aria-label="Global search"
-            className="h-10 rounded-full border-transparent bg-muted/80 pl-11 pr-4 shadow-none focus-visible:border-primary/30 focus-visible:bg-background"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={searchPlaceholder}
-            type="search"
-            value={search}
-          />
+      <div className="pointer-events-none absolute left-1/2 w-[min(40vw,48rem)] min-w-64 -translate-x-1/2">
+        <div className="pointer-events-auto">
+          <GlobalSearch items={globalSearchItems} placeholder={searchPlaceholder} />
         </div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1 px-3">
@@ -95,10 +95,19 @@ export function TechmediaTopMenu({
           </Button>
         ) : null}
         <div className="ml-2 flex items-center gap-3">
-          <AppLauncher items={workspaceItems} user={user} />
+          <AppLauncher
+            {...(companionLabel ? { companionLabel } : {})}
+            companionVisible={companionVisible}
+            items={workspaceItems}
+            {...(onCompanionVisibleChange ? { onCompanionVisibleChange } : {})}
+            user={user}
+          />
           <TechmediaUserMenu
+            {...(companionLabel ? { companionLabel } : {})}
+            companionVisible={companionVisible}
             logoutHref={logoutHref}
             {...(onLogout ? { onLogout } : {})}
+            {...(onCompanionVisibleChange ? { onCompanionVisibleChange } : {})}
             {...(profileHref ? { profileHref } : {})}
             user={user}
           />
@@ -162,7 +171,19 @@ function NotificationMenu({
   );
 }
 
-function AppLauncher({ items, user }: { items: TopMenuWorkspaceItem[]; user: TopUserMenuUser }) {
+function AppLauncher({
+  companionLabel,
+  companionVisible = false,
+  items,
+  onCompanionVisibleChange,
+  user
+}: {
+  companionLabel?: string;
+  companionVisible?: boolean;
+  items: TopMenuWorkspaceItem[];
+  onCompanionVisibleChange?: (visible: boolean) => void;
+  user: TopUserMenuUser;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -208,6 +229,20 @@ function AppLauncher({ items, user }: { items: TopMenuWorkspaceItem[]; user: Top
             </DropdownMenuItem>
           ))}
         </div>
+        {companionLabel && onCompanionVisibleChange ? (
+          <DropdownMenuItem
+            className="mt-2 h-12 gap-3 rounded-2xl border bg-background px-4"
+            onSelect={(event) => event.preventDefault()}
+          >
+            <BugIcon />
+            <span className="flex-1">Show {companionLabel}</span>
+            <Switch
+              aria-label={`Show ${companionLabel}`}
+              checked={companionVisible}
+              onCheckedChange={onCompanionVisibleChange}
+            />
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

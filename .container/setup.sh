@@ -174,6 +174,9 @@ prepare_deploy_environment() {
   set_file_value "$DEPLOY_ENV" DEVKIT_MIGRATION_COMPATIBLE_VERSION "$version"
   set_file_value "$DEPLOY_ENV" NODE_RUNTIME_VERSION "$node_version"
   set_file_value "$DEPLOY_ENV" NPM_RUNTIME_VERSION "$npm_version"
+  set_default_if_empty "$DEPLOY_ENV" DEVKIT_CODEX_STATE_VOLUME devkit-codex-state
+  set_default_if_empty "$DEPLOY_ENV" DEVKIT_AGENT_WORKTREE_VOLUME devkit-agent-worktrees
+  set_default_if_empty "$DEPLOY_ENV" DEVKIT_AGENT_REPOSITORY_VOLUME devkit-agent-repositories
   chmod 600 "$DEPLOY_ENV" 2>/dev/null || true
 }
 
@@ -395,6 +398,29 @@ compose() {
     -f "$COMPOSE_FILE" "$@"
 }
 
+verify_agent_runtime_image() {
+  compose run --rm --no-deps api sh -lc '
+    test "$(id -u)" = "1000"
+    command -v git >/dev/null
+    git --version
+    test -w "$DEVKIT_CODEX_HOME"
+    test -w "$DEVKIT_AGENT_WORKTREE_ROOT"
+    test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"
+  '
+}
+
+verify_agent_runtime_container() {
+  local container
+  container="$(file_value "$DEPLOY_ENV" DEVKIT_API_CONTAINER_NAME devkit-api)"
+  docker exec "$container" sh -lc '
+    test "$(id -u)" = "1000"
+    command -v git >/dev/null
+    test -w "$DEVKIT_CODEX_HOME"
+    test -w "$DEVKIT_AGENT_WORKTREE_ROOT"
+    test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"
+  '
+}
+
 safe_docker_name() {
   [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || {
     echo "Unsafe Docker resource name: $1" >&2
@@ -453,7 +479,10 @@ validate_deploy_environment() {
     DEVKIT_WEB_CONTAINER_NAME \
     DEVKIT_MARIADB_CONTAINER_NAME \
     DEVKIT_NETWORK \
-    DEVKIT_MARIADB_DATA_VOLUME; do
+    DEVKIT_MARIADB_DATA_VOLUME \
+    DEVKIT_CODEX_STATE_VOLUME \
+    DEVKIT_AGENT_WORKTREE_VOLUME \
+    DEVKIT_AGENT_REPOSITORY_VOLUME; do
     safe_docker_name "$(file_value "$DEPLOY_ENV" "$key")"
   done
   ensure_available_host_port \
@@ -597,6 +626,7 @@ echo "  Infrastructure: $infrastructure_label"
 echo "  MariaDB data: $database_mode"
 echo "  Images: internal Framework/UI -> DevKit Platform API/Web"
 echo "  Runtime: DevKit API, DevKit Web, selected MariaDB"
+echo "  Agent storage: separate Codex state, repository, and worktree volumes"
 echo "  Excluded: CXApp, TMApp, Billing, Mail, Redis, and Media"
 read -r -p "Build and apply this standalone DevKit installation? [Y/n] " confirmation
 case "${confirmation:-Y}" in
@@ -614,6 +644,8 @@ if [[ "$infrastructure_mode" == dedicated && "$database_mode" == fresh ]] &&
 fi
 
 compose build api web
+echo "Verifying Git and writable Agent runtime volumes in the API image."
+verify_agent_runtime_image
 if [[ "$infrastructure_mode" == shared ]]; then
   connect_shared_mariadb
   reconcile_database_user shared
@@ -624,7 +656,11 @@ else
   compose up -d api web --no-build --force-recreate --wait --wait-timeout 300
 fi
 
+echo "Verifying the running Agent runtime."
+verify_agent_runtime_container
+
 echo
 echo "DevKit standalone installation completed."
 echo "Web: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_WEB_HOST_PORT 9060)/"
 echo "API health: http://$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1):$(file_value "$DEPLOY_ENV" DEVKIT_API_HOST_PORT 9050)/health"
+echo "Agent repositories: /srv/devkit/repositories inside the API container"

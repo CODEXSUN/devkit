@@ -291,7 +291,7 @@ function BrandLogo({
   fallback: SidebarBrand;
 }) {
   const size = compact ? "size-7" : "size-8";
-  const imageSize = compact ? "size-4" : "size-5";
+  const imageSize = compact ? "size-5" : "size-6";
   return (
     <div
       className={`flex aspect-square ${size} shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-background`}

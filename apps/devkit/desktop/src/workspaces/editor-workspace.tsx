@@ -61,7 +61,7 @@ export function EditorWorkspace({ path }: { path: string | undefined }) {
           padding: { top: 14 },
           scrollBeyondLastLine: false
         }}
-        theme="vs-dark"
+        theme="vs"
         value={content}
       />
     </section>

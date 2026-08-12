@@ -6,6 +6,11 @@ export const telegramSupportMigration = {
   key: "devkit.telegram-support.sql.v1"
 } as const;
 
+export const telegramMtprotoMigration = {
+  description: "Encrypted Telegram MTProto account sessions.",
+  key: "devkit.telegram-support.mtproto.sql.v2"
+} as const;
+
 export async function migrateTelegramSupportModule(database: Kysely<DevkitDatabase>) {
   await sql`CREATE TABLE IF NOT EXISTS devkit_telegram_connections (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, uuid CHAR(16) NOT NULL,
@@ -27,4 +32,11 @@ export async function migrateTelegramSupportModule(database: Kysely<DevkitDataba
     KEY idx_devkit_telegram_messages_chat (chat_id, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`.execute(database);
   return telegramSupportMigration;
+}
+
+export async function migrateTelegramMtprotoModule(database: Kysely<DevkitDatabase>) {
+  await sql`ALTER TABLE devkit_telegram_connections
+    ADD COLUMN IF NOT EXISTS auth_mode VARCHAR(24) NOT NULL DEFAULT 'bot' AFTER uuid,
+    ADD COLUMN IF NOT EXISTS encrypted_session TEXT NULL AFTER link_token_hash`.execute(database);
+  return telegramMtprotoMigration;
 }

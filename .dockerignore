@@ -1,0 +1,10 @@
+.git
+.env
+.container/deploy.env
+.container/backups
+CodeLogicX
+coverage
+dist
+node_modules
+storage
+*.log

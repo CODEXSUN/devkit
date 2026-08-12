@@ -17,7 +17,8 @@ import {
   migratePlanningModule,
   planningMigration,
 } from "../modules/planning/planning.migration.js";
-import { migrateTelegramSupportModule, telegramSupportMigration } from "../modules/telegram-support/telegram-support.migration.js";
+import { migrateTelegramMtprotoModule, migrateTelegramSupportModule, telegramMtprotoMigration, telegramSupportMigration } from "../modules/telegram-support/telegram-support.migration.js";
+import { honeyMigration, migrateHoneyModule } from "../modules/honey/honey.migration.js";
 import {
   migrateOrchestrationChat,
   orchestrationChatMigration
@@ -60,6 +61,8 @@ const migrationSteps = [
     name: syncMigration.key,
   },
   { migrate: migrateTelegramSupportModule, name: telegramSupportMigration.key },
+  { migrate: migrateTelegramMtprotoModule, name: telegramMtprotoMigration.key },
+  { migrate: migrateHoneyModule, name: honeyMigration.key },
   { migrate: migrateOrchestrationChat, name: orchestrationChatMigration.key },
   { migrate: migrateAgentRuns, name: agentRunMigration.key },
 ] as const;

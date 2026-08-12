@@ -22,9 +22,7 @@ type PendingRequest = {
 
 type CodexAccess = "plan" | "read-only" | "ask-approval" | "auto-approve" | "full-access";
 
-type CodexUserInput =
-  | { type: "text"; text: string }
-  | { type: "image"; url: string };
+type CodexUserInput = { type: "text"; text: string } | { type: "image"; url: string };
 
 export type CodexAccountStatus = {
   available: boolean;
@@ -33,6 +31,12 @@ export type CodexAccountStatus = {
   email: string | null;
   planType: string | null;
   error: string | null;
+};
+
+export type CodexMcpServerList = {
+  data?: unknown[];
+  items?: unknown[];
+  nextCursor?: string | null;
 };
 
 export class CodexAppServerClient {
@@ -99,6 +103,19 @@ export class CodexAppServerClient {
     await this.request("account/logout", {});
   }
 
+  async reloadMcpServers() {
+    await this.ensureStarted();
+    return this.request("config/mcpServer/reload", {});
+  }
+
+  async listMcpServers() {
+    await this.ensureStarted();
+    return this.request("mcpServerStatus/list", {
+      detail: "toolsAndAuthOnly",
+      limit: 100
+    }) as Promise<CodexMcpServerList>;
+  }
+
   async cancelLogin(loginId: string) {
     await this.ensureStarted();
     await this.request("account/login/cancel", { loginId });
@@ -143,7 +160,11 @@ export class CodexAppServerClient {
     await this.request("turn/interrupt", { threadId, turnId });
   }
 
-  resolveApproval(threadId: string, requestId: number, decision: "accept" | "acceptForSession" | "decline") {
+  resolveApproval(
+    threadId: string,
+    requestId: number,
+    decision: "accept" | "acceptForSession" | "decline"
+  ) {
     if (this.approvalRequests.get(requestId) !== threadId) {
       throw AppError.notFound("The Codex approval request is no longer pending.");
     }

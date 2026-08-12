@@ -2,15 +2,14 @@ import type { SidemenuItem } from "@codexsun/ui/blocks/menu/sidemenu/sub/sidemen
 import type { TopMenuWorkspaceItem } from "@codexsun/ui/blocks/menu/sidemenu/top-menu";
 import {
   BotIcon,
-  CircleGaugeIcon,
-  CalendarCheckIcon,
-  DatabaseIcon,
-  FolderKanbanIcon,
-  GitForkIcon,
-  PaletteIcon,
-  PencilRulerIcon,
+  BriefcaseBusinessIcon,
+  CableIcon,
+  GitBranchIcon,
+  LayoutDashboardIcon,
+  LibraryBigIcon,
+  RocketIcon,
   SendIcon,
-  WorkflowIcon,
+  ServerCogIcon,
   WrenchIcon
 } from "lucide-react";
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
@@ -35,6 +34,26 @@ const workspace = (
 });
 
 const workspaces = Object.freeze([
+  workspace("dashboard", "Dashboard", "My Work", () =>
+    import("./modules/dashboard").then((module) => ({
+      default: module.DashboardWorkspace
+    }))
+  ),
+  workspace("apps", "App Desk", "System", () =>
+    import("./modules/app-desk").then((module) => ({
+      default: module.AppDeskWorkspace
+    }))
+  ),
+  workspace("hostinger", "Hostinger VPS", "Infrastructure", () =>
+    import("./modules/hostinger-mcp").then((module) => ({
+      default: module.HostingerMcpWorkspace
+    }))
+  ),
+  workspace("hostinger-details", "Hostinger details", "Infrastructure", () =>
+    import("./modules/hostinger-mcp").then((module) => ({
+      default: module.HostingerDetailWorkspace
+    }))
+  ),
   workspace("orchestration", "Engineering Command Center", "Orchestration", () =>
     import("./modules/orchestration").then((module) => ({
       default: module.OrchestrationWorkspace
@@ -45,7 +64,10 @@ const workspaces = Object.freeze([
       default: module.AgentIdeWorkspace
     }))
   ),
-  workspace("launch-desk", "Codex Runtime", "Agents", () =>
+  workspace("honey", "Honey Chat", "Agents", () =>
+    import("./modules/honey").then((module) => ({ default: module.HoneyWorkspace }))
+  ),
+  workspace("launch-desk", "Agent Connector", "Agents", () =>
     import("./modules/launch-desk").then((module) => ({
       default: module.LaunchDeskWorkspace
     }))
@@ -55,33 +77,62 @@ const workspaces = Object.freeze([
       default: module.SkillLibraryWorkspace
     }))
   ),
-  workspace("today", "Today", "Development", () =>
-    import("./modules/today").then((module) => ({
-      default: module.TodayWorkspace
+  workspace("my-work", "My Work", "Work", () =>
+    import("./modules/work-hub").then((module) => ({
+      default: module.MyWorkWorkspace
     }))
   ),
-  workspace("overview", "Overview", "Development", () =>
-    import("./modules/project-manager").then((module) => ({
-      default: () => (
-        <module.ProjectManagerOverview
-          onOpenProject={() => window.location.assign("/app/devkit/projects")}
-        />
-      )
+  workspace("overview", "Work Overview", "Work", () =>
+    import("./modules/work-hub").then((module) => ({
+      default: module.WorkOverviewWorkspace
     }))
   ),
-  workspace("projects", "Projects", "Development", () =>
-    import("./modules/work-automation").then((module) => ({
-      default: module.WorkAutomationWorkspace
+  workspace("projects", "Projects", "Work", () =>
+    Promise.all([import("./modules/work-automation"), import("./modules/work-hub")]).then(
+      ([work, hub]) => ({
+        default: () => (
+          <hub.WorkShell current="Projects">
+            <work.WorkAutomationWorkspace />
+          </hub.WorkShell>
+        )
+      })
+    )
+  ),
+  workspace("roadmap", "Roadmap", "Work", () =>
+    Promise.all([import("./modules/work-automation"), import("./modules/work-hub")]).then(
+      ([work, hub]) => ({
+        default: () => (
+          <hub.WorkShell current="Roadmap">
+            <work.WorkAutomationWorkspace initialView="roadmap" />
+          </hub.WorkShell>
+        )
+      })
+    )
+  ),
+  workspace("tasks", "Tasks", "Work", () =>
+    Promise.all([import("./modules/task-manager"), import("./modules/work-hub")]).then(
+      ([tasks, hub]) => ({
+        default: () => (
+          <hub.WorkShell current="Tasks">
+            <tasks.TaskManagerWorkspace />
+          </hub.WorkShell>
+        )
+      })
+    )
+  ),
+  workspace("issues", "Issues", "Work", () =>
+    import("./modules/work-hub").then((module) => ({
+      default: () => <module.WorkSectionWorkspace section="Issues" />
     }))
   ),
-  workspace("roadmap", "Initiative Roadmap", "Development", () =>
-    import("./modules/work-automation").then((module) => ({
-      default: () => <module.WorkAutomationWorkspace initialView="roadmap" />
+  workspace("sprints", "Sprints", "Work", () =>
+    import("./modules/work-hub").then((module) => ({
+      default: () => <module.WorkSectionWorkspace section="Sprints" />
     }))
   ),
-  workspace("tasks", "Tasks", "Development", () =>
-    import("./modules/task-manager").then((module) => ({
-      default: module.TaskManagerWorkspace
+  workspace("releases", "Releases", "Work", () =>
+    import("./modules/work-hub").then((module) => ({
+      default: () => <module.WorkSectionWorkspace section="Releases" />
     }))
   ),
   workspace("telegram-connect", "Connect Telegram", "Telegram", () =>
@@ -135,124 +186,62 @@ export const devkitWebBundle = Object.freeze({
   applicationSwitcherItem(active: boolean): TopMenuWorkspaceItem {
     return {
       active,
-      description: "Developer and engineering orchestration workspace.",
+      description: "Review and open CodeLogicX workspaces.",
       icon: WrenchIcon,
-      title: "CodeLogicX",
-      url: "/app/devkit/orchestration"
+      title: "App Desk",
+      url: "/app/devkit/apps"
+    };
+  },
+  githubSwitcherItem(active: boolean): TopMenuWorkspaceItem {
+    return {
+      active,
+      description: "Repositories, pull requests, and delivery signals.",
+      icon: GitBranchIcon,
+      title: "GitHub",
+      url: "/app/devkit/github"
     };
   },
   menuItems(activeWorkspaceId: string): SidemenuItem[] {
     return [
       {
-        icon: FolderKanbanIcon,
-        isActive:
-          activeWorkspaceId === "projects" ||
-          activeWorkspaceId === "roadmap" ||
-          activeWorkspaceId === "tasks",
-        items: [
-          {
-            isActive: activeWorkspaceId === "projects",
-            title: "Projects",
-            url: "/app/devkit/projects"
-          },
-          {
-            isActive: activeWorkspaceId === "roadmap",
-            title: "Initiative Roadmap",
-            url: "/app/devkit/roadmap"
-          },
-          {
-            isActive: activeWorkspaceId === "tasks",
-            title: "Tasks",
-            url: "/app/devkit/tasks"
-          }
-        ],
-        title: "Development",
-        url: "/app/devkit/projects"
+        icon: LayoutDashboardIcon,
+        isActive: activeWorkspaceId === "dashboard",
+        title: "Dashboard",
+        url: "/app/devkit/dashboard"
       },
       {
-        icon: WorkflowIcon,
-        isActive: activeWorkspaceId === "orchestration",
-        title: "Command Center",
-        url: "/app/devkit/orchestration"
+        icon: BriefcaseBusinessIcon,
+        isActive: workWorkspaceIds.includes(activeWorkspaceId),
+        items: workMenuItems.map((item) => ({
+          isActive: activeWorkspaceId === item.id,
+          title: item.title,
+          url: `/app/devkit/${item.id}`
+        })),
+        title: "Work"
       },
       {
         icon: BotIcon,
-        isActive:
-          activeWorkspaceId === "agent-ide" ||
-          activeWorkspaceId === "launch-desk" ||
-          activeWorkspaceId === "skills",
+        isActive: agentWorkspaceIds.includes(activeWorkspaceId),
+        items: agentMenuItems.map((item) => ({
+          icon: item.icon,
+          isActive: activeWorkspaceId === item.id,
+          title: item.title,
+          url: `/app/devkit/${item.id}`
+        })),
+        title: "Agents"
+      },
+      {
+        icon: GitBranchIcon,
+        isActive: ["github", "repository-settings"].includes(activeWorkspaceId),
         items: [
           {
-            isActive: activeWorkspaceId === "agent-ide",
-            title: "Project Agent",
-            url: "/app/devkit/agent-ide"
-          },
-          {
-            isActive: activeWorkspaceId === "launch-desk",
-            title: "Codex Runtime",
-            url: "/app/devkit/launch-desk"
-          },
-          {
-            isActive: activeWorkspaceId === "skills",
-            title: "Skill Library",
-            url: "/app/devkit/skills"
-          }
-        ],
-        title: "Agents",
-        url: "/app/devkit/agent-ide"
-      },
-      {
-        icon: PencilRulerIcon,
-        isActive: activeWorkspaceId === "planning",
-        title: "Planning",
-        url: "/app/devkit/planning"
-      },
-      {
-        icon: CalendarCheckIcon,
-        isActive: activeWorkspaceId === "today",
-        title: "Today",
-        url: "/app/devkit/today"
-      },
-      {
-        icon: CircleGaugeIcon,
-        isActive: activeWorkspaceId === "overview",
-        title: "Overview",
-        url: "/app/devkit/overview"
-      },
-      {
-        icon: SendIcon,
-        isActive: activeWorkspaceId === "telegram-connect" || activeWorkspaceId === "telegram-chat",
-        items: [
-          {
-            isActive: activeWorkspaceId === "telegram-connect",
-            title: "Connect Mobile",
-            url: "/app/devkit/telegram-connect"
-          },
-          {
-            isActive: activeWorkspaceId === "telegram-chat",
-            title: "Chat",
-            url: "/app/devkit/telegram-chat"
-          }
-        ],
-        title: "Telegram",
-        url: "/app/devkit/telegram-connect"
-      },
-      {
-        icon: DatabaseIcon,
-        isActive: activeWorkspaceId === "registry",
-        title: "Platform Registry",
-        url: "/app/devkit/registry"
-      },
-      {
-        icon: GitForkIcon,
-        isActive: activeWorkspaceId === "github" || activeWorkspaceId === "repository-settings",
-        items: [
-          {
+            icon: LayoutDashboardIcon,
             isActive: activeWorkspaceId === "github",
-            title: "Projects",
+            title: "GitHub Dashboard",
             url: "/app/devkit/github"
           },
           {
+            icon: CableIcon,
             isActive: activeWorkspaceId === "repository-settings",
             title: "Repository Connections",
             url: "/app/devkit/repository-settings"
@@ -262,24 +251,28 @@ export const devkitWebBundle = Object.freeze({
         url: "/app/devkit/github"
       },
       {
-        icon: PaletteIcon,
-        isActive:
-          activeWorkspaceId === "design-system-components" ||
-          activeWorkspaceId === "design-system-templates",
+        icon: SendIcon,
+        isActive: telegramWorkspaceIds.includes(activeWorkspaceId),
+        items: telegramMenuItems.map((item) => ({
+          isActive: activeWorkspaceId === item.id,
+          title: item.title,
+          url: `/app/devkit/${item.id}`
+        })),
+        title: "Telegram",
+        url: "/app/devkit/telegram-connect"
+      },
+      {
+        icon: RocketIcon,
+        isActive: ["hostinger", "hostinger-details"].includes(activeWorkspaceId),
         items: [
           {
-            isActive: activeWorkspaceId === "design-system-components",
-            title: "Components",
-            url: "/app/devkit/design-system/components"
-          },
-          {
-            isActive: activeWorkspaceId === "design-system-templates",
-            title: "Templates",
-            url: "/app/devkit/design-system/templates"
+            icon: ServerCogIcon,
+            isActive: ["hostinger", "hostinger-details"].includes(activeWorkspaceId),
+            title: "Hostinger VPS",
+            url: "/app/devkit/hostinger"
           }
         ],
-        title: "Design System",
-        url: "/app/devkit/design-system/components"
+        title: "Deployment"
       }
     ];
   },
@@ -292,3 +285,31 @@ export const devkitWebBundle = Object.freeze({
     return workspaces.find((entry) => entry.id === workspaceId);
   }
 });
+
+const workMenuItems = [
+  { id: "overview", title: "Overview" },
+  { id: "my-work", title: "My Work" },
+  { id: "projects", title: "Projects" },
+  { id: "tasks", title: "Tasks" },
+  { id: "issues", title: "Issues" },
+  { id: "roadmap", title: "Roadmap" },
+  { id: "sprints", title: "Sprints" },
+  { id: "releases", title: "Releases" }
+] as const;
+
+const workWorkspaceIds: string[] = workMenuItems.map((item) => item.id);
+
+const agentMenuItems = [
+  { icon: BotIcon, id: "agent-ide", title: "Project Agent" },
+  { icon: CableIcon, id: "launch-desk", title: "Agent Connector" },
+  { icon: LibraryBigIcon, id: "skills", title: "Skills" }
+] as const;
+
+const agentWorkspaceIds: string[] = agentMenuItems.map((item) => item.id);
+
+const telegramMenuItems = [
+  { id: "telegram-connect", title: "Connect Mobile" },
+  { id: "telegram-chat", title: "Chat" }
+] as const;
+
+const telegramWorkspaceIds: string[] = telegramMenuItems.map((item) => item.id);

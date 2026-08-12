@@ -1,7 +1,8 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { AppError } from "@codexsun/framework/errors";
 import { TaskManagerService } from "../task-manager/task-manager.service.js";
 import { TelegramSupportRepository } from "./telegram-support.repository.js";
+import { telegramMtprotoService } from "./telegram-mtproto.service.js";
 
 const scopeKey = "super-admin";
 
@@ -12,39 +13,23 @@ export class TelegramSupportService {
   ) {}
 
   async status() {
-    const connection = await this.repository.connection();
-    return {
-      botUsername: botUsername(),
-      configured: Boolean(botUsername() && process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_WEBHOOK_PUBLIC_URL?.trim() && process.env.TELEGRAM_WEBHOOK_SECRET?.trim()),
-      connected: connection?.status === "connected",
-      displayName: connection?.display_name ?? "",
-      telegramUsername: connection?.telegram_username ?? ""
-    };
+    return telegramMtprotoService.status();
   }
 
   async beginConnection() {
-    if (!botUsername()) throw AppError.validation("TELEGRAM_BOT_USERNAME is not configured.");
-    await configureWebhook();
-    const token = randomBytes(18).toString("base64url");
-    await this.repository.disconnect();
-    await this.repository.createConnection(token);
-    return { deepLink: `https://t.me/${botUsername()}?start=${token}`, expiresInMinutes: 15 };
+    return telegramMtprotoService.beginConnection();
   }
 
-  async disconnect() { await this.repository.disconnect(); return { disconnected: true }; }
+  async submitPassword(password: string) { return telegramMtprotoService.submitPassword(password); }
+
+  async disconnect() { return telegramMtprotoService.disconnect(); }
 
   async messages() {
-    const connection = await this.connected();
-    return this.repository.messages(connection.chat_id!);
+    return telegramMtprotoService.messages();
   }
 
   async send(bodyInput: string) {
-    const body = bodyInput.trim();
-    if (!body) throw AppError.validation("Message is required.");
-    const connection = await this.connected();
-    const result = await telegram("sendMessage", { chat_id: connection.chat_id, text: body });
-    await this.repository.addMessage(connection.chat_id!, "outbound", body, String(result.message_id ?? ""));
-    return { sent: true };
+    return telegramMtprotoService.send(bodyInput);
   }
 
   async webhook(secret: string | undefined, update: TelegramUpdate) {
@@ -101,14 +86,6 @@ async function telegram(method: string, payload: unknown) {
   return result.result ?? {};
 }
 
-function botUsername() { return process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/u, "") ?? ""; }
-async function configureWebhook() {
-  const publicUrl = process.env.TELEGRAM_WEBHOOK_PUBLIC_URL?.trim().replace(/\/+$/u, "");
-  const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
-  if (!publicUrl || !secret) throw AppError.validation("TELEGRAM_WEBHOOK_PUBLIC_URL and TELEGRAM_WEBHOOK_SECRET are required.");
-  const url = publicUrl.endsWith("/telegram/webhook") ? publicUrl : `${publicUrl}/api/devkit/telegram/webhook`;
-  await telegram("setWebhook", { allowed_updates: ["message"], secret_token: secret, url });
-}
 function verifySecret(value: string | undefined) {
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   if (!expected || !value || expected.length !== value.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(value))) throw AppError.unauthorized("Invalid Telegram webhook secret.");

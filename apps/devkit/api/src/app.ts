@@ -11,6 +11,7 @@ import { planningModule } from "./modules/planning/index.js";
 import { orchestrationModule } from "./modules/orchestration/index.js";
 import { skillsModule } from "./modules/skills/index.js";
 import { telegramSupportModule } from "./modules/telegram-support/index.js";
+import { honeyModule } from "./modules/honey/index.js";
 import { runWithDevkitActor, type DevkitActor } from "./request-context.js";
 
 export const devkitApiModuleKeys = [
@@ -21,6 +22,7 @@ export const devkitApiModuleKeys = [
   orchestrationModule.key,
   skillsModule.key,
   telegramSupportModule.key,
+  honeyModule.key,
   syncModule.key
 ] as const;
 
@@ -72,6 +74,7 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
     await orchestrationModule.register({ app: devkitApp });
     await skillsModule.register({ app: devkitApp });
     await telegramSupportModule.register({ app: devkitApp });
+    await honeyModule.register({ app: devkitApp });
     await syncModule.register({ app: devkitApp });
   });
 }

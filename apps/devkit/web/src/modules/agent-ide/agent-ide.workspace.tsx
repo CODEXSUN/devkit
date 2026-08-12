@@ -1,12 +1,19 @@
 import { Button } from "@codexsun/ui/components/button";
 import { WorkspaceSelect } from "@codexsun/ui/workspace/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BotIcon, CheckCircle2Icon, RotateCcwIcon } from "lucide-react";
+import {
+  BotIcon,
+  CheckCircle2Icon,
+  PanelLeftOpenIcon,
+  PanelRightOpenIcon,
+  RotateCcwIcon
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useProjectManagerRecordsQuery } from "../project-manager/project-manager.hooks";
+import { HoneyFace } from "../honey";
 import { AgentIdeChat } from "./agent-ide.chat";
-import { AgentIdeProjectContext } from "./agent-ide.project-context";
+import { AgentIdeChatHistory, AgentIdeProjectAccordion } from "./agent-ide.project-context";
 import { AgentIdeRunConsole } from "./agent-ide.run-console";
 import {
   getAgentIdeCodexStatus,
@@ -44,6 +51,8 @@ export function AgentIdeWorkspace() {
   const [model, setModel] = useState<AgentIdeModel>("gpt-5.6-terra");
   const [approval, setApproval] = useState<AgentIdeApproval | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [projectContextVisible, setProjectContextVisible] = useState(true);
+  const [runConsoleVisible, setRunConsoleVisible] = useState(true);
   const historyQuery = useQuery({
     queryKey: ["devkit", "agent-ide", "chat-history"],
     queryFn: listAgentIdeChats
@@ -214,7 +223,10 @@ export function AgentIdeWorkspace() {
     if (running) return;
     try {
       const history = await getAgentIdeChat(uuid);
-      setProjectId(history.projectUuid);
+      const historyProject = projects.find(
+        (candidate) => candidate.id === history.projectUuid || candidate.key === history.projectKey
+      );
+      if (historyProject) setProjectId(historyProject.id);
       setConversationId(history.uuid);
       setThreadId(history.codexThreadId);
       setAccess(history.access);
@@ -239,14 +251,19 @@ export function AgentIdeWorkspace() {
   const connected = codexStatus.data?.connected ?? false;
   return (
     <main className="flex h-[calc(100dvh-3.5rem)] min-h-[38rem] flex-col overflow-hidden bg-background">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="flex items-center gap-3">
+      <header className="relative z-20 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="flex w-[17rem] shrink-0 items-center gap-3">
           <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
             <BotIcon className="size-4" />
           </span>
-          <div>
-            <h1 className="font-semibold">Project Agent</h1>
-            <p className="text-xs text-muted-foreground">Codex workspace with project context</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-semibold">{project?.title ?? "Project Agent"}</h1>
+            <AgentIdeProjectAccordion
+              access={access}
+              model={model}
+              threadId={threadId}
+              {...(project ? { project } : {})}
+            />
           </div>
         </div>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:max-w-2xl">
@@ -266,6 +283,11 @@ export function AgentIdeWorkspace() {
           >
             <CheckCircle2Icon className="size-4" /> {connected ? "Codex connected" : "Disconnected"}
           </span>
+          <Button asChild className="gap-2" size="sm" variant="ghost">
+            <a href="/app/devkit/honey" title="Open Honey Chat">
+              <HoneyFace size="compact" /> Honey
+            </a>
+          </Button>
           <Button
             disabled={!messages.length || running}
             onClick={newChat}
@@ -277,15 +299,24 @@ export function AgentIdeWorkspace() {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <AgentIdeProjectContext
-          access={access}
-          conversationId={conversationId}
-          histories={historyQuery.data ?? []}
-          model={model}
-          onOpenHistory={(uuid) => void openHistory(uuid)}
-          threadId={threadId}
-          {...(project ? { project } : {})}
-        />
+        {projectContextVisible ? (
+          <AgentIdeChatHistory
+            conversationId={conversationId}
+            histories={historyQuery.data ?? []}
+            onClose={() => setProjectContextVisible(false)}
+            onOpenHistory={(uuid) => void openHistory(uuid)}
+          />
+        ) : (
+          <button
+            aria-label="Show chat history"
+            className="hidden w-10 shrink-0 items-start justify-center border-r bg-background pt-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
+            onClick={() => setProjectContextVisible(true)}
+            title="Show chat history"
+            type="button"
+          >
+            <PanelLeftOpenIcon className="size-4" />
+          </button>
+        )}
         <AgentIdeChat
           access={access}
           approval={approval}
@@ -302,7 +333,23 @@ export function AgentIdeWorkspace() {
           {...(project ? { projectTitle: project.title } : {})}
           running={running}
         />
-        <AgentIdeRunConsole activeRunId={activeRunId} projectUuid={project?.id ?? ""} />
+        {runConsoleVisible ? (
+          <AgentIdeRunConsole
+            activeRunId={activeRunId}
+            onClose={() => setRunConsoleVisible(false)}
+            projectUuid={project?.id ?? ""}
+          />
+        ) : (
+          <button
+            aria-label="Show run control"
+            className="hidden w-10 shrink-0 items-start justify-center border-l bg-background pt-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground 2xl:flex"
+            onClick={() => setRunConsoleVisible(true)}
+            title="Show run control"
+            type="button"
+          >
+            <PanelRightOpenIcon className="size-4" />
+          </button>
+        )}
       </div>
     </main>
   );

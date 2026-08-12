@@ -12,7 +12,8 @@
 - `apps/devkit/api`: Project Manager, Task Manager, Planning, GitHub Dashboard, Orchestration,
   Skills, Sync, MariaDB lifecycle, and public host contracts.
 - `apps/devkit/web`: Today, Projects, Tasks, Platform Registry, Whiteboards, GitHub Dashboard,
-  Engineering Command Center, Project Agent, Skill Library, Design System, and Sync workspaces.
+  Engineering Command Center, Project Agent, Skill Library, Design System, Work Hub, and Sync
+  workspaces.
 - `assist/skills/library`: Repository-owned physical skill folders used for Agent prompting and
   review workflows. DevKit generates the hidden `SKILL.md` manifest and links each user-managed
   reference file from it so agents can load the relevant knowledge progressively.
@@ -26,6 +27,9 @@
 - Orchestration owns parent task graphs, task dependencies, agent profiles, file scopes, child runs,
   child worktrees, and parent review evidence. The scheduler starts only dependency-ready tasks and
   rejects concurrent scopes that overlap.
+- Orchestration owns the Hostinger VPS MCP connection status and managed private-Codex
+  configuration. It also owns the read-only VPS metrics and Docker inventory dashboard.
+  `HOSTINGER_API_TOKEN` remains server-side and is forwarded by name at runtime.
 - Orchestration owns registered verification commands, verification attempts, rework state, and
   approved local commits. It does not push Agent branches.
 

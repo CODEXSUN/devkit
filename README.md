@@ -29,6 +29,19 @@ Writable Project Agent runs use isolated Git worktrees. The current repository i
 default. Set `DEVKIT_AGENT_ALLOWED_ROOTS` to allow other repository roots. Set
 `DEVKIT_AGENT_WORKTREE_ROOT` to change the managed worktree location.
 
+### Docker Agent runtime
+
+The API image includes Git and runs application commands as the unprivileged `node` user. Compose
+keeps mutable Agent data outside the immutable application tree:
+
+- `/var/lib/devkit/codex` stores Codex authentication and state;
+- `/srv/devkit/repositories` stores complete Git clones used by projects;
+- `/var/lib/devkit/worktrees` stores isolated writable Agent worktrees.
+
+Setup and update verify Git and directory ownership. After installation, clone or connect each
+project as a complete repository below `/srv/devkit/repositories`. Do not initialize
+`/workspace/devkit` as an empty repository or mount `.git` separately from its matching worktree.
+
 The built-in quality gate runs `git diff --check`. Set
 `DEVKIT_AGENT_VERIFICATION_COMMANDS` to a JSON array of approved commands. Each entry needs an ID,
 label, executable, argument array, required flag, and timeout. DevKit executes these commands

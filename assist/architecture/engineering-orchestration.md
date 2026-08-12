@@ -46,6 +46,11 @@ The current orchestration slice provides these implemented controls:
 - agent profiles remain definitions, while Codex supplies the current executable runtime;
 - preview, deployment, provider routing, and Codex command interception remain planned.
 - automatic sub-agent prompt execution remains planned. The current scheduler prepares dispatch-ready child runs and worktrees.
+- DevKit can register the Hostinger VPS MCP server in its private Codex runtime. The server-side
+  environment supplies the API token, while Codex applies MCP tool approval policy. DevKit never
+  returns the token to the browser or stores it in the generated Codex configuration.
+- The read-only Hostinger dashboard retrieves VPS capacity and six-hour health metrics together
+  with Docker project, container, image-version, health, and published-port inventory through MCP.
 
 Orchestration owns runtime persistence through an additive migration and actor-scoped repositories.
 The local executor enforces the recorded run limits through the Codex turn interrupt contract.

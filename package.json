@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.25",
+  "version": "1.0.28",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -39,6 +39,7 @@
     "test:e2e:launch-desk": "node tools/e2e/launch-desk-stream.e2e.mjs",
     "test:e2e:codex-chat": "node tools/e2e/codex-chat.e2e.mjs",
     "test:e2e:agent-worktree": "node tools/e2e/agent-worktree.e2e.mjs",
+    "test:e2e:honey-mascot": "playwright test honey-mascot.e2e.mjs",
     "version:show": "node tools/repository-release.mjs version:show",
     "version:bump": "node tools/repository-release.mjs version:bump",
     "version-bump": "node tools/repository-release.mjs version:bump",
@@ -58,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.3.3",
     "@tiptap/extension-text-style": "^3.29.2",
     "@types/node": "^26.1.2",

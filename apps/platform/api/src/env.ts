@@ -24,13 +24,22 @@ const envSchema = z.object({
   INITIAL_ADMIN_NAME: z.string().default(""),
   INITIAL_ADMIN_PASSWORD: z.string().default(""),
   OPENAI_API_KEY: z.string().default(""),
-  OPENAI_BASE_URL: z.string().url("OPENAI_BASE_URL must be a valid URL").default("https://api.openai.com/v1"),
+  OPENAI_BASE_URL: z
+    .string()
+    .url("OPENAI_BASE_URL must be a valid URL")
+    .default("https://api.openai.com/v1"),
   OPENAI_MODEL: z.string().min(1, "OPENAI_MODEL is required").default("gpt-5.6-terra"),
   OPENAI_REASONING_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
   CODEX_EXECUTABLE: z.string().min(1).default("bundled"),
   DEVKIT_CODEX_HOME: z.string().optional(),
+  HOSTINGER_API_TOKEN: z.string().default(""),
+  HOSTINGER_MCP_COMMAND: z.string().default(""),
+  HOSTINGER_MCP_PACKAGE: z.string().default("hostinger-api-mcp@1.33.1"),
   TELEGRAM_BOT_TOKEN: z.string().default(""),
   TELEGRAM_BOT_USERNAME: z.string().default(""),
+  TELEGRAM_API_ID: z.coerce.number().int().positive().optional(),
+  TELEGRAM_API_HASH: z.string().default(""),
+  TELEGRAM_SESSION_ENCRYPTION_KEY: z.string().default(""),
   TELEGRAM_WEBHOOK_SECRET: z.string().default(""),
   TELEGRAM_WEBHOOK_PUBLIC_URL: z.union([z.literal(""), z.string().url()]).default(""),
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required")

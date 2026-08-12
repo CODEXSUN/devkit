@@ -26,6 +26,8 @@ import { agentWorktreeService } from "./agent-worktree.service.js";
 import { agentVerificationService } from "./agent-verification.service.js";
 import { agentIntegrationService } from "./agent-integration.service.js";
 import { agentTaskGraphRepository } from "./agent-task-graph.repository.js";
+import { hostingerMcpService } from "./hostinger-mcp.service.js";
+import { hostingerDashboardService } from "./hostinger-dashboard.service.js";
 
 const service = new OrchestrationService();
 const planningGateway = new OpenAiPlanningGateway();
@@ -68,38 +70,88 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     ok(await orchestrationChatRepository.list(requireDevkitActor().id), { requestId: request.id })
   );
   app.get("/orchestration/agent-ide/runs", async (request) => {
-    const { projectUuid } = z.object({ projectUuid: z.string().min(1).max(160) }).strict().parse(request.query);
-    return ok(await agentRunRepository.list(projectUuid, requireDevkitActor().id), { requestId: request.id });
+    const { projectUuid } = z
+      .object({ projectUuid: z.string().min(1).max(160) })
+      .strict()
+      .parse(request.query);
+    return ok(await agentRunRepository.list(projectUuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.get("/orchestration/agent-ide/runs/:uuid", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    return ok(await agentRunRepository.find(uuid, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await agentRunRepository.find(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.get("/orchestration/agent-ide/runs/:uuid/tasks", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    return ok(await agentTaskGraphRepository.find(uuid, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await agentTaskGraphRepository.find(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.put("/orchestration/agent-ide/runs/:uuid/tasks", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const input = agentDecompositionInputSchema.parse(request.body);
-    return ok(await agentTaskGraphRepository.replace(uuid, requireDevkitActor().id, input), { requestId: request.id });
+    return ok(await agentTaskGraphRepository.replace(uuid, requireDevkitActor().id, input), {
+      requestId: request.id
+    });
   });
   app.post("/orchestration/agent-ide/tasks/:uuid/start", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    return ok(await agentTaskGraphRepository.start(uuid, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await agentTaskGraphRepository.start(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.post("/orchestration/agent-ide/tasks/:uuid/finish", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const input = agentTaskStatusInputSchema.parse(request.body);
-    return ok(await agentTaskGraphRepository.finish(uuid, requireDevkitActor().id, input.status, input.resultSummary), { requestId: request.id });
+    return ok(
+      await agentTaskGraphRepository.finish(
+        uuid,
+        requireDevkitActor().id,
+        input.status,
+        input.resultSummary
+      ),
+      { requestId: request.id }
+    );
   });
   app.post("/orchestration/agent-ide/runs/:uuid/parent-review", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const input = agentParentReviewInputSchema.parse(request.body);
-    return ok(await agentTaskGraphRepository.review(uuid, requireDevkitActor().id, input.decision, input.note), { requestId: request.id });
+    return ok(
+      await agentTaskGraphRepository.review(
+        uuid,
+        requireDevkitActor().id,
+        input.decision,
+        input.note
+      ),
+      { requestId: request.id }
+    );
   });
   app.post("/orchestration/agent-ide/runs/:uuid/workspace/cleanup", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const actorId = requireDevkitActor().id;
     const workspace = await agentRunRepository.workspace(uuid, actorId);
     const result = await agentWorktreeService.cleanup(workspace);
@@ -110,34 +162,68 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     ok(agentVerificationService.catalog(), { requestId: request.id })
   );
   app.post("/orchestration/agent-ide/runs/:uuid/verification", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    return ok(await agentVerificationService.run(uuid, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await agentVerificationService.run(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.post("/orchestration/agent-ide/runs/:uuid/rework", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const { note } = agentReworkInputSchema.parse(request.body);
-    return ok(await agentRunRepository.requestRework(uuid, requireDevkitActor().id, note), { requestId: request.id });
+    return ok(await agentRunRepository.requestRework(uuid, requireDevkitActor().id, note), {
+      requestId: request.id
+    });
   });
   app.post("/orchestration/agent-ide/runs/:uuid/commit", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const { message } = agentCommitInputSchema.parse(request.body);
-    return ok(await agentIntegrationService.commit(uuid, requireDevkitActor().id, message), { requestId: request.id });
+    return ok(await agentIntegrationService.commit(uuid, requireDevkitActor().id, message), {
+      requestId: request.id
+    });
   });
   app.get("/orchestration/agent-ide/tools", async (request) =>
     ok(agentPolicyService.catalog(), { requestId: request.id })
   );
   app.get("/orchestration/agent-ide/chats/:uuid", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    return ok(await orchestrationChatRepository.find(uuid, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await orchestrationChatRepository.find(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.delete("/orchestration/agent-ide/chats/:uuid", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    return ok(await orchestrationChatRepository.archive(uuid, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await orchestrationChatRepository.archive(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
   });
   app.put("/orchestration/agent-ide/chat-messages/:uuid/feedback", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
-    const { feedback } = z.object({ feedback: z.enum(["up", "down"]).nullable() }).strict().parse(request.body);
-    return ok(await orchestrationChatRepository.setFeedback(uuid, feedback, requireDevkitActor().id), { requestId: request.id });
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    const { feedback } = z
+      .object({ feedback: z.enum(["up", "down"]).nullable() })
+      .strict()
+      .parse(request.body);
+    return ok(
+      await orchestrationChatRepository.setFeedback(uuid, feedback, requireDevkitActor().id),
+      { requestId: request.id }
+    );
   });
   app.post("/orchestration/agent-ide/codex/approval", async (request) => {
     const input = codexApprovalInputSchema.parse(request.body);
@@ -163,6 +249,15 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     await codexAppServer.logout();
     return ok({ disconnected: true }, { requestId: request.id });
   });
+  app.get("/orchestration/integrations/hostinger/status", async (request) =>
+    ok(await hostingerMcpService.status(), { requestId: request.id })
+  );
+  app.post("/orchestration/integrations/hostinger/configure", async (request) =>
+    ok(await hostingerMcpService.configure(), { requestId: request.id })
+  );
+  app.get("/orchestration/integrations/hostinger/dashboard", async (request) =>
+    ok(await hostingerDashboardService.dashboard(), { requestId: request.id })
+  );
   app.post("/orchestration/launch-desk/stream", async (request, reply) => {
     const input = launchDeskInputSchema.parse(request.body);
     reply.hijack();

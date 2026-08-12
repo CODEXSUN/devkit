@@ -13,10 +13,32 @@ export class TelegramSupportRepository {
   async createConnection(token: string) {
     const uuid = randomBytes(8).toString("hex");
     await this.database.insertInto("devkit_telegram_connections").values({
-      chat_id: null, connected_at: null, display_name: "", link_token_hash: hash(token),
+      auth_mode: "bot", chat_id: null, connected_at: null, display_name: "", encrypted_session: null, link_token_hash: hash(token),
       status: "pending", telegram_username: "", uuid
     }).executeTakeFirstOrThrow();
     return uuid;
+  }
+
+  async mtprotoConnection() {
+    return this.database.selectFrom("devkit_telegram_connections").selectAll()
+      .where("auth_mode", "=", "mtproto").orderBy("created_at", "desc").executeTakeFirst();
+  }
+
+  async saveMtprotoConnection(input: { encryptedSession: string; id: string; username: string; displayName: string }) {
+    await this.database.updateTable("devkit_telegram_connections")
+      .set({ status: "disconnected", updated_at: new Date() })
+      .where("auth_mode", "=", "mtproto").where("status", "=", "connected").execute();
+    await this.database.insertInto("devkit_telegram_connections").values({
+      auth_mode: "mtproto", chat_id: input.id, connected_at: new Date(), display_name: input.displayName,
+      encrypted_session: input.encryptedSession, link_token_hash: hash(randomBytes(24).toString("base64url")),
+      status: "connected", telegram_username: input.username, uuid: randomBytes(8).toString("hex")
+    }).executeTakeFirstOrThrow();
+  }
+
+  async disconnectMtproto() {
+    await this.database.updateTable("devkit_telegram_connections")
+      .set({ encrypted_session: null, status: "disconnected", updated_at: new Date() })
+      .where("auth_mode", "=", "mtproto").where("status", "=", "connected").execute();
   }
 
   async connect(token: string, chatId: string, username: string, displayName: string) {

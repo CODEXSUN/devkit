@@ -6,16 +6,11 @@ const apiModules = resolve(root, "apps/platform/api/src/modules");
 const webModules = resolve(root, "apps/platform/web/src/modules");
 const devkitApiModules = resolve(root, "apps/devkit/api/src/modules");
 const devkitWebModules = resolve(root, "apps/devkit/web/src/modules");
-const allowed = new Set([
-  "permission",
-  "role",
-  "role-permission",
-  "user",
-  "user-role"
-]);
+const allowed = new Set(["permission", "role", "role-permission", "user", "user-role"]);
 const failures = [];
 const devkitApiOwned = new Set([
   "github-dashboard",
+  "honey",
   "orchestration",
   "planning",
   "project-manager",
@@ -25,19 +20,25 @@ const devkitApiOwned = new Set([
   "task-manager"
 ]);
 const devkitWebOwned = new Set([
+  "app-desk",
   "agent-ide",
+  "dashboard",
   "design-system",
   "github-dashboard",
   "launch-desk",
+  "hostinger-mcp",
+  "honey",
   "orchestration",
   "planning",
   "platform-registry",
   "project-manager",
+  "repository-settings",
   "skill-library",
   "sync",
   "telegram-support",
   "task-manager",
   "today",
+  "work-hub",
   "work-automation"
 ]);
 

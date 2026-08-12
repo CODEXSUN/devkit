@@ -2,9 +2,11 @@ import { Suspense, useEffect } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ShieldCheckIcon } from "lucide-react";
 import { devkitWebBundle } from "@codexsun/devkit-web";
+import { honeyChatClient } from "@codexsun/devkit-web/modules/honey";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
 import { ApplicationLayout } from "@codexsun/ui/layouts/application-layout";
 import type { SidemenuItem } from "@codexsun/ui/blocks/menu/sidemenu/sub/sidemenu-section";
+import type { GlobalSearchItem } from "@codexsun/ui/blocks/menu/sidemenu/global-search";
 import { AuthGate } from "../../shared/auth/AuthGate";
 import { getToken, logout } from "../../shared/api/platform-api";
 import {
@@ -46,15 +48,23 @@ export function AppDesk() {
   }, [invalidIdentityPage, invalidPath, navigate]);
 
   const showingIdentity = Boolean(identityPage && !invalidIdentityPage);
+  const showingGitHub = workspace?.group === "GitHub";
   const headerTitle = showingIdentity
     ? identityTitle(identityPage!)
     : (workspace?.title ?? "Engineering Command Center");
+  const globalSearchItems = buildGlobalSearchItems(administrator);
 
   return (
     <AuthGate>
       <ApplicationLayout
-        brand={{ subtitle: "engineering orchestration", title: "CodeLogicX" }}
+        brand={{ subtitle: "Developer DevKit", title: "CodeLogicX" }}
+        companion={{
+          chat: honeyChatClient,
+          label: "Honey",
+          spriteSheetUrl: "/pets/honey/spritesheet.webp"
+        }}
         deskVariant="techmedia"
+        globalSearchItems={globalSearchItems}
         headerTitle={headerTitle}
         menuItems={
           showingIdentity
@@ -78,7 +88,8 @@ export function AppDesk() {
         }}
         versionLabel={`v ${__APP_VERSION__}`}
         workspaceItems={[
-          devkitWebBundle.applicationSwitcherItem(!showingIdentity),
+          devkitWebBundle.applicationSwitcherItem(!showingIdentity && !showingGitHub),
+          devkitWebBundle.githubSwitcherItem(showingGitHub),
           ...(administrator
             ? [
                 {
@@ -106,6 +117,37 @@ export function AppDesk() {
       </ApplicationLayout>
     </AuthGate>
   );
+}
+
+function buildGlobalSearchItems(administrator: boolean): GlobalSearchItem[] {
+  const workspaces = devkitWebBundle.workspaces.map((entry) => ({
+    group: entry.group,
+    keywords: [entry.id, "DevKit", "workspace"],
+    title: entry.title,
+    url: workspaceUrl(entry.id)
+  }));
+  if (!administrator) return workspaces;
+  return [
+    ...workspaces,
+    ...[
+      ["Users", "users"],
+      ["Roles", "roles"],
+      ["Permissions", "permissions"],
+      ["Access controls", "access"]
+    ].map(([title, page]) => ({
+      group: "Platform",
+      keywords: ["identity", "security"],
+      title: title!,
+      url: `/app/identity/${page}`
+    }))
+  ];
+}
+
+function workspaceUrl(workspaceId: string) {
+  if (workspaceId.startsWith("design-system-")) {
+    return `/app/devkit/design-system/${workspaceId.replace("design-system-", "")}`;
+  }
+  return `/app/devkit/${workspaceId}`;
 }
 
 function renderIdentityPage(page: IdentityPage, actorEmail: string) {

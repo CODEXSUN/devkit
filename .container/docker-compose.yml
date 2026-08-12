@@ -41,6 +41,7 @@ services:
         NPM_RUNTIME_VERSION: ${NPM_RUNTIME_VERSION:-12.0.2}
     image: ${DEVKIT_IMAGE_REGISTRY:-devkit}/api:${DEVKIT_IMAGE_TAG:-local}
     container_name: ${DEVKIT_API_CONTAINER_NAME:-devkit-api}
+    init: true
     restart: unless-stopped
     env_file:
       - ${DEVKIT_RUNTIME_ENV_FILE:-../.env}
@@ -49,6 +50,9 @@ services:
       NODE_ENV: production
       PLATFORM_API_PORT: ${DEVKIT_API_INTERNAL_PORT:-9050}
       DEVKIT_ENV_FILE_PATH: /workspace/devkit/.env
+      DEVKIT_CODEX_HOME: /var/lib/devkit/codex
+      DEVKIT_AGENT_ALLOWED_ROOTS: /srv/devkit/repositories
+      DEVKIT_AGENT_WORKTREE_ROOT: /var/lib/devkit/worktrees
     depends_on:
       mariadb:
         condition: service_healthy
@@ -56,6 +60,9 @@ services:
       - "${DEVKIT_BIND_ADDRESS:-127.0.0.1}:${DEVKIT_API_HOST_PORT:-9050}:${DEVKIT_API_INTERNAL_PORT:-9050}"
     volumes:
       - ${DEVKIT_RUNTIME_ENV_FILE:-../.env}:/workspace/devkit/.env:rw
+      - codex-state:/var/lib/devkit/codex
+      - agent-worktrees:/var/lib/devkit/worktrees
+      - agent-repositories:/srv/devkit/repositories
     networks: [devkit]
     healthcheck:
       test:
@@ -101,6 +108,12 @@ services:
 volumes:
   mariadb-data:
     name: ${DEVKIT_MARIADB_DATA_VOLUME:-devkit-mariadb-data}
+  codex-state:
+    name: ${DEVKIT_CODEX_STATE_VOLUME:-devkit-codex-state}
+  agent-worktrees:
+    name: ${DEVKIT_AGENT_WORKTREE_VOLUME:-devkit-agent-worktrees}
+  agent-repositories:
+    name: ${DEVKIT_AGENT_REPOSITORY_VOLUME:-devkit-agent-repositories}
 
 networks:
   devkit:

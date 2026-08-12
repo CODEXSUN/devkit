@@ -37,11 +37,47 @@ export type DevkitDatabase = {
   devkit_task_manager_todos: TaskManagerTodosTable;
   devkit_telegram_connections: TelegramConnectionsTable;
   devkit_telegram_messages: TelegramMessagesTable;
+  devkit_honey_threads: HoneyThreadsTable;
+  devkit_honey_messages: HoneyMessagesTable;
+  devkit_honey_memory: HoneyMemoryTable;
   devkit_sync_conflicts: DevkitSyncConflictsTable;
   devkit_sync_connections: DevkitSyncConnectionsTable;
   devkit_sync_runs: DevkitSyncRunsTable;
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
+};
+
+export type HoneyThreadsTable = {
+  actor_id: string;
+  codex_thread_id: string | null;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  status: string;
+  title: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type HoneyMessagesTable = {
+  actor_id: string;
+  body: string;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  role: string;
+  thread_uuid: string;
+  uuid: string;
+};
+
+export type HoneyMemoryTable = {
+  actor_id: string;
+  content: string;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  kind: string;
+  source_thread_uuid: string | null;
+  status: string;
+  updated_at: TimestampColumn;
+  uuid: string;
 };
 
 export type RepositoryConnectionsTable = {
@@ -245,10 +281,12 @@ export type OrchestrationChatMessagesTable = {
 };
 
 export type TelegramConnectionsTable = {
+  auth_mode: string;
   chat_id: string | null;
   connected_at: TimestampColumn | null;
   created_at: TimestampColumn;
   display_name: string;
+  encrypted_session: string | null;
   id: Generated<number>;
   link_token_hash: string;
   status: string;

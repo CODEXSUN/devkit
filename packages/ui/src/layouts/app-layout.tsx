@@ -1,3 +1,5 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
 import {
   AppWindowIcon,
@@ -23,14 +25,22 @@ import {
 } from "../blocks/menu/sidemenu/app-sidebar";
 import { TopMenu, type TopMenuWorkspaceItem } from "../blocks/menu/sidemenu/top-menu";
 import { TechmediaTopMenu } from "../blocks/menu/sidemenu/techmedia-top-menu";
+import type { GlobalSearchItem } from "../blocks/menu/sidemenu/global-search";
 import type { SidemenuItem } from "../blocks/menu/sidemenu/sub/sidemenu-section";
 import { SidebarInset, SidebarProvider } from "../components/sidebar";
+import {
+  ScreenCompanion,
+  type ScreenCompanionConfig
+} from "../blocks/companion/screen-companion";
+import { useMascotVisibility } from "../modules/mascot";
 
 type AppLayoutProps = {
   brand?: SidebarBrand;
   children: ReactNode;
+  companion?: ScreenCompanionConfig;
   deskVariant?: "standard" | "techmedia";
   headerTitle?: ReactNode;
+  globalSearchItems?: GlobalSearchItem[];
   homeHref?: string;
   logoutHref?: string;
   menuItems?: SidemenuItem[];
@@ -174,8 +184,10 @@ export const defaultUserMenuItems: SidebarUserMenuItem[] = [
 export function AppLayout({
   brand = defaultSidebarBrand,
   children,
+  companion,
   deskVariant = "standard",
   headerTitle = "Documents",
+  globalSearchItems = [],
   homeHref = "/workspace",
   logoutHref = "/login",
   menuItems = defaultAppMenuItems,
@@ -192,13 +204,19 @@ export function AppLayout({
   workspaceItems = defaultWorkspaceItems,
   showPageTitle = true
 }: AppLayoutProps) {
+  const [companionVisible, setCompanionVisible] = useMascotVisibility(Boolean(companion));
+
   if (deskVariant === "techmedia") {
     return (
       <SidebarProvider className="flex-col" style={{ "--sidebar-width": "19rem" } as CSSProperties}>
         <TechmediaTopMenu
+          {...(companion ? { companionLabel: companion.label } : {})}
+          companionVisible={companionVisible}
+          globalSearchItems={globalSearchItems}
           homeHref={homeHref}
           logoutHref={logoutHref}
           {...(onLogout ? { onLogout } : {})}
+          onCompanionVisibleChange={setCompanionVisible}
           pageTitle={String(headerTitle)}
           {...(profileHref ? { profileHref } : {})}
           showHomeAction={showHomeAction}
@@ -207,6 +225,7 @@ export function AppLayout({
           user={user}
           workspaceItems={workspaceItems}
         />
+        {companion ? <ScreenCompanion {...companion} visible={companionVisible} /> : null}
         <div className="flex min-h-0 flex-1">
           <AppSidebar
             brand={brand}
@@ -218,7 +237,7 @@ export function AppLayout({
             variant="inset"
             versionLabel={versionLabel}
           />
-          <SidebarInset className="md:!m-1 md:!ml-0">
+          <SidebarInset className="md:!m-0 md:!rounded-none md:!border-0 md:!shadow-none">
             <AppLayoutContent subtitle={subtitle} title={title}>
               {children}
             </AppLayoutContent>

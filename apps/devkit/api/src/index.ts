@@ -5,5 +5,6 @@ export * from "./modules/task-manager/index.js";
 export * from "./modules/orchestration/index.js";
 export * from "./modules/skills/index.js";
 export * from "./modules/sync/index.js";
+export * from "./modules/honey/index.js";
 export * from "./request-context.js";
 export * from "./stack.js";

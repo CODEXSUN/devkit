@@ -75,7 +75,7 @@ export function LaunchDeskWorkspace() {
           <RadioTowerIcon className="size-4" />
         </span>
         <div>
-          <h1 className="text-lg font-semibold leading-tight">Codex Runtime</h1>
+          <h1 className="text-lg font-semibold leading-tight">Agent Connector</h1>
           <p className="text-sm text-muted-foreground">Independent ChatGPT device authorization</p>
         </div>
       </header>

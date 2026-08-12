@@ -7,6 +7,7 @@ import {
   FileCode2Icon,
   FolderGit2Icon,
   GitBranchIcon,
+  PanelRightCloseIcon,
   ShieldAlertIcon,
   TerminalSquareIcon,
   XCircleIcon
@@ -18,7 +19,15 @@ import type { AgentRunDetail, AgentRunStatus } from "./agent-ide.types";
 import { AgentIdeQualityGates } from "./agent-ide.quality-gates";
 import { AgentIdeTaskGraph } from "./agent-ide.task-graph";
 
-export function AgentIdeRunConsole({ activeRunId, projectUuid }: { activeRunId: string | null; projectUuid: string }) {
+export function AgentIdeRunConsole({
+  activeRunId,
+  onClose,
+  projectUuid
+}: {
+  activeRunId: string | null;
+  onClose: () => void;
+  projectUuid: string;
+}) {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(activeRunId);
   const runsQuery = useQuery({
@@ -56,20 +65,31 @@ export function AgentIdeRunConsole({ activeRunId, projectUuid }: { activeRunId: 
   };
 
   return (
-    <aside className="hidden w-[22rem] shrink-0 overflow-y-auto border-l bg-background 2xl:block">
+    <aside className="hidden w-[22rem] shrink-0 overflow-y-auto border-l bg-background [scrollbar-color:hsl(var(--muted-foreground)/0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/35 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1 2xl:block">
       <header className="sticky top-0 z-10 border-b bg-background px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
+        <div className="flex items-start gap-2">
+          <button
+            aria-label="Hide run control"
+            className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            title="Hide run control"
+            type="button"
+          >
+            <PanelRightCloseIcon className="size-4" />
+          </button>
+          <div className="min-w-0 flex-1 pt-1.5">
             <h2 className="flex items-center gap-2 text-sm font-semibold"><ActivityIcon className="size-4" /> Run control</h2>
             <p className="pt-0.5 text-xs text-muted-foreground">Durable execution and approval evidence</p>
           </div>
-          {run ? <StatusBadge status={run.status} /> : null}
+          <div className="shrink-0 pt-1">
+            {run ? <StatusBadge status={run.status} /> : null}
+          </div>
         </div>
       </header>
       {!projectUuid ? <EmptyState text="Select a project to inspect its Agent runs." /> : null}
       {projectUuid && !runs.length ? <EmptyState text="Send a message to create the first durable Agent run." /> : null}
       {run ? (
-        <div className="grid gap-5 p-4">
+        <div className="grid gap-5 px-4 pb-4 pt-6">
           <section>
             <p className="line-clamp-3 text-sm font-medium leading-5">{run.objective}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 pt-2 text-xs text-muted-foreground">

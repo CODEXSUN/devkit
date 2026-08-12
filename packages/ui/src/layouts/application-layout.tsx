@@ -11,15 +11,19 @@ import {
 import { AppLayout } from "./app-layout";
 import type { SidebarBrand, SidebarUser } from "../blocks/menu/sidemenu/app-sidebar";
 import type { TopMenuWorkspaceItem } from "../blocks/menu/sidemenu/top-menu";
+import type { GlobalSearchItem } from "../blocks/menu/sidemenu/global-search";
 import type { SidemenuItem } from "../blocks/menu/sidemenu/sub/sidemenu-section";
+import type { ScreenCompanionConfig } from "../blocks/companion/screen-companion";
 
 type ApplicationLayoutProps = {
   actions?: ReactNode;
   brand?: SidebarBrand;
   children: ReactNode;
+  companion?: ScreenCompanionConfig;
   deskVariant?: "standard" | "techmedia";
   menuItems?: SidemenuItem[];
   headerTitle?: ReactNode;
+  globalSearchItems?: GlobalSearchItem[];
   homeHref?: string;
   onLogout?: () => void | Promise<void>;
   profileHref?: string;
@@ -87,8 +91,10 @@ export function ApplicationLayout({
   actions,
   brand,
   children,
+  companion,
   deskVariant = "standard",
   headerTitle = "Overview",
+  globalSearchItems = [],
   homeHref = "/",
   menuItems = applicationMenuItems,
   onLogout,
@@ -111,6 +117,8 @@ export function ApplicationLayout({
         title: brand?.title ?? "Application Desk"
       }}
       deskVariant={deskVariant}
+      {...(companion ? { companion } : {})}
+      globalSearchItems={globalSearchItems}
       headerTitle={headerTitle}
       homeHref={homeHref}
       logoutHref="/login"

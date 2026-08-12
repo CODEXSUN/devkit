@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.25
-Release tag: v-1.0.25
-Changelog label: v 1.0.25
+Current version: 1.0.28
+Release tag: v-1.0.28
+Changelog label: v 1.0.28
 
 ### [Session] 2026-08-11 - CODEXSUN application workspace layout
 
@@ -167,6 +167,91 @@ Changelog label: v 1.0.25
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.28
+
+### [v 1.0.28] 2026-08-12 11:49 am - version update
+
+#### Database Changes
+
+- Database update: Yes.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.28.
+
+## v-1.0.27
+
+### [v 1.0.27] 2026-08-12 11:47 am - Honey assistant, Telegram connection, and deployment runtime
+
+#### Database Changes
+
+- Database update: Yes.
+- Added actor-owned Honey conversation, message, and reviewed-memory tables.
+- Added encrypted Telegram MTProto session fields and an authentication mode field.
+- Kept the Honey and Telegram migrations additive and repeatable.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.27.
+- Added the Honey assistant API, chat workspace, conversation history, reviewed memory, business knowledge, and provider-neutral Codex gateway.
+- Added context-aware Honey action cards for projects, tasks, Project Agent, error help, and deployment review.
+- Added Honey voice input with automatic submission after speech ends.
+- Added the Honey mascot with smooth roaming, drag placement, stay mode, voice status, conversation reactions, and visibility controls.
+- Added Honey links to the application menus and the Project Agent header.
+- Added browser-based Telegram account connection with QR, phone, code, password, and encrypted session flows.
+- Added Telegram task controls, chat, notifications, connection guidance, and environment settings.
+- Added Hostinger MCP status, reload, metrics, Docker inventory, and detail workspaces.
+- Added App Desk, dashboard, work overview, My Work, and compact work navigation surfaces.
+- Updated the Project Agent panels, project context, run controls, and workspace layout.
+- Updated CodeLogicX application branding, global search, app menus, user menus, side panels, and responsive layout behavior.
+- Added persistent Codex state, repository, and worktree volumes to the container runtime.
+- Added Git and unprivileged Agent runtime checks to setup and update scripts.
+- Updated deployment documentation, environment templates, package contracts, and module-boundary checks.
+
+#### Verification
+
+- Passed the Honey action resolver regression.
+- Passed both Honey mascot and voice browser tests.
+- Passed focused DevKit API, DevKit web, UI, and Platform checks during implementation.
+- Passed the module-boundary and version consistency checks.
+- Passed the full repository typecheck, lint, Framework test, and production build.
+- The aggregate check remains blocked because the deployment check still requires the removed root `updat.sh` file.
+
+## v-1.0.26
+
+### [v 1.0.26] 2026-08-12 11:29 am - Project Agent workspace navigation
+
+#### Database Changes
+
+- Database update: No.
+- Kept the existing Project Agent chat, run, and project persistence contracts.
+
+#### App Codebase Changes
+
+- Bumped the repository and all workspace packages to 1.0.26.
+- Added slim scrollbars to the Chat History and Run Control panels.
+- Added accessible show and hide controls to both side panels.
+- Moved the Run Control toggle to the left and improved its header spacing.
+- Changed the left panel to show chat history without duplicate project details.
+- Kept the selected project when a user opens an older chat history record.
+- Moved project details into a compact dropdown in the Project Agent header.
+- Changed the Project Agent heading to the selected project title.
+- Matched the project information dropdown position and width to the Chat History panel.
+- Added project status, access, model, description, module, reference, and conversation details.
+- Removed stored HTML tags from project descriptions before display.
+- Added an Agents side-menu group with Project Agent, Agent Connector, and Skills links.
+- Renamed the existing Codex Runtime user interface to Agent Connector.
+
+#### Verification
+
+- Passed the DevKit web TypeScript and lint checks.
+- Passed the Platform web TypeScript and lint checks.
+- Passed the Git whitespace check for the changed Project Agent files.
+- Verified project selection, chat history switching, panel controls, and the project information dropdown in a live browser.
+- Verified a live read-only Project Agent reply for project `PRJ-0001`.
+- Verified that the project information dropdown and Chat History panel both use a 288 px width.
+- Verified that the browser console reported no errors during the interaction checks.
 
 ## v-1.0.25
 

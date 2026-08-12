@@ -19,10 +19,17 @@ FROM node:${NODE_RUNTIME_VERSION}-bookworm-slim AS api-runtime
 ARG NPM_RUNTIME_VERSION=12.0.2
 WORKDIR /workspace/devkit
 RUN npm install --global npm@${NPM_RUNTIME_VERSION} && \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+  apt-get update && \
+  apt-get install -y --no-install-recommends ca-certificates git gosu openssh-client && \
   rm -rf /var/lib/apt/lists/*
 COPY --chown=node:node --from=build /workspace/devkit /workspace/devkit
-USER node
+COPY --chmod=755 .container/scripts/api-entrypoint.sh /usr/local/bin/devkit-api-entrypoint
+RUN mkdir -p /var/lib/devkit/codex /var/lib/devkit/worktrees /srv/devkit/repositories && \
+  chown -R node:node /workspace/devkit /var/lib/devkit /srv/devkit/repositories
+ENV DEVKIT_CODEX_HOME=/var/lib/devkit/codex \
+  DEVKIT_AGENT_ALLOWED_ROOTS=/srv/devkit/repositories \
+  DEVKIT_AGENT_WORKTREE_ROOT=/var/lib/devkit/worktrees
+ENTRYPOINT ["devkit-api-entrypoint"]
 EXPOSE 9050
 CMD ["node", "dist/platform/api/server.js"]
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { LogOutIcon, UserRoundIcon, XIcon } from "lucide-react";
+import { BugIcon, LogOutIcon, UserRoundIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../../../components/avatar";
 import { Button } from "../../../components/button";
+import { Switch } from "../../../components/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,14 +16,20 @@ import {
 import type { TopUserMenuUser } from "./top-user-menu";
 
 type TechmediaUserMenuProps = {
+  companionLabel?: string;
+  companionVisible?: boolean;
   logoutHref?: string;
+  onCompanionVisibleChange?: (visible: boolean) => void;
   onLogout?: () => void | Promise<void>;
   profileHref?: string;
   user: TopUserMenuUser;
 };
 
 export function TechmediaUserMenu({
+  companionLabel,
+  companionVisible = false,
   logoutHref = "/login",
+  onCompanionVisibleChange,
   onLogout,
   profileHref,
   user
@@ -83,6 +90,20 @@ export function TechmediaUserMenu({
           </div>
         </DropdownMenuLabel>
         <div className="overflow-hidden rounded-2xl border bg-background shadow-sm">
+          {companionLabel && onCompanionVisibleChange ? (
+            <DropdownMenuItem
+              className="h-12 gap-3 rounded-none border-b px-4"
+              onSelect={(event) => event.preventDefault()}
+            >
+              <BugIcon />
+              <span className="flex-1">Show {companionLabel}</span>
+              <Switch
+                aria-label={`Show ${companionLabel}`}
+                checked={companionVisible}
+                onCheckedChange={onCompanionVisibleChange}
+              />
+            </DropdownMenuItem>
+          ) : null}
           {onLogout ? (
             <DropdownMenuItem
               className="h-12 gap-3 rounded-none px-4"

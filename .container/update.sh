@@ -135,6 +135,27 @@ compose() {
     -f "$COMPOSE_FILE" "$@"
 }
 
+verify_agent_runtime_image() {
+  compose run --rm --no-deps api sh -lc '
+    test "$(id -u)" = "1000"
+    command -v git >/dev/null
+    git --version
+    test -w "$DEVKIT_CODEX_HOME"
+    test -w "$DEVKIT_AGENT_WORKTREE_ROOT"
+    test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"
+  '
+}
+
+verify_agent_runtime_container() {
+  docker exec "$api_container" sh -lc '
+    test "$(id -u)" = "1000"
+    command -v git >/dev/null
+    test -w "$DEVKIT_CODEX_HOME"
+    test -w "$DEVKIT_AGENT_WORKTREE_ROOT"
+    test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"
+  '
+}
+
 require_file() {
   [[ -f "$1" ]] || {
     echo "Required configuration file is missing: $1" >&2
@@ -389,6 +410,14 @@ for container in "$mariadb_container" "$api_container" "$web_container"; do
   }
 done
 
+verify_agent_runtime_container || {
+  echo "The current API container is missing Git or writable Agent runtime storage." >&2
+  if [[ "$CHECK_ONLY" == true ]]; then
+    exit 77
+  fi
+  echo "The replacement image will be verified before the container is recreated." >&2
+}
+
 if container_is_running "$api_container"; then
   docker exec "$api_container" node -e \
     "require('node:fs').accessSync(process.env.DEVKIT_ENV_FILE_PATH, require('node:fs').constants.R_OK | require('node:fs').constants.W_OK)" \
@@ -423,6 +452,7 @@ echo "  Preflight: production build and repository checks in Docker"
 echo "  Release: source and image tags locked to $source_version"
 echo "  Source commit: $source_commit (dirty: $source_dirty)"
 echo "  Rebuild: $api_container and $web_container"
+echo "  Agent runtime: Git plus persistent Codex, repository, and worktree storage"
 echo "  Backup: SHA-256 verified SQL dump in $BACKUP_DIR (keep $backup_retention)"
 echo "  Database: version-approved migrations and repeatable seeds before replacement"
 echo "  Audit: deployment metadata beside the retained backup"
@@ -456,6 +486,8 @@ fi
 
 echo "Building the verification, API, and Web images."
 compose build verify api web
+echo "Verifying Git and writable Agent runtime volumes in the new API image."
+verify_agent_runtime_image
 built_api_image="$(docker image inspect --format '{{.Id}}' "$api_image")"
 built_web_image="$(docker image inspect --format '{{.Id}}' "$web_image")"
 
@@ -558,6 +590,10 @@ if ! compose up -d api web \
   --wait \
   --wait-timeout 300; then
   rollback_application "The replacement containers did not become healthy."
+fi
+
+if ! verify_agent_runtime_container; then
+  rollback_application "The replacement API failed its Git and Agent storage preflight."
 fi
 
 bind_address="$(file_value "$DEPLOY_ENV" DEVKIT_BIND_ADDRESS 127.0.0.1)"
