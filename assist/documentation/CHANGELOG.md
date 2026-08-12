@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.31
-Release tag: v-1.0.31
-Changelog label: v 1.0.31
+Current version: 1.0.32
+Release tag: v-1.0.32
+Changelog label: v 1.0.32
 
 ### [Session] 2026-08-11 - CODEXSUN application workspace layout
 
@@ -167,6 +167,18 @@ Changelog label: v 1.0.31
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.32
+
+### [v 1.0.32] 2026-08-12 8:45 pm - version update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.32.
 
 ## v-1.0.31
 
