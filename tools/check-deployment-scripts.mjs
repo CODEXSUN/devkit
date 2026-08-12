@@ -49,6 +49,7 @@ requireTokens(".container/update-watcher/devkit-update-watcher.sh", watcher, [
   "merge --ff-only",
   "bash \"$REPO_DIR/update.sh\" --check",
   "bash \"$REPO_DIR/update.sh\" --yes",
+  '"$STATE_DIR/config-backups/deploy.env.pre-${target_commit:0:12}"',
   "com.docker.compose.oneoff=True",
   "last-successful-commit"
 ]);

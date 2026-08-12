@@ -77,7 +77,8 @@ trap - EXIT
 git -C "$REPO_DIR" merge --ff-only "$target_commit"
 version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -n 1)"
 [[ -n "$version" ]] || fail "Could not read package version after fast-forward"
-cp -p -- "$DEPLOY_ENV" "${DEPLOY_ENV}.pre-${target_commit:0:12}"
+mkdir -p "$STATE_DIR/config-backups"
+cp -p -- "$DEPLOY_ENV" "$STATE_DIR/config-backups/deploy.env.pre-${target_commit:0:12}"
 for key in DEVKIT_VERSION DEVKIT_IMAGE_TAG DEVKIT_MIGRATION_COMPATIBLE_VERSION; do
   grep -qE "^${key}=" "$DEPLOY_ENV" || fail "$key is missing from $DEPLOY_ENV"
   sed -i -E "s|^${key}=.*$|${key}=${version}|" "$DEPLOY_ENV"
