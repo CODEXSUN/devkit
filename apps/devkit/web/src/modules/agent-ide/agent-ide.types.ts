@@ -20,7 +20,13 @@ export type AgentIdeCodexStatus = {
 };
 
 export type AgentIdeChatEvent =
-  | { type: "chat.started"; conversationId: string; runId: string; threadId: string; turnId: string }
+  | {
+      type: "chat.started";
+      conversationId: string;
+      runId: string;
+      threadId: string;
+      turnId: string;
+    }
   | { type: "chat.delta"; delta: string }
   | { type: "chat.activity"; label: string }
   | { type: "chat.files"; files: string[] }
@@ -58,6 +64,12 @@ export type AgentIdeChatHistory = {
   projectKey: string;
   projectTitle: string;
   projectUuid: string;
+  workItem: {
+    id: string;
+    key: string;
+    kind: "activity" | "issue" | "project" | "review" | "task";
+    title: string;
+  } | null;
   title: string;
   updatedAt: string;
   uuid: string;
@@ -76,12 +88,7 @@ export type AgentIdeChatHistoryDetail = AgentIdeChatHistory & {
   }>;
 };
 
-export type AgentIdeAccess =
-  | "plan"
-  | "read-only"
-  | "ask-approval"
-  | "auto-approve"
-  | "full-access";
+export type AgentIdeAccess = "plan" | "read-only" | "ask-approval" | "auto-approve" | "full-access";
 export type AgentIdeModel = "gpt-5.6-luna" | "gpt-5.6-sol" | "gpt-5.6-terra";
 export type AgentIdeAttachment = {
   content: string;
@@ -95,7 +102,12 @@ export type AgentRunSummary = {
   access: AgentIdeAccess;
   agentProfile: string;
   assistMode: string;
-  budget: { maxDurationSeconds: number; maxFilesChanged: number; maxSubAgents: number; maxToolCalls: number };
+  budget: {
+    maxDurationSeconds: number;
+    maxFilesChanged: number;
+    maxSubAgents: number;
+    maxToolCalls: number;
+  };
   chatThreadUuid: string;
   completedAt: string | null;
   createdAt: string;
@@ -126,11 +138,33 @@ export type AgentRunSummary = {
 };
 
 export type AgentRunDetail = AgentRunSummary & {
-  approvals: Array<{ createdAt: string; decision: string | null; reason: string; requestId: number; status: string; uuid: string }>;
+  approvals: Array<{
+    createdAt: string;
+    decision: string | null;
+    reason: string;
+    requestId: number;
+    status: string;
+    uuid: string;
+  }>;
   artifacts: Array<{ createdAt: string; label: string; path: string; type: string; uuid: string }>;
   events: Array<{ createdAt: string; payload: unknown; type: string; uuid: string }>;
-  steps: Array<{ completedAt: string | null; kind: string; label: string; sequence: number; startedAt: string | null; status: string; uuid: string }>;
-  toolCalls: Array<{ completedAt: string | null; name: string; risk: string; startedAt: string; status: string; uuid: string }>;
+  steps: Array<{
+    completedAt: string | null;
+    kind: string;
+    label: string;
+    sequence: number;
+    startedAt: string | null;
+    status: string;
+    uuid: string;
+  }>;
+  toolCalls: Array<{
+    completedAt: string | null;
+    name: string;
+    risk: string;
+    startedAt: string;
+    status: string;
+    uuid: string;
+  }>;
   verifications: Array<{
     args: string[];
     attempt: number;
@@ -148,11 +182,17 @@ export type AgentRunDetail = AgentRunSummary & {
   }>;
 };
 
-export type AgentRunStatus = "awaiting_approval" | "cancelled" | "completed" | "failed" | "planning" | "running";
+export type AgentRunStatus =
+  "awaiting_approval" | "cancelled" | "completed" | "failed" | "planning" | "running";
 
 export type AgentTaskGraph = {
   parentRunUuid: string;
-  reviews: Array<{ createdAt: string; decision: "approved" | "rework"; note: string; uuid: string }>;
+  reviews: Array<{
+    createdAt: string;
+    decision: "approved" | "rework";
+    note: string;
+    uuid: string;
+  }>;
   tasks: Array<{
     agentProfile: string;
     childRunUuid: string | null;

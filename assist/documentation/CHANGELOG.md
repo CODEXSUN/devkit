@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.33
-Release tag: v-1.0.33
-Changelog label: v 1.0.33
+Current version: 1.0.34
+Release tag: v-1.0.34
+Changelog label: v 1.0.34
 
 ### [Session] 2026-08-11 - CODEXSUN application workspace layout
 
@@ -167,6 +167,35 @@ Changelog label: v 1.0.33
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.34
+
+### [v 1.0.34] 2026-08-13 2:01 am - Honey voice chat and history controls
+
+#### Database Changes
+
+- Database update: No.
+- Used the existing Honey thread status field to retain archived conversations.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.34.
+- Sent completed mascot voice transcripts to the persisted Honey chat service.
+- Added listening, thinking, success, and error reactions for mascot voice requests.
+- Opened the three-message quick chat after Honey answers a mascot voice request.
+- Hid the welcome balloon while quick chat is open.
+- Limited the welcome balloon to one display per browser tab session.
+- Kept Honey above the Documentation navigation and anchored it near the top of the menu.
+- Added an accessible archive action on hover and keyboard focus for each chat history row.
+- Removed archived conversations from active history without deleting their messages.
+
+#### Verification
+
+- Passed the DevKit API and web TypeScript checks.
+- Passed the DevKit API and web lint checks.
+- Passed the UI TypeScript and lint checks.
+- Passed the Honey mascot Playwright test for voice chat and hover behavior.
+- Passed the repository version consistency check.
 
 ## v-1.0.33
 

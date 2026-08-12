@@ -3,17 +3,15 @@ import { renameLegacyTable } from "../../database/database-utils.js";
 import type { DevkitDatabase } from "../../database/schema.js";
 
 export const taskManagerMigration = {
-  description: "Task Manager todos, lookups, and audit activity.",
-  key: "devkit.task-manager.sql.v2",
+  description: "Task Manager todos, project links, lookups, and audit activity.",
+  key: "devkit.task-manager.sql.v3"
 } as const;
 
-export async function migrateTaskManagerModule(
-  database: Kysely<DevkitDatabase>,
-) {
+export async function migrateTaskManagerModule(database: Kysely<DevkitDatabase>) {
   const tables = [
     ["task_manager_todos", "devkit_task_manager_todos"],
     ["task_manager_lookups", "devkit_task_manager_lookups"],
-    ["task_manager_activity", "devkit_task_manager_activity"],
+    ["task_manager_activity", "devkit_task_manager_activity"]
   ] as const;
   for (const [legacyName, ownedName] of tables) {
     await renameLegacyTable(database, legacyName, ownedName);
@@ -28,6 +26,7 @@ export async function migrateTaskManagerModule(
       description TEXT NOT NULL,
       category VARCHAR(80) NOT NULL DEFAULT 'work',
       group_name VARCHAR(120) NOT NULL DEFAULT '',
+      project_uuid CHAR(36) NOT NULL DEFAULT '',
       status VARCHAR(24) NOT NULL DEFAULT 'open',
       priority VARCHAR(24) NOT NULL DEFAULT 'medium',
       due_date VARCHAR(16) NOT NULL DEFAULT '',
@@ -38,6 +37,11 @@ export async function migrateTaskManagerModule(
       KEY idx_devkit_task_manager_todos_scope_order (scope_key, position, updated_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `.execute(database);
+
+  await sql`ALTER TABLE devkit_task_manager_todos
+    ADD COLUMN IF NOT EXISTS project_uuid CHAR(36) NOT NULL DEFAULT '' AFTER group_name`.execute(
+    database
+  );
 
   await sql`
     CREATE TABLE IF NOT EXISTS devkit_task_manager_lookups (

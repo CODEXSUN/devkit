@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { ShieldCheckIcon } from "lucide-react";
+import { Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import { devkitWebBundle } from "@codexsun/devkit-web";
 import { honeyChatClient } from "@codexsun/devkit-web/modules/honey";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
@@ -19,6 +19,7 @@ import { RoleWorkspace } from "../../modules/role";
 import { PermissionWorkspace } from "../../modules/permission";
 import { RolePermissionWorkspace } from "../../modules/role-permission";
 import { UserProfileWorkspace } from "../../modules/user/user.profile.workspace";
+import { ApplicationSettingsWorkspace } from "./application-settings.workspace";
 
 type IdentityPage =
   | "identity.users"
@@ -36,10 +37,11 @@ export function AppDesk() {
   const administrator = canAccessAdministratorSettings(claims.role);
   const identityPage = identityPageFromPath(pathname);
   const workspace = devkitWebBundle.resolveWorkspace(pathname);
+  const showingSettings = pathname === "/app/settings";
   const invalidIdentityPage = Boolean(
     identityPage && identityPage !== "identity.profile" && !administrator
   );
-  const invalidPath = !workspace && !identityPage;
+  const invalidPath = !workspace && !identityPage && !showingSettings;
 
   useEffect(() => {
     if (invalidIdentityPage || invalidPath) {
@@ -55,15 +57,23 @@ export function AppDesk() {
 
   const showingIdentity = Boolean(identityPage && !invalidIdentityPage);
   const showingGitHub = workspace?.group === "GitHub";
-  const headerTitle = showingIdentity
-    ? identityTitle(identityPage!)
-    : (workspace?.title ?? "Engineering Command Center");
+  const headerTitle = showingSettings
+    ? "Clear cache"
+    : showingIdentity
+      ? identityTitle(identityPage!)
+      : (workspace?.title ?? "Engineering Command Center");
   const globalSearchItems = buildGlobalSearchItems(administrator);
 
   return (
     <AuthGate>
       <ApplicationLayout
-        brand={{ subtitle: "Developer DevKit", title: "CodeLogicX" }}
+        brand={{
+          logoAlt: "CodeLogicX",
+          logoDarkSrc: "/logo/logo-dark.svg",
+          logoSrc: "/logo/logo.svg",
+          subtitle: "Developer DevKit",
+          title: "CodeLogicX"
+        }}
         companion={{
           chat: honeyChatClient,
           label: "Honey",
@@ -75,7 +85,7 @@ export function AppDesk() {
         menuItems={
           showingIdentity
             ? buildIdentityMenu(identityPage!, navigate, administrator)
-            : devkitWebBundle.menuItems(workspace?.id ?? "orchestration")
+            : buildApplicationMenu(workspace?.id ?? "", showingSettings)
         }
         onLogout={async () => {
           await logout();
@@ -110,7 +120,9 @@ export function AppDesk() {
         ]}
       >
         <Suspense fallback={<GlobalLoader />}>
-          {showingIdentity ? (
+          {showingSettings ? (
+            <ApplicationSettingsWorkspace />
+          ) : showingIdentity ? (
             <main className="mx-auto w-[calc(100%-2rem)] max-w-[92rem] space-y-5 py-4 lg:w-[calc(100%-3rem)] lg:py-5">
               {renderIdentityPage(identityPage!, claims.email)}
             </main>
@@ -123,6 +135,26 @@ export function AppDesk() {
       </ApplicationLayout>
     </AuthGate>
   );
+}
+
+function buildApplicationMenu(activeWorkspaceId: string, showingSettings: boolean) {
+  const menuItems = devkitWebBundle.menuItems(activeWorkspaceId);
+  const documentation = menuItems.at(-1);
+  const settings: SidemenuItem = {
+    icon: Settings2Icon,
+    isActive: showingSettings,
+    items: [
+      {
+        isActive: showingSettings,
+        title: "Clear cache",
+        url: "/app/settings"
+      }
+    ],
+    title: "Settings"
+  };
+  return documentation
+    ? [...menuItems.slice(0, -1), settings, documentation]
+    : [...menuItems, settings];
 }
 
 function buildGlobalSearchItems(administrator: boolean): GlobalSearchItem[] {

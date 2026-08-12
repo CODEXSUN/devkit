@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArchiveRestoreIcon,
+  ArchiveIcon,
   ArrowLeftIcon,
   BanIcon,
+  BotIcon,
   ChartNoAxesGanttIcon,
   ChevronRightIcon,
   ListTreeIcon,
@@ -97,9 +99,13 @@ type FlowKind = (typeof flow)[number];
 type DeliveryStage = Exclude<FlowKind, "project"> | "roadmap" | "gantt";
 
 export function WorkAutomationWorkspace({
-  initialView = "automation"
+  initialView = "automation",
+  onRoadmapBack,
+  projectScopeId = "all"
 }: {
   initialView?: WorkflowView;
+  onRoadmapBack?: () => void;
+  projectScopeId?: string;
 }) {
   const workflowOnly = initialView !== "automation";
   const projectQuery = useProjectManagerRecordsQuery("project");
@@ -211,7 +217,9 @@ export function WorkAutomationWorkspace({
       workflowRecords
         .filter((record) =>
           initialView === "roadmap"
-            ? record.kind === "issue"
+            ? record.kind === "issue" &&
+              (projectScopeId === "all" ||
+                issueBelongsToProject(record, projectScopeId, projectQuery.data ?? []))
             : workflowKindFilter === "all" || record.kind === workflowKindFilter
         )
         .map((record) => ({
@@ -219,7 +227,7 @@ export function WorkAutomationWorkspace({
           label: record.title,
           value: `${record.kind}:${record.id}`
         })),
-    [initialView, workflowKindFilter, workflowRecords]
+    [initialView, projectQuery.data, projectScopeId, workflowKindFilter, workflowRecords]
   );
   const workflowSearchResult = useMemo(
     () =>
@@ -240,15 +248,24 @@ export function WorkAutomationWorkspace({
       : null;
 
   useEffect(() => {
+    if (initialView !== "roadmap") return;
+    setSelectedWorkflowRecord("");
+  }, [initialView, projectScopeId]);
+
+  useEffect(() => {
     if (initialView !== "roadmap" || selectedWorkflowRecord || !query.data?.length) return;
     const requestedIssue = new URLSearchParams(window.location.search).get("issue");
-    if (!requestedIssue) return;
-    const issue = query.data.find(
-      (record) => record.id === requestedIssue || record.key === requestedIssue
+    const scopedIssues = query.data.filter(
+      (record) =>
+        projectScopeId === "all" ||
+        issueBelongsToProject(record, projectScopeId, projectQuery.data ?? [])
     );
+    const issue = requestedIssue
+      ? scopedIssues.find((record) => record.id === requestedIssue || record.key === requestedIssue)
+      : scopedIssues[0];
     if (!issue) return;
     setSelectedWorkflowRecord(`issue:${issue.id}`);
-  }, [initialView, query.data, selectedWorkflowRecord]);
+  }, [initialView, projectQuery.data, projectScopeId, query.data, selectedWorkflowRecord]);
 
   useEffect(() => {
     if (workflowOnly) return;
@@ -382,6 +399,28 @@ export function WorkAutomationWorkspace({
     setEditing(formFromRecord(record));
   }
 
+  function openRecordAgent(record: ProjectManagerRecord) {
+    const project =
+      record.kind === "project"
+        ? record
+        : (rootProject ??
+          (projectQuery.data ?? []).find((candidate) =>
+            isRecordInProject(record, candidate, workflowRecords)
+          ));
+    if (!project) {
+      toast.error("Connect this work item to a project before opening the Agent.");
+      return;
+    }
+    const search = new URLSearchParams({
+      project: project.id,
+      workItemId: record.id,
+      workItemKey: record.key,
+      workItemKind: record.kind,
+      workItemTitle: record.title
+    });
+    window.location.assign(`/app/devkit/agent-ide?${search.toString()}`);
+  }
+
   function save(form: ProjectManagerForm, pendingFiles: File[]) {
     const missing = requiredFields(form, editorKind);
     if (missing.length) {
@@ -467,6 +506,10 @@ export function WorkAutomationWorkspace({
   }
 
   function backToReviews() {
+    if (onRoadmapBack) {
+      onRoadmapBack();
+      return;
+    }
     const reviewParentId = new URLSearchParams(window.location.search).get("reviewParent");
     if (reviewParentId) {
       window.location.assign(
@@ -548,7 +591,7 @@ export function WorkAutomationWorkspace({
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={backToReviews}>
               <ArrowLeftIcon className="size-4" />
-              Back to reviews
+              {onRoadmapBack ? "All roadmaps" : "Back to reviews"}
             </Button>
             {roadmapIssue ? (
               <WorkspaceStatusBadge
@@ -740,6 +783,7 @@ export function WorkAutomationWorkspace({
                   </div>
                   <WorkAutomationWorkflow
                     records={isolatedWorkflow}
+                    onAgentRecord={openRecordAgent}
                     onEditRecord={openEditor}
                     view={
                       workflowView === "gantt" ||
@@ -935,10 +979,25 @@ export function WorkAutomationWorkspace({
                             />
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                aria-label={`Open ${record.title} in Project Agent`}
+                                onClick={() => openRecordAgent(record)}
+                                size="icon"
+                                title="Open in Project Agent"
+                                variant="outline"
+                              >
+                                <BotIcon className="size-4" />
+                              </Button>
                               <WorkspaceRowActions
                                 title={record.title}
                                 actions={[
+                                  {
+                                    id: "agent",
+                                    label: "Open in Project Agent",
+                                    icon: <BotIcon className="size-4" />,
+                                    onSelect: () => openRecordAgent(record)
+                                  },
                                   {
                                     id: "whiteboards",
                                     label: "Whiteboards",
@@ -956,8 +1015,14 @@ export function WorkAutomationWorkspace({
                                   record.active
                                     ? {
                                         id: "deactivate",
-                                        label: "Deactivate",
-                                        icon: <BanIcon className="size-4" />,
+                                        label: isCompleted(record.status)
+                                          ? "Move to archive"
+                                          : "Deactivate",
+                                        icon: isCompleted(record.status) ? (
+                                          <ArchiveIcon className="size-4" />
+                                        ) : (
+                                          <BanIcon className="size-4" />
+                                        ),
                                         onSelect: () => mutations.deactivate.mutate(record.id)
                                       }
                                     : {
@@ -1371,6 +1436,17 @@ function initialWorkflowView(initialView: WorkflowView): WorkflowView {
     ? requestedView
     : "timeline";
 }
+
+function issueBelongsToProject(
+  issue: ProjectManagerRecord,
+  projectId: string,
+  projects: ProjectManagerRecord[]
+) {
+  const project = projects.find((record) => record.id === projectId || record.key === projectId);
+  return Boolean(
+    project && (issue.referenceId === project.id || issue.referenceId === project.key)
+  );
+}
 function previousFlowKind(stage: Exclude<DeliveryStage, "roadmap" | "gantt">): FlowKind {
   if (stage === "issue") return "project";
   if (stage === "task") return "issue";
@@ -1474,6 +1550,16 @@ function buildParentPath(target: ProjectManagerRecord, records: ProjectManagerRe
     current = parent;
   }
   return parents;
+}
+function isRecordInProject(
+  target: ProjectManagerRecord,
+  project: ProjectManagerRecord,
+  records: ProjectManagerRecord[]
+) {
+  return buildParentPath(target, records).some((parent) => parent.id === project.id);
+}
+function isCompleted(status: string) {
+  return ["approved", "completed", "done", "released"].includes(status.toLowerCase());
 }
 function isolateWorkflow(
   selected: ProjectManagerRecord,

@@ -2,8 +2,8 @@ import { sql, type Kysely } from "kysely";
 import type { DevkitDatabase } from "../../database/schema.js";
 
 export const orchestrationChatMigration = {
-  description: "User-owned Agent chat conversations and review history.",
-  key: "devkit.orchestration-chat.sql.v1"
+  description: "User-owned Agent chat conversations, work-item references, and review history.",
+  key: "devkit.orchestration-chat.sql.v2"
 } as const;
 
 export async function migrateOrchestrationChat(database: Kysely<DevkitDatabase>) {
@@ -15,6 +15,10 @@ export async function migrateOrchestrationChat(database: Kysely<DevkitDatabase>)
       project_uuid VARCHAR(160) NOT NULL,
       project_key VARCHAR(160) NOT NULL,
       project_title VARCHAR(240) NOT NULL,
+      work_item_uuid VARCHAR(160) NULL,
+      work_item_key VARCHAR(160) NULL,
+      work_item_kind VARCHAR(32) NULL,
+      work_item_title VARCHAR(240) NULL,
       title VARCHAR(240) NOT NULL,
       codex_thread_id VARCHAR(240) NULL,
       access_mode VARCHAR(32) NOT NULL,
@@ -27,6 +31,18 @@ export async function migrateOrchestrationChat(database: Kysely<DevkitDatabase>)
       KEY idx_devkit_chat_threads_actor_project (actor_id, project_uuid, updated_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `.execute(database);
+  await sql`ALTER TABLE devkit_orchestration_chat_threads ADD COLUMN IF NOT EXISTS work_item_uuid VARCHAR(160) NULL AFTER project_title`.execute(
+    database
+  );
+  await sql`ALTER TABLE devkit_orchestration_chat_threads ADD COLUMN IF NOT EXISTS work_item_key VARCHAR(160) NULL AFTER work_item_uuid`.execute(
+    database
+  );
+  await sql`ALTER TABLE devkit_orchestration_chat_threads ADD COLUMN IF NOT EXISTS work_item_kind VARCHAR(32) NULL AFTER work_item_key`.execute(
+    database
+  );
+  await sql`ALTER TABLE devkit_orchestration_chat_threads ADD COLUMN IF NOT EXISTS work_item_title VARCHAR(240) NULL AFTER work_item_kind`.execute(
+    database
+  );
   await sql`
     CREATE TABLE IF NOT EXISTS devkit_orchestration_chat_messages (
       id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

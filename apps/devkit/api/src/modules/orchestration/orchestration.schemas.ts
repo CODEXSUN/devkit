@@ -117,6 +117,22 @@ export const codexChatInputSchema = z
     conversationId: z.string().length(16).nullable(),
     model: z.enum(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]),
     threadId: z.string().min(1).nullable(),
+    workItem: z
+      .object({
+        id: z.string().min(1).max(160),
+        key: z.string().min(1).max(160),
+        kind: z.enum(["activity", "issue", "project", "review", "task"]),
+        title: z.string().min(1).max(240),
+        description: z.string().max(8_000),
+        status: z.string().max(80),
+        assignee: z.string().max(240),
+        priority: z.string().max(80),
+        dueDate: z.string().max(40),
+        parentId: z.string().max(160),
+        parentType: z.string().max(32)
+      })
+      .strict()
+      .nullable(),
     project: z
       .object({
         id: z.string().min(1),
@@ -141,36 +157,52 @@ export const codexApprovalInputSchema = z
   })
   .strict();
 
-export const agentReworkInputSchema = z.object({
-  note: z.string().trim().min(3).max(4_000)
-}).strict();
+export const agentReworkInputSchema = z
+  .object({
+    note: z.string().trim().min(3).max(4_000)
+  })
+  .strict();
 
-export const agentCommitInputSchema = z.object({
-  approved: z.literal(true),
-  message: z.string().trim().min(3).max(240)
-}).strict();
+export const agentCommitInputSchema = z
+  .object({
+    approved: z.literal(true),
+    message: z.string().trim().min(3).max(240)
+  })
+  .strict();
 
-const agentTaskInputSchema = z.object({
-  agentProfile: z.string().trim().min(1).max(80),
-  dependsOn: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
-  key: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/u).max(80),
-  objective: z.string().trim().min(3).max(4_000),
-  scopePaths: z.array(z.string().trim().min(1).max(500)).min(1).max(50),
-  title: z.string().trim().min(1).max(240)
-}).strict();
+const agentTaskInputSchema = z
+  .object({
+    agentProfile: z.string().trim().min(1).max(80),
+    dependsOn: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
+    key: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9][a-z0-9-]*$/u)
+      .max(80),
+    objective: z.string().trim().min(3).max(4_000),
+    scopePaths: z.array(z.string().trim().min(1).max(500)).min(1).max(50),
+    title: z.string().trim().min(1).max(240)
+  })
+  .strict();
 
-export const agentDecompositionInputSchema = z.object({
-  tasks: z.array(agentTaskInputSchema).min(1).max(20)
-}).strict();
+export const agentDecompositionInputSchema = z
+  .object({
+    tasks: z.array(agentTaskInputSchema).min(1).max(20)
+  })
+  .strict();
 
-export const agentTaskStatusInputSchema = z.object({
-  resultSummary: z.string().trim().max(8_000).default(""),
-  status: z.enum(["completed", "failed"])
-}).strict();
+export const agentTaskStatusInputSchema = z
+  .object({
+    resultSummary: z.string().trim().max(8_000).default(""),
+    status: z.enum(["completed", "failed"])
+  })
+  .strict();
 
-export const agentParentReviewInputSchema = z.object({
-  decision: z.enum(["approved", "rework"]),
-  note: z.string().trim().min(3).max(4_000)
-}).strict();
+export const agentParentReviewInputSchema = z
+  .object({
+    decision: z.enum(["approved", "rework"]),
+    note: z.string().trim().min(3).max(4_000)
+  })
+  .strict();
 
 export type AgentDecompositionInput = z.infer<typeof agentDecompositionInputSchema>;

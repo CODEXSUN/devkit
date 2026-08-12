@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.33",
+  "version": "1.0.34",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -16,6 +16,9 @@
     "desktop:check": "npm run check --workspace @devkit/desktop",
     "dev:api": "node tools/preflight.mjs platform-api",
     "dev:web": "node tools/preflight.mjs platform-web",
+    "dev:restart": "node tools/dev-stack.mjs",
+    "dev:restart:api": "node tools/preflight.mjs platform-api",
+    "dev:restart:web": "node tools/preflight.mjs platform-web",
     "preinstall": "node tools/enforce-root-install.mjs",
     "postinstall": "node tools/clean-workspace-artifacts.mjs && node tools/check-root-node-modules.mjs",
     "setup": "node tools/install-stack.mjs",
@@ -81,6 +84,14 @@
   "engines": {
     "node": ">=26.5.0",
     "npm": ">=12.0.2"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.9",
+    "dompurify": "3.4.13",
+    "fast-uri": "4.1.2",
+    "lodash-es": "4.18.1",
+    "mermaid": "11.16.1",
+    "nanoid": "6.0.1"
   },
   "allowScripts": {
     "bullmq": false,

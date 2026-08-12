@@ -7,7 +7,13 @@ import { agentWorktreeService, type AgentWorkspace } from "./agent-worktree.serv
 import { AgentRunBudgetGuard } from "./agent-run.budget.js";
 
 export type CodexChatEvent =
-  | { type: "chat.started"; conversationId: string; runId: string; threadId: string; turnId: string }
+  | {
+      type: "chat.started";
+      conversationId: string;
+      runId: string;
+      threadId: string;
+      turnId: string;
+    }
   | { type: "chat.delta"; delta: string }
   | { type: "chat.activity"; label: string }
   | { type: "chat.files"; files: string[] }
@@ -35,7 +41,8 @@ export class CodexChatService {
               model: input.model,
               projectKey: input.project.key,
               projectTitle: input.project.title,
-              projectUuid: input.project.id
+              projectUuid: input.project.id,
+              workItem: input.workItem
             },
             actorId
           );
@@ -87,15 +94,15 @@ export class CodexChatService {
       const turnId = await codexAppServer.startTurn(
         threadId,
         cwd,
-        await formatInputs(input, workspace),
+        await formatInputs(input, workspace, actorId),
         input.model,
         input.access
       );
-      await orchestrationChatRepository.updateRuntime(
-        conversationId,
-        actorId,
-        { access: input.access, codexThreadId: threadId, model: input.model }
-      );
+      await orchestrationChatRepository.updateRuntime(conversationId, actorId, {
+        access: input.access,
+        codexThreadId: threadId,
+        model: input.model
+      });
       await agentRunRepository.start(runId, actorId, threadId, turnId);
       yield { type: "chat.started", conversationId, runId, threadId, turnId };
       while (true) {
@@ -103,7 +110,15 @@ export class CodexChatService {
         if (!notification) {
           const message = budget.timeoutViolation();
           await codexAppServer.interruptTurn(threadId, turnId).catch(() => undefined);
-          await persistFailure(runId, actorId, conversationId, message, startedAt, editedFileList, workspace);
+          await persistFailure(
+            runId,
+            actorId,
+            conversationId,
+            message,
+            startedAt,
+            editedFileList,
+            workspace
+          );
           yield { type: "chat.failed", message };
           return;
         }
@@ -150,7 +165,11 @@ export class CodexChatService {
             actorId
           );
           event = { ...event, messageId };
-          await agentRunRepository.complete(runId, actorId, assistantText || "No response returned.");
+          await agentRunRepository.complete(
+            runId,
+            actorId,
+            assistantText || "No response returned."
+          );
           await finalizeWorkspace(runId, actorId, workspace);
         }
         if (event.type === "chat.failed") {
@@ -173,25 +192,25 @@ export class CodexChatService {
       }
     } catch (error) {
       if (runId) {
-        await agentRunRepository.fail(
-          runId,
-          actorId,
-          error instanceof Error ? error.message : "Codex chat failed."
-        ).catch(() => undefined);
+        await agentRunRepository
+          .fail(runId, actorId, error instanceof Error ? error.message : "Codex chat failed.")
+          .catch(() => undefined);
         if (workspace) await finalizeWorkspace(runId, actorId, workspace).catch(() => undefined);
       }
       if (conversationId) {
-        await orchestrationChatRepository.addMessage(
-          {
-            attachments: [],
-            body: error instanceof Error ? error.message : "Codex chat failed.",
-            durationMs: Date.now() - startedAt,
-            files: editedFileList,
-            role: "assistant",
-            threadUuid: conversationId
-          },
-          actorId
-        ).catch(() => undefined);
+        await orchestrationChatRepository
+          .addMessage(
+            {
+              attachments: [],
+              body: error instanceof Error ? error.message : "Codex chat failed.",
+              durationMs: Date.now() - startedAt,
+              files: editedFileList,
+              role: "assistant",
+              threadUuid: conversationId
+            },
+            actorId
+          )
+          .catch(() => undefined);
       }
       yield {
         type: "chat.failed",
@@ -205,7 +224,10 @@ export class CodexChatService {
 
 class NotificationQueue {
   private readonly values: CodexNotification[] = [];
-  private waiting: { resolve: (value: CodexNotification | null) => void; timer: NodeJS.Timeout } | null = null;
+  private waiting: {
+    resolve: (value: CodexNotification | null) => void;
+    timer: NodeJS.Timeout;
+  } | null = null;
 
   push(value: CodexNotification) {
     if (this.waiting) {
@@ -240,10 +262,7 @@ function toChatEvent(
 ): CodexChatEvent | null {
   const params = notification.params as Record<string, unknown> | undefined;
   if (params?.threadId !== threadId) return null;
-  if (
-    typeof notification.id === "number" &&
-    notification.method?.includes("requestApproval")
-  ) {
+  if (typeof notification.id === "number" && notification.method?.includes("requestApproval")) {
     return {
       type: "chat.approval",
       requestId: notification.id,
@@ -283,7 +302,7 @@ export function editedFiles(diff: string) {
   return [...files].sort();
 }
 
-async function formatInputs(input: CodexChatInput, workspace: AgentWorkspace) {
+async function formatInputs(input: CodexChatInput, workspace: AgentWorkspace, actorId: string) {
   const project = input.project;
   const textAttachments = input.attachments.filter((file) => file.kind === "text");
   const attachments = textAttachments.length
@@ -291,15 +310,19 @@ async function formatInputs(input: CodexChatInput, workspace: AgentWorkspace) {
         .map((file) => `--- ${file.name} (${file.mimeType}) ---\n${file.content}`)
         .join("\n\n")}`
     : "";
-  const planInstruction =
+  const planInstruction = `\n- Authenticated DevKit actor: ${actorId}${
     input.access === "plan"
       ? "\n- Planning mode: inspect and reason, but return a plan only. Do not modify files."
-      : "";
+      : ""
+  }`;
   const skillContext = await skillsRepository.promptingContext();
   const skills = skillContext.length
     ? `\n\nDevKit skills:\n${skillContext.map((skill) => `--- ${skill.name} (${skill.review ? "review" : "prompt"}) ---\nSkill root: ${skill.root}\n${skill.content}`).join("\n\n")}`
     : "";
-  const prompt = `Project reference:\n- ID: ${project.id}\n- Key: ${project.key}\n- Title: ${project.title}\n- Module: ${project.moduleKey || "not set"}\n- Reference: ${project.referenceType || "not set"} / ${project.referenceId || "not set"}\n- Description: ${project.description || "not provided"}\n- Access: ${input.access}\n- Workspace mode: ${workspace.mode}\n- Branch: ${workspace.branchName || "source checkout"}\n- Base revision: ${workspace.baseRevision}${planInstruction}\n\nUser message:\n${input.message}${attachments}${skills}`;
+  const workItem = input.workItem
+    ? `\n\nSelected work item:\n- ID: ${input.workItem.id}\n- Key: ${input.workItem.key}\n- Kind: ${input.workItem.kind}\n- Title: ${input.workItem.title}\n- Status: ${input.workItem.status}\n- Priority: ${input.workItem.priority}\n- Assignee: ${input.workItem.assignee || "unassigned"}\n- Due date: ${input.workItem.dueDate || "not set"}\n- Parent: ${input.workItem.parentType || "none"} / ${input.workItem.parentId || "none"}\n- Description: ${input.workItem.description || "not provided"}\n\nWorkflow contract:\n1. Treat this work item as the scope anchor and inspect its linked project records before changing code.\n2. Keep implementation, tests, review evidence, and work-item status aligned.\n3. When delivery is complete, update the repository changelog and version using its existing release scripts.\n4. Run the registered verification gates. Never commit until the user approves the commit gate. Never push automatically.`
+    : "";
+  const prompt = `Project reference:\n- ID: ${project.id}\n- Key: ${project.key}\n- Title: ${project.title}\n- Module: ${project.moduleKey || "not set"}\n- Reference: ${project.referenceType || "not set"} / ${project.referenceId || "not set"}\n- Description: ${project.description || "not provided"}\n- Access: ${input.access}\n- Workspace mode: ${workspace.mode}\n- Branch: ${workspace.branchName || "source checkout"}\n- Base revision: ${workspace.baseRevision}${planInstruction}${workItem}\n\nUser message:\n${input.message}${attachments}${skills}`;
   return [
     { type: "text" as const, text: prompt },
     ...input.attachments
@@ -312,9 +335,12 @@ async function finalizeWorkspace(runId: string, actorId: string, workspace: Agen
   try {
     const inspection = await agentWorktreeService.inspect(workspace);
     await agentRunRepository.setWorkspaceStatus(runId, actorId, inspection.status);
-    if (inspection.changedFiles.length) await agentRunRepository.files(runId, actorId, inspection.changedFiles);
+    if (inspection.changedFiles.length)
+      await agentRunRepository.files(runId, actorId, inspection.changedFiles);
   } catch {
-    await agentRunRepository.setWorkspaceStatus(runId, actorId, "inspection_failed").catch(() => undefined);
+    await agentRunRepository
+      .setWorkspaceStatus(runId, actorId, "inspection_failed")
+      .catch(() => undefined);
   }
 }
 
@@ -344,5 +370,9 @@ async function persistFailure(
 
 function approvalReason(notification: CodexNotification) {
   const params = notification.params as { command?: string; reason?: string } | undefined;
-  return params?.reason || params?.command || "Codex wants to perform an action outside the current boundary.";
+  return (
+    params?.reason ||
+    params?.command ||
+    "Codex wants to perform an action outside the current boundary."
+  );
 }

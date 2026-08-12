@@ -1,5 +1,3 @@
-﻿#!/usr/bin/env node
-
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -22,8 +20,8 @@ console.log("\nDevKit Platform runtime");
 await startStack();
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.once(signal, () => {
-    stopChildren();
+  process.once(signal, async () => {
+    await stopChildren();
     process.exit(0);
   });
 }
@@ -39,13 +37,13 @@ function startService(serviceName) {
   children.add(child);
   child.stdout.on("data", (chunk) => writeServiceLines(service, chunk));
   child.stderr.on("data", (chunk) => writeServiceLines(service, chunk));
-  child.on("exit", (code) => {
+  child.on("exit", async (code) => {
     children.delete(child);
     if (stopping) return;
 
     const exitCode = code ?? 1;
     console.error(`${service.color}[${service.label}]${reset} exited with code ${exitCode}`);
-    stopChildren(child);
+    await stopChildren(child);
     process.exit(exitCode || 1);
   });
 
@@ -81,7 +79,7 @@ async function waitForHealthyUrl(url, label, timeoutMs) {
   }
 
   console.error(`  x ${label} did not become healthy: ${lastStatus}`);
-  stopChildren();
+  await stopChildren();
   process.exit(1);
 }
 
@@ -107,7 +105,7 @@ function monitorStackHealth() {
 
         if (target.failures >= 3) {
           console.error(`  x ${target.label} became unavailable; stopping Platform runtime`);
-          stopChildren();
+          await stopChildren();
           process.exit(1);
         }
       }
@@ -145,14 +143,36 @@ function writeServiceLines(service, chunk) {
   }
 }
 
-function stopChildren(skipChild) {
+async function stopChildren(skipChild) {
   stopping = true;
-  for (const child of children) {
-    if (child === skipChild || child.killed || !child.pid) continue;
+  const activeChildren = [...children].filter(
+    (child) => child !== skipChild && !child.killed && child.pid
+  );
+
+  for (const child of activeChildren) {
+    child.kill("SIGTERM");
+  }
+
+  await Promise.all(activeChildren.map((child) => waitForExit(child, 5_000)));
+
+  for (const child of activeChildren) {
+    if (child.exitCode !== null || child.signalCode !== null || !child.pid) continue;
+    console.warn(`  ! Process ${child.pid} did not stop gracefully; forcing shutdown`);
     if (process.platform === "win32") {
       spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } else {
-      child.kill("SIGTERM");
+      child.kill("SIGKILL");
     }
   }
+}
+
+function waitForExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolveWait) => {
+    const timeout = setTimeout(resolveWait, timeoutMs);
+    child.once("exit", () => {
+      clearTimeout(timeout);
+      resolveWait();
+    });
+  });
 }

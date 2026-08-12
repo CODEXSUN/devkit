@@ -1,5 +1,3 @@
-﻿#!/usr/bin/env node
-
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -18,11 +16,7 @@ const apps = {
     envKey: "PLATFORM_API_PORT",
     host: "127.0.0.1",
     command: process.execPath,
-    args: [
-      nodePackageBin("tsx", "dist/cli.mjs"),
-      "watch",
-      "apps/platform/api/src/server.ts"
-    ]
+    args: [nodePackageBin("tsx", "dist/cli.mjs"), "watch", "apps/platform/api/src/server.ts"]
   },
   "platform-web": {
     displayName: "web",
@@ -83,7 +77,7 @@ child.on("exit", (code) => process.exit(code ?? 0));
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, () => {
-    stopChild(child, signal);
+    void stopChild(child, signal);
   });
 }
 
@@ -368,23 +362,43 @@ function killPid(pid) {
   process.kill(pid, "SIGTERM");
 }
 
-function stopChild(childProcess, signal) {
+async function stopChild(childProcess, signal) {
   if (childProcess.killed || !childProcess.pid) {
     return;
   }
 
-  if (process.platform === "win32") {
-    try {
-      execFileSync("taskkill", ["/PID", String(childProcess.pid), "/T", "/F"], {
-        stdio: ["ignore", "pipe", "pipe"]
-      });
-    } catch {
-      childProcess.kill(signal);
-    }
+  const pid = childProcess.pid;
+  childProcess.kill(signal);
+  if (await waitForExit(childProcess, 5_000)) {
     return;
   }
 
-  childProcess.kill(signal);
+  console.warn(`  ! Development process ${pid} did not stop gracefully; forcing shutdown`);
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+    } catch {
+      // The process may have exited between the timeout and taskkill.
+    }
+  } else {
+    childProcess.kill("SIGKILL");
+  }
+}
+
+function waitForExit(childProcess, timeoutMs) {
+  if (childProcess.exitCode !== null || childProcess.signalCode !== null) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolveWait) => {
+    const timeout = setTimeout(() => resolveWait(false), timeoutMs);
+    childProcess.once("exit", () => {
+      clearTimeout(timeout);
+      resolveWait(true);
+    });
+  });
 }
 
 function nodePackageBin(packageName, binPath) {

@@ -32,7 +32,13 @@ export function AgentIdeChatHistory({
         <div className="flex items-center gap-2 font-semibold">
           <MessageSquareTextIcon className="size-4" /> Chat history
         </div>
-        <Button aria-label="Hide chat history" onClick={onClose} size="icon" title="Hide chat history" variant="ghost">
+        <Button
+          aria-label="Hide chat history"
+          onClick={onClose}
+          size="icon"
+          title="Hide chat history"
+          variant="ghost"
+        >
           <PanelLeftCloseIcon />
         </Button>
       </div>
@@ -47,12 +53,15 @@ export function AgentIdeChatHistory({
           >
             <span className="line-clamp-2 text-sm font-medium leading-5">{history.title}</span>
             <span className="block pt-1 text-xs text-muted-foreground">
+              {history.workItem ? `${history.workItem.key} · ` : ""}
               {history.projectKey} · {formatHistoryTime(history.updatedAt)}
             </span>
           </button>
         ))}
         {!histories.length ? (
-          <p className="py-6 text-center text-sm leading-6 text-muted-foreground">Completed chats will appear here.</p>
+          <p className="py-6 text-center text-sm leading-6 text-muted-foreground">
+            Completed chats will appear here.
+          </p>
         ) : null}
       </div>
     </aside>
@@ -90,8 +99,12 @@ export function AgentIdeProjectAccordion({
         <div className="absolute -left-16 top-full z-30 mt-3 w-72 rounded-lg border bg-popover p-4 text-sm text-popover-foreground shadow-lg">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="font-semibold">{project.key} · {project.title}</p>
-              <p className="pt-1 text-xs text-muted-foreground">{accessLabel(access)} · {model}</p>
+              <p className="font-semibold">
+                {project.key} · {project.title}
+              </p>
+              <p className="pt-1 text-xs text-muted-foreground">
+                {accessLabel(access)} · {model}
+              </p>
             </div>
             <StatusBadge status={project.status} />
           </div>
@@ -104,11 +117,18 @@ export function AgentIdeProjectAccordion({
             <ContextValue label="Reference" value={project.referenceId || "Not set"} />
             <ContextValue label="Model" value={model} />
             <div>
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheckIcon className="size-3.5" /> Conversation</p>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheckIcon className="size-3.5" /> Conversation
+              </p>
               <div className="flex min-w-0 items-center gap-1 pt-1">
                 <code className="truncate text-xs">{threadId ?? "New conversation"}</code>
                 {threadId ? (
-                  <Button aria-label="Copy thread ID" onClick={() => void copyThread()} size="icon" variant="ghost">
+                  <Button
+                    aria-label="Copy thread ID"
+                    onClick={() => void copyThread()}
+                    size="icon"
+                    variant="ghost"
+                  >
                     {copied ? <CheckIcon /> : <CopyIcon />}
                   </Button>
                 ) : null}
@@ -122,15 +142,26 @@ export function AgentIdeProjectAccordion({
 }
 
 function ContextValue({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-xs text-muted-foreground">{label}</p><p className="break-words pt-1">{value}</p></div>;
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="break-words pt-1">{value}</p>
+    </div>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  return <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">{status}</span>;
+  return (
+    <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+      {status}
+    </span>
+  );
 }
 
 function formatHistoryTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(value)
+  );
 }
 
 function plainText(value: string) {

@@ -63,8 +63,11 @@ import type {
   TodoPriority,
   TodoStatus
 } from "./task-manager.types";
+import { useProjectManagerRecordsQuery } from "../project-manager/project-manager.hooks";
+import type { ProjectManagerRecord } from "../project-manager/project-manager.types";
 
 export function TaskManagerWorkspace() {
+  const projectsQuery = useProjectManagerRecordsQuery("project");
   const client = useQueryClient();
   const query = useQuery({
     queryKey: ["task-manager", "todos"],
@@ -82,6 +85,7 @@ export function TaskManagerWorkspace() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(100);
   const [deleting, setDeleting] = useState<Todo | null>(null);
@@ -148,13 +152,14 @@ export function TaskManagerWorkspace() {
         (todo) =>
           (statusFilter === "all" || todo.status === statusFilter) &&
           (categoryFilter === "all" || todo.category === categoryFilter) &&
+          (projectFilter === "all" || todo.projectId === projectFilter) &&
           (groupFilter === "all" ||
             (groupFilter === "__none__" ? !todo.groupName : todo.groupName === groupFilter)) &&
           `${todo.title} ${todo.description} ${todo.category} ${todo.groupName} ${todo.priority} ${todo.status}`
             .toLowerCase()
             .includes(search.toLowerCase())
       ),
-    [categoryFilter, groupFilter, query.data, search, statusFilter]
+    [categoryFilter, groupFilter, projectFilter, query.data, search, statusFilter]
   );
   const totalPages = Math.max(1, Math.ceil(todos.length / rowsPerPage));
   const currentPage = Math.min(page, totalPages);
@@ -177,6 +182,7 @@ export function TaskManagerWorkspace() {
                 description: "",
                 category: "work",
                 groupName: "",
+                projectId: "",
                 status: "open",
                 priority: "medium",
                 dueDate: "",
@@ -210,7 +216,17 @@ export function TaskManagerWorkspace() {
         searchPlaceholder="Search Todos"
         searchValue={search}
         toolbarAction={
-          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
+            <WorkspaceLookup
+              createMode="none"
+              options={projectOptions(projectsQuery.data ?? [], true)}
+              placeholder="All projects"
+              value={projectFilter}
+              onValueChange={(value) => {
+                setProjectFilter(value || "all");
+                setPage(1);
+              }}
+            />
             <WorkspaceSelect
               options={[{ label: "All categories", value: "all" }, ...lookupOptions("category")]}
               value={categoryFilter}
@@ -235,6 +251,7 @@ export function TaskManagerWorkspace() {
           key={editing.id || "new"}
           value={editing}
           lookups={lookupQuery.data ?? []}
+          projects={projectsQuery.data ?? []}
           saving={save.isPending}
           onCreateLookup={addLookup}
           onCancel={() => setEditing(null)}
@@ -441,6 +458,7 @@ function SortableTodoRow({
 function TodoForm({
   value,
   lookups,
+  projects,
   saving,
   onCreateLookup,
   onCancel,
@@ -448,6 +466,7 @@ function TodoForm({
 }: {
   value: Todo;
   lookups: TodoLookup[];
+  projects: ProjectManagerRecord[];
   saving: boolean;
   onCreateLookup: (kind: TodoLookupKind, name: string) => Promise<WorkspaceLookupOption>;
   onCancel: () => void;
@@ -458,6 +477,7 @@ function TodoForm({
     description: value.description,
     category: value.category,
     groupName: value.groupName,
+    projectId: value.projectId,
     status: value.status,
     priority: value.priority,
     dueDate: value.dueDate
@@ -501,6 +521,15 @@ function TodoForm({
             onCreate={onCreateLookup}
             onValueChange={(next) => patch("category", next)}
           />
+          <WorkspaceFormField label="Project">
+            <WorkspaceLookup
+              createMode="none"
+              options={projectOptions(projects)}
+              placeholder="Select project"
+              value={form.projectId ?? ""}
+              onValueChange={(next) => patch("projectId", next)}
+            />
+          </WorkspaceFormField>
           <TodoLookupField
             kind="group"
             label="Group / Client"
@@ -573,6 +602,19 @@ function TodoLookupField({
       />
     </WorkspaceFormField>
   );
+}
+
+function projectOptions(projects: ProjectManagerRecord[], includeAll = false) {
+  return [
+    ...(includeAll ? [{ label: "All projects", value: "all" }] : []),
+    ...projects
+      .filter((project) => project.active)
+      .map((project) => ({
+        description: project.key,
+        label: project.title,
+        value: project.id
+      }))
+  ];
 }
 
 function toLookupOptions(lookups: TodoLookup[], kind: TodoLookupKind): WorkspaceLookupOption[] {

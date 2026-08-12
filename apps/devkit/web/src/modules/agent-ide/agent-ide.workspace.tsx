@@ -11,6 +11,7 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useProjectManagerRecordsQuery } from "../project-manager/project-manager.hooks";
+import type { ProjectManagerRecord } from "../project-manager/project-manager.types";
 import { HoneyFace } from "../honey";
 import { AgentIdeChat } from "./agent-ide.chat";
 import { AgentIdeChatHistory, AgentIdeProjectAccordion } from "./agent-ide.project-context";
@@ -34,6 +35,10 @@ import type {
 export function AgentIdeWorkspace() {
   const queryClient = useQueryClient();
   const projectsQuery = useProjectManagerRecordsQuery("project");
+  const initiativesQuery = useProjectManagerRecordsQuery("issue");
+  const tasksQuery = useProjectManagerRecordsQuery("task");
+  const activitiesQuery = useProjectManagerRecordsQuery("activity");
+  const reviewsQuery = useProjectManagerRecordsQuery("review");
   const codexStatus = useQuery({
     queryKey: ["devkit", "agent-ide", "codex-status"],
     queryFn: getAgentIdeCodexStatus,
@@ -46,8 +51,12 @@ export function AgentIdeWorkspace() {
     const search = new URLSearchParams(window.location.search);
     if (search.get("source") !== "honey") return undefined;
     const objective = search.get("objective")?.trim();
-    return objective ? `Honey handoff brief:\n\nObjective: ${objective}\n\nUse the selected project context. Inspect the workspace before changing files.` : undefined;
+    return objective
+      ? `Honey handoff brief:\n\nObjective: ${objective}\n\nUse the selected project context. Inspect the workspace before changing files.`
+      : undefined;
   }, []);
+  const initialWorkItem = useMemo(() => workItemFromSearch(window.location.search), []);
+  const [workItem, setWorkItem] = useState(initialWorkItem);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentIdeChatMessage[]>([]);
@@ -59,12 +68,20 @@ export function AgentIdeWorkspace() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [projectContextVisible, setProjectContextVisible] = useState(true);
   const [runConsoleVisible, setRunConsoleVisible] = useState(true);
+  const initialMessage = honeyBrief ?? workItemBrief(initialWorkItem);
   const historyQuery = useQuery({
     queryKey: ["devkit", "agent-ide", "chat-history"],
     queryFn: listAgentIdeChats
   });
   const projects = projectsQuery.data ?? [];
   const project = projects.find((candidate) => candidate.id === projectId);
+  const workItemRecord = [
+    ...(initiativesQuery.data ?? []),
+    ...(tasksQuery.data ?? []),
+    ...(activitiesQuery.data ?? []),
+    ...(reviewsQuery.data ?? [])
+  ].find((record) => record.id === workItem?.id && record.kind === workItem?.kind);
+  const resolvedWorkItem = workItemRecord ? agentWorkItemFromRecord(workItemRecord) : workItem;
   const options = useMemo(
     () => projects.map((item) => ({ label: `${item.key} · ${item.title}`, value: item.id })),
     [projects]
@@ -76,6 +93,7 @@ export function AgentIdeWorkspace() {
     setConversationId(null);
     setMessages([]);
     setActiveRunId(null);
+    setWorkItem(null);
   };
 
   const newChat = () => {
@@ -134,6 +152,7 @@ export function AgentIdeWorkspace() {
           message: text,
           model,
           threadId,
+          workItem: resolvedWorkItem,
           project: {
             id: project.id,
             key: project.key,
@@ -237,6 +256,21 @@ export function AgentIdeWorkspace() {
       setThreadId(history.codexThreadId);
       setAccess(history.access);
       setModel(history.model);
+      setWorkItem(
+        history.workItem
+          ? {
+              ...history.workItem,
+              assignee: "",
+              description: "",
+              dueDate: "",
+              parentId: "",
+              parentType: "",
+              priority: "",
+              status: "",
+              kind: normalizeWorkItemKind(history.workItem.kind)
+            }
+          : null
+      );
       setMessages(
         history.messages.map((entry) => ({
           attachments: entry.attachments,
@@ -329,7 +363,7 @@ export function AgentIdeWorkspace() {
           activity={activity}
           disabled={!project || !connected}
           messages={messages}
-          {...(honeyBrief ? { initialMessage: honeyBrief } : {})}
+          {...(initialMessage ? { initialMessage } : {})}
           model={model}
           onAccessChange={changeAccess}
           onApprovalDecision={(decision) => void decideApproval(decision)}
@@ -360,4 +394,72 @@ export function AgentIdeWorkspace() {
       </div>
     </main>
   );
+}
+
+type AgentWorkItem = {
+  assignee: string;
+  description: string;
+  dueDate: string;
+  id: string;
+  key: string;
+  kind: "activity" | "issue" | "project" | "review" | "task";
+  parentId: string;
+  parentType: string;
+  priority: string;
+  status: string;
+  title: string;
+};
+
+function workItemFromSearch(searchValue: string): AgentWorkItem | null {
+  const search = new URLSearchParams(searchValue);
+  const kind = search.get("workItemKind");
+  if (!kind || !["activity", "issue", "project", "review", "task"].includes(kind)) return null;
+  const id = search.get("workItemId")?.trim() ?? "";
+  const key = search.get("workItemKey")?.trim() ?? "";
+  const title = search.get("workItemTitle")?.trim() ?? "";
+  if (!id || !key || !title) return null;
+  return {
+    assignee: search.get("workItemAssignee")?.trim() ?? "",
+    description: search.get("workItemDescription")?.trim() ?? "",
+    dueDate: search.get("workItemDueDate")?.trim() ?? "",
+    id,
+    key,
+    kind: kind as AgentWorkItem["kind"],
+    parentId: search.get("workItemParentId")?.trim() ?? "",
+    parentType: search.get("workItemParentType")?.trim() ?? "",
+    priority: search.get("workItemPriority")?.trim() ?? "",
+    status: search.get("workItemStatus")?.trim() ?? "",
+    title
+  };
+}
+
+function workItemBrief(workItem: AgentWorkItem | null) {
+  if (!workItem) return undefined;
+  return `Continue ${workItem.key}: ${workItem.title}. Review its project context and linked delivery records, then propose the next safe action. Preserve the chat reference for later continuation.`;
+}
+
+function normalizeWorkItemKind(kind: string): AgentWorkItem["kind"] {
+  return ["activity", "issue", "project", "review", "task"].includes(kind)
+    ? (kind as AgentWorkItem["kind"])
+    : "task";
+}
+
+function agentWorkItemFromRecord(record: ProjectManagerRecord): AgentWorkItem {
+  return {
+    assignee: record.assignee,
+    description: plainText(record.description),
+    dueDate: record.dueDate,
+    id: record.id,
+    key: record.key,
+    kind: normalizeWorkItemKind(record.kind),
+    parentId: record.referenceId,
+    parentType: record.referenceType,
+    priority: record.priority,
+    status: record.status,
+    title: record.title
+  };
+}
+
+function plainText(value: string) {
+  return value.replace(/<[^>]*>/gu, "").trim();
 }

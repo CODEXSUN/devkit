@@ -33,6 +33,7 @@ export class TaskManagerService {
       description: String(input.description ?? ""),
       dueDate: String(input.dueDate ?? ""),
       groupName: String(input.groupName ?? "").trim(),
+      projectId: String(input.projectId ?? "").trim(),
       id: newUuid(),
       position: records.length,
       priority: input.priority ?? "medium",
@@ -45,12 +46,7 @@ export class TaskManagerService {
     return created;
   }
 
-  async update(
-    scopeKey: string,
-    id: string,
-    input: TodoUpdateInput,
-    actorEmail: string
-  ) {
+  async update(scopeKey: string, id: string, input: TodoUpdateInput, actorEmail: string) {
     const current = await this.repository.find(scopeKey, id);
     if (!current) throw AppError.notFound("Todo was not found.");
     const next: Todo = {
@@ -59,6 +55,7 @@ export class TaskManagerService {
       description: String(input.description ?? current.description),
       dueDate: String(input.dueDate ?? current.dueDate),
       groupName: String(input.groupName ?? current.groupName).trim(),
+      projectId: String(input.projectId ?? current.projectId).trim(),
       priority: input.priority ?? current.priority,
       status: input.status ?? current.status,
       title: requiredTitle(input.title ?? current.title),
@@ -78,7 +75,10 @@ export class TaskManagerService {
       actorEmail,
       "status-changed"
     );
-    await this.notifications.taskChanged(status === "in-progress" ? "started" : "status changed", updated);
+    await this.notifications.taskChanged(
+      status === "in-progress" ? "started" : "status changed",
+      updated
+    );
     return updated;
   }
 

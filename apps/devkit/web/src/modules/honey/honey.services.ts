@@ -1,13 +1,28 @@
 import { apiGet, apiPost, apiPut } from "../../shared/api/devkit-api";
-import type { HoneyConversation, HoneyConversationSummary, HoneyDashboard, HoneyPageContext } from "./honey.types";
+import type {
+  HoneyConversation,
+  HoneyConversationSummary,
+  HoneyDashboard,
+  HoneyPageContext
+} from "./honey.types";
 
-export const listHoneyConversations = () => apiGet<HoneyConversationSummary[]>("/honey/conversations");
-export const getHoneyConversation = (id: string) => apiGet<HoneyConversation>(`/honey/conversations/${id}`);
-export const sendHoneyMessage = (message: string, threadId: string | null, context = readHoneyPageContext()) =>
-  apiPost<HoneyConversation>("/honey/chat", { context, message, threadId });
+export const listHoneyConversations = () =>
+  apiGet<HoneyConversationSummary[]>("/honey/conversations");
+export const getHoneyConversation = (id: string) =>
+  apiGet<HoneyConversation>(`/honey/conversations/${id}`);
+export const archiveHoneyConversation = (id: string) =>
+  apiPut<{ archived: true; id: string }>(`/honey/conversations/${id}/archive`);
+export const sendHoneyMessage = (
+  message: string,
+  threadId: string | null,
+  context = readHoneyPageContext()
+) => apiPost<HoneyConversation>("/honey/chat", { context, message, threadId });
 export const getHoneyDashboard = () => apiGet<HoneyDashboard>("/honey/dashboard");
 export const reviewHoneyKnowledge = (id: string, status: "approved" | "rejected" | "reverted") =>
-  apiPut<HoneyDashboard["knowledge"]>(`/honey/memory/${id}`, { note: "Reviewed in Honey dashboard", status });
+  apiPut<HoneyDashboard["knowledge"]>(`/honey/memory/${id}`, {
+    note: "Reviewed in Honey dashboard",
+    status
+  });
 
 export function readHoneyPageContext(): HoneyPageContext {
   const search = new URLSearchParams(window.location.search);
@@ -15,9 +30,11 @@ export function readHoneyPageContext(): HoneyPageContext {
   return {
     pageLabel: document.title || window.location.pathname,
     pathname: previousPage || `${window.location.pathname}${window.location.search}`,
-    projectId: search.get("project"), projectTitle: search.get("projectTitle"),
+    projectId: search.get("project"),
+    projectTitle: search.get("projectTitle"),
     recentError: window.sessionStorage.getItem("devkit.honey.recent-error"),
-    runStatus: search.get("runStatus"), taskId: search.get("task") ?? search.get("issue")
+    runStatus: search.get("runStatus"),
+    taskId: search.get("task") ?? search.get("issue")
   };
 }
 

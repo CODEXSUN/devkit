@@ -7,6 +7,7 @@ export type Todo = {
   description: string;
   category: TodoCategory;
   groupName: string;
+  projectId: string;
   status: TodoStatus;
   priority: TodoPriority;
   dueDate: string;
@@ -19,6 +20,7 @@ export type TodoInput = {
   description?: string | undefined;
   dueDate?: string | undefined;
   groupName?: string | undefined;
+  projectId?: string | undefined;
   priority?: TodoPriority | undefined;
   status?: TodoStatus | undefined;
   title: string;
@@ -28,6 +30,7 @@ export type TodoUpdateInput = {
   description?: string | undefined;
   dueDate?: string | undefined;
   groupName?: string | undefined;
+  projectId?: string | undefined;
   priority?: TodoPriority | undefined;
   status?: TodoStatus | undefined;
   title?: string | undefined;

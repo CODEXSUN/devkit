@@ -34,14 +34,18 @@ export class OrchestrationChatRepository {
     return { ...mapThread(row), messages: messages.map(mapMessage) };
   }
 
-  async create(input: {
-    access: string;
-    message: string;
-    model: string;
-    projectKey: string;
-    projectTitle: string;
-    projectUuid: string;
-  }, actorId: string) {
+  async create(
+    input: {
+      access: string;
+      message: string;
+      model: string;
+      projectKey: string;
+      projectTitle: string;
+      projectUuid: string;
+      workItem: { id: string; key: string; kind: string; title: string } | null;
+    },
+    actorId: string
+  ) {
     const uuid = randomBytes(8).toString("hex");
     await this.database
       .insertInto("devkit_orchestration_chat_threads")
@@ -53,6 +57,10 @@ export class OrchestrationChatRepository {
         project_key: input.projectKey,
         project_title: input.projectTitle,
         project_uuid: input.projectUuid,
+        work_item_key: input.workItem?.key ?? null,
+        work_item_kind: input.workItem?.kind ?? null,
+        work_item_title: input.workItem?.title ?? null,
+        work_item_uuid: input.workItem?.id ?? null,
         status: "active",
         title: compactTitle(input.message),
         uuid
@@ -61,24 +69,36 @@ export class OrchestrationChatRepository {
     return this.find(uuid, actorId);
   }
 
-  async updateRuntime(uuid: string, actorId: string, input: { access: string; codexThreadId: string; model: string }) {
+  async updateRuntime(
+    uuid: string,
+    actorId: string,
+    input: { access: string; codexThreadId: string; model: string }
+  ) {
     await this.requireThread(uuid, actorId);
     await this.database
       .updateTable("devkit_orchestration_chat_threads")
-      .set({ access_mode: input.access, codex_thread_id: input.codexThreadId, model: input.model, updated_at: new Date() })
+      .set({
+        access_mode: input.access,
+        codex_thread_id: input.codexThreadId,
+        model: input.model,
+        updated_at: new Date()
+      })
       .where("uuid", "=", uuid)
       .where("actor_id", "=", actorId)
       .executeTakeFirst();
   }
 
-  async addMessage(input: {
-    attachments: Array<{ name: string; size: number }>;
-    body: string;
-    durationMs: number | null;
-    files: string[];
-    role: "assistant" | "user";
-    threadUuid: string;
-  }, actorId: string) {
+  async addMessage(
+    input: {
+      attachments: Array<{ name: string; size: number }>;
+      body: string;
+      durationMs: number | null;
+      files: string[];
+      role: "assistant" | "user";
+      threadUuid: string;
+    },
+    actorId: string
+  ) {
     await this.requireThread(input.threadUuid, actorId);
     const uuid = randomBytes(8).toString("hex");
     await this.database
@@ -149,6 +169,14 @@ function mapThread(row: Selectable<OrchestrationChatThreadsTable>) {
     projectKey: row.project_key,
     projectTitle: row.project_title,
     projectUuid: row.project_uuid,
+    workItem: row.work_item_uuid
+      ? {
+          id: row.work_item_uuid,
+          key: row.work_item_key ?? "",
+          kind: row.work_item_kind ?? "",
+          title: row.work_item_title ?? ""
+        }
+      : null,
     title: row.title,
     updatedAt: new Date(row.updated_at).toISOString(),
     uuid: row.uuid
@@ -163,7 +191,7 @@ function mapMessage(row: Selectable<OrchestrationChatMessagesTable>) {
     durationMs: row.duration_ms,
     feedback: row.feedback === "up" || row.feedback === "down" ? row.feedback : null,
     files: JSON.parse(row.files_json) as string[],
-    role: row.role === "assistant" ? "assistant" as const : "user" as const,
+    role: row.role === "assistant" ? ("assistant" as const) : ("user" as const),
     uuid: row.uuid
   };
 }

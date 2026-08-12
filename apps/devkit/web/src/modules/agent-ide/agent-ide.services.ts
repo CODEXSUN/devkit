@@ -35,7 +35,9 @@ export const getAgentIdeChat = (uuid: string) =>
   apiGet<AgentIdeChatHistoryDetail>(`/orchestration/agent-ide/chats/${uuid}`);
 
 export const listAgentRuns = (projectUuid: string) =>
-  apiGet<AgentRunSummary[]>(`/orchestration/agent-ide/runs?projectUuid=${encodeURIComponent(projectUuid)}`);
+  apiGet<AgentRunSummary[]>(
+    `/orchestration/agent-ide/runs?projectUuid=${encodeURIComponent(projectUuid)}`
+  );
 
 export const getAgentRun = (uuid: string) =>
   apiGet<AgentRunDetail>(`/orchestration/agent-ide/runs/${uuid}`);
@@ -43,23 +45,32 @@ export const getAgentRun = (uuid: string) =>
 export const getAgentTaskGraph = (uuid: string) =>
   apiGet<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`);
 
-export const saveAgentTaskGraph = (uuid: string, tasks: Array<{
-  agentProfile: string;
-  dependsOn: string[];
-  key: string;
-  objective: string;
-  scopePaths: string[];
-  title: string;
-}>) => apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, { tasks });
+export const saveAgentTaskGraph = (
+  uuid: string,
+  tasks: Array<{
+    agentProfile: string;
+    dependsOn: string[];
+    key: string;
+    objective: string;
+    scopePaths: string[];
+    title: string;
+  }>
+) => apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, { tasks });
 
 export const startAgentTask = (uuid: string) =>
   apiPost<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/start`);
 
 export const finishAgentTask = (uuid: string, status: "completed" | "failed", resultSummary = "") =>
-  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/finish`, { resultSummary, status });
+  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/finish`, {
+    resultSummary,
+    status
+  });
 
 export const reviewAgentTaskGraph = (uuid: string, decision: "approved" | "rework", note: string) =>
-  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/parent-review`, { decision, note });
+  apiPost<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/parent-review`, {
+    decision,
+    note
+  });
 
 export const cleanupAgentRunWorkspace = (uuid: string) =>
   apiPost<{ branchName: string; cleaned: boolean; path: string }>(
@@ -72,10 +83,9 @@ export const verifyAgentRun = (uuid: string) =>
   );
 
 export const requestAgentRunRework = (uuid: string, note: string) =>
-  apiPost<{ note: string; reviewStatus: string }>(
-    `/orchestration/agent-ide/runs/${uuid}/rework`,
-    { note }
-  );
+  apiPost<{ note: string; reviewStatus: string }>(`/orchestration/agent-ide/runs/${uuid}/rework`, {
+    note
+  });
 
 export const commitAgentRun = (uuid: string, message: string) =>
   apiPost<{ branchName: string; commitHash: string; pushed: false }>(
@@ -83,13 +93,11 @@ export const commitAgentRun = (uuid: string, message: string) =>
     { approved: true, message }
   );
 
-export const setAgentIdeMessageFeedback = (
-  uuid: string,
-  feedback: "down" | "up" | null
-) => apiPut<{ feedback: "down" | "up" | null; messageUuid: string }>(
-  `/orchestration/agent-ide/chat-messages/${uuid}/feedback`,
-  { feedback }
-);
+export const setAgentIdeMessageFeedback = (uuid: string, feedback: "down" | "up" | null) =>
+  apiPut<{ feedback: "down" | "up" | null; messageUuid: string }>(
+    `/orchestration/agent-ide/chat-messages/${uuid}/feedback`,
+    { feedback }
+  );
 
 export const resolveAgentIdeApproval = (input: {
   decision: "accept" | "acceptForSession" | "decline";
@@ -105,6 +113,19 @@ export async function streamAgentIdeChat(
     message: string;
     model: AgentIdeModel;
     threadId: string | null;
+    workItem: {
+      id: string;
+      key: string;
+      kind: "activity" | "issue" | "project" | "review" | "task";
+      title: string;
+      description: string;
+      status: string;
+      assignee: string;
+      priority: string;
+      dueDate: string;
+      parentId: string;
+      parentType: string;
+    } | null;
     project: {
       id: string;
       key: string;

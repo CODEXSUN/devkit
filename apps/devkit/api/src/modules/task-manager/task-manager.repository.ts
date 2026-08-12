@@ -4,14 +4,12 @@ import { getDevkitDatabase } from "../../database/devkit-database.js";
 import type {
   DevkitDatabase,
   TaskManagerLookupsTable,
-  TaskManagerTodosTable,
+  TaskManagerTodosTable
 } from "../../database/schema.js";
 import type { Todo, TodoLookup, TodoLookupKind } from "./task-manager.types.js";
 
 export class TaskManagerRepository {
-  constructor(
-    private readonly database: Kysely<DevkitDatabase> = getDevkitDatabase(),
-  ) {}
+  constructor(private readonly database: Kysely<DevkitDatabase> = getDevkitDatabase()) {}
 
   async list(scopeKey: string) {
     const rows = await this.database
@@ -43,18 +41,13 @@ export class TaskManagerRepository {
         .values(todoValues(scopeKey, record))
         .executeTakeFirstOrThrow();
       await writeActivity(transaction, actorEmail, "created", record.id, {
-        title: record.title,
+        title: record.title
       });
     });
     return record;
   }
 
-  async update(
-    scopeKey: string,
-    record: Todo,
-    actorEmail: string,
-    action = "updated",
-  ) {
+  async update(scopeKey: string, record: Todo, actorEmail: string, action = "updated") {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
         .updateTable("devkit_task_manager_todos")
@@ -63,18 +56,19 @@ export class TaskManagerRepository {
           description: record.description,
           due_date: record.dueDate,
           group_name: record.groupName,
+          project_uuid: record.projectId,
           position: record.position,
           priority: record.priority,
           status: record.status,
           title: record.title,
-          updated_at: new Date(record.updatedAt),
+          updated_at: new Date(record.updatedAt)
         })
         .where("scope_key", "=", scopeKey)
         .where("uuid", "=", record.id)
         .executeTakeFirstOrThrow();
       await writeActivity(transaction, actorEmail, action, record.id, {
         status: record.status,
-        title: record.title,
+        title: record.title
       });
     });
     return record;
@@ -87,13 +81,13 @@ export class TaskManagerRepository {
         .set({
           sync_direction: "outbound",
           sync_status: "deleted",
-          sync_updated_at: new Date(),
+          sync_updated_at: new Date()
         })
         .where("scope_key", "=", scopeKey)
         .where("uuid", "=", record.id)
         .executeTakeFirstOrThrow();
       await writeActivity(transaction, actorEmail, "deleted", record.id, {
-        title: record.title,
+        title: record.title
       });
     });
     return { deleted: true, id: record.id };
@@ -106,14 +100,14 @@ export class TaskManagerRepository {
           .updateTable("devkit_task_manager_todos")
           .set({
             position: record.position,
-            updated_at: new Date(record.updatedAt),
+            updated_at: new Date(record.updatedAt)
           })
           .where("scope_key", "=", scopeKey)
           .where("uuid", "=", record.id)
           .executeTakeFirstOrThrow();
       }
       await writeActivity(transaction, actorEmail, "reordered", "multiple", {
-        orderedIds: records.map((record) => record.id),
+        orderedIds: records.map((record) => record.id)
       });
     });
     return records;
@@ -152,19 +146,13 @@ export class TaskManagerRepository {
           name: record.name,
           scope_key: scopeKey,
           uuid: record.id,
-          value: record.value,
+          value: record.value
         })
         .executeTakeFirstOrThrow();
-      await writeActivity(
-        transaction,
-        actorEmail,
-        "lookup-created",
-        record.id,
-        {
-          kind: record.kind,
-          name: record.name,
-        },
-      );
+      await writeActivity(transaction, actorEmail, "lookup-created", record.id, {
+        kind: record.kind,
+        name: record.name
+      });
     });
     return record;
   }
@@ -177,13 +165,14 @@ function todoValues(scopeKey: string, record: Todo) {
     description: record.description,
     due_date: record.dueDate,
     group_name: record.groupName,
+    project_uuid: record.projectId,
     position: record.position,
     priority: record.priority,
     scope_key: scopeKey,
     status: record.status,
     title: record.title,
     updated_at: new Date(record.updatedAt),
-    uuid: record.id,
+    uuid: record.id
   };
 }
 
@@ -192,7 +181,7 @@ async function writeActivity(
   actorEmail: string,
   action: string,
   recordUuid: string,
-  details: unknown,
+  details: unknown
 ) {
   await database
     .insertInto("devkit_task_manager_activity")
@@ -201,7 +190,7 @@ async function writeActivity(
       actor_email: actorEmail,
       details_json: JSON.stringify(details),
       record_uuid: recordUuid,
-      uuid: newUuid(),
+      uuid: newUuid()
     })
     .executeTakeFirstOrThrow();
 }
@@ -213,12 +202,13 @@ function mapTodo(row: Selectable<TaskManagerTodosTable>): Todo {
     description: row.description,
     dueDate: row.due_date,
     groupName: row.group_name,
+    projectId: row.project_uuid,
     id: row.uuid,
     position: row.position,
     priority: row.priority,
     status: row.status,
     title: row.title,
-    updatedAt: iso(row.updated_at),
+    updatedAt: iso(row.updated_at)
   };
 }
 
@@ -228,14 +218,12 @@ function mapLookup(row: Selectable<TaskManagerLookupsTable>): TodoLookup {
     id: row.uuid,
     kind: row.kind as TodoLookupKind,
     name: row.name,
-    value: row.value,
+    value: row.value
   };
 }
 
 function iso(value: Date | string) {
-  return value instanceof Date
-    ? value.toISOString()
-    : new Date(value).toISOString();
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
 function newUuid() {

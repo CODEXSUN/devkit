@@ -264,6 +264,10 @@ export type OrchestrationChatThreadsTable = {
   project_key: string;
   project_title: string;
   project_uuid: string;
+  work_item_key: string | null;
+  work_item_kind: string | null;
+  work_item_title: string | null;
+  work_item_uuid: string | null;
   status: string;
   title: string;
   updated_at: TimestampColumn;
@@ -491,6 +495,7 @@ export type TaskManagerTodosTable = SyncColumns & {
   description: string;
   due_date: string;
   group_name: string;
+  project_uuid: string;
   id: Generated<number>;
   position: number;
   priority: string;

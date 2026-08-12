@@ -116,15 +116,9 @@ const workspaces = Object.freeze([
     }))
   ),
   workspace("roadmap", "Roadmap", "Work", () =>
-    Promise.all([import("./modules/work-automation"), import("./modules/work-hub")]).then(
-      ([work, hub]) => ({
-        default: () => (
-          <hub.WorkShell current="Roadmap">
-            <work.WorkAutomationWorkspace initialView="roadmap" />
-          </hub.WorkShell>
-        )
-      })
-    )
+    import("./modules/work-hub").then((module) => ({
+      default: module.ProjectScopedRoadmapWorkspace
+    }))
   ),
   workspace("tasks", "Tasks", "Work", () =>
     Promise.all([import("./modules/task-manager"), import("./modules/work-hub")]).then(
@@ -227,12 +221,6 @@ export const devkitWebBundle = Object.freeze({
         url: "/app/devkit/dashboard"
       },
       {
-        icon: BookOpenIcon,
-        isActive: activeWorkspaceId === "docs",
-        title: "Documentation",
-        url: "/app/devkit/docs"
-      },
-      {
         icon: BriefcaseBusinessIcon,
         isActive: workWorkspaceIds.includes(activeWorkspaceId),
         items: workMenuItems.map((item) => ({
@@ -308,6 +296,12 @@ export const devkitWebBundle = Object.freeze({
           }
         ],
         title: "Cloud"
+      },
+      {
+        icon: BookOpenIcon,
+        isActive: activeWorkspaceId === "docs",
+        title: "Documentation",
+        url: "/app/devkit/docs"
       }
     ];
   },
