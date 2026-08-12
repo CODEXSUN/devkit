@@ -19,7 +19,7 @@ export const synchronizedTables = [
   "devkit_project_manager_attachments",
   "devkit_task_manager_todos",
   "devkit_task_manager_lookups",
-  "devkit_task_manager_activity",
+  "devkit_task_manager_activity"
 ] as const;
 
 type DynamicDatabase = Record<string, Record<string, unknown>>;
@@ -27,7 +27,7 @@ type DynamicDatabase = Record<string, Record<string, unknown>>;
 export class DevkitSyncRepository {
   constructor(
     private readonly database: Kysely<DevkitDatabase> = getDevkitDatabase(),
-    private readonly attachmentStorage = new ProjectManagerAttachmentStorage(),
+    private readonly attachmentStorage = new ProjectManagerAttachmentStorage()
   ) {}
 
   async exportSnapshot(instanceId: string): Promise<DevkitSyncSnapshot> {
@@ -35,11 +35,8 @@ export class DevkitSyncRepository {
     const entries = await Promise.all(
       synchronizedTables.map(async (table) => {
         const rows = await dynamic.selectFrom(table).selectAll().execute();
-        return [
-          table,
-          rows.map(({ id: _id, ...row }) => serializable(row)),
-        ] as const;
-      }),
+        return [table, rows.map(({ id: _id, ...row }) => serializable(row))] as const;
+      })
     );
     const attachmentData: Record<string, string> = {};
     const attachmentRows =
@@ -48,17 +45,64 @@ export class DevkitSyncRepository {
     for (const row of attachmentRows) {
       if (row.sync_status === "deleted") continue;
       const storageKey = String(row.storage_key);
-      attachmentData[storageKey] = (
-        await this.attachmentStorage.read(storageKey)
-      ).toString("base64");
+      attachmentData[storageKey] = (await this.attachmentStorage.read(storageKey)).toString(
+        "base64"
+      );
     }
     return {
       attachmentData,
       instanceId,
       protocolVersion: 1,
       publishedAt: new Date().toISOString(),
-      tables: Object.fromEntries(entries),
+      tables: Object.fromEntries(entries)
     };
+  }
+
+  async exportProjectSnapshot(instanceId: string): Promise<DevkitSyncSnapshot> {
+    const rows = await this.database
+      .selectFrom("devkit_project_manager_items")
+      .selectAll()
+      .where("kind", "=", "project")
+      .execute();
+    return {
+      attachmentData: {},
+      instanceId,
+      protocolVersion: 1,
+      publishedAt: new Date().toISOString(),
+      tables: {
+        devkit_project_manager_items: rows.map(({ id: _id, ...row }) => serializable(row))
+      }
+    };
+  }
+
+  async projectCounts() {
+    const [total, pending] = await Promise.all([
+      this.database
+        .selectFrom("devkit_project_manager_items")
+        .select(({ fn }) => fn.count<number>("uuid").as("count"))
+        .where("kind", "=", "project")
+        .executeTakeFirst(),
+      this.database
+        .selectFrom("devkit_project_manager_items")
+        .select(({ fn }) => fn.count<number>("uuid").as("count"))
+        .where("kind", "=", "project")
+        .where("sync_status", "in", ["deleted", "pending"])
+        .executeTakeFirst()
+    ]);
+    return { pending: Number(pending?.count ?? 0), total: Number(total?.count ?? 0) };
+  }
+
+  async markProjectsPublished() {
+    await this.database
+      .updateTable("devkit_project_manager_items")
+      .set({
+        sync_direction: "outbound",
+        sync_status: "synchronized",
+        sync_updated_at: new Date()
+      })
+      .where("kind", "=", "project")
+      .where("sync_status", "!=", "deleted")
+      .execute();
   }
 
   async importSnapshot(snapshot: DevkitSyncSnapshot) {
@@ -70,12 +114,11 @@ export class DevkitSyncRepository {
           const row = {
             ...input,
             sync_direction: "inbound",
-            sync_status:
-              input.sync_status === "deleted" ? "deleted" : "synchronized",
-            sync_updated_at: new Date(),
+            sync_status: input.sync_status === "deleted" ? "deleted" : "synchronized",
+            sync_updated_at: new Date()
           };
           const updates = Object.fromEntries(
-            Object.entries(row).filter(([column]) => column !== "uuid"),
+            Object.entries(row).filter(([column]) => column !== "uuid")
           );
           await target
             .insertInto(table)
@@ -100,16 +143,12 @@ export class DevkitSyncRepository {
       }
       const encoded = snapshot.attachmentData[storageKey];
       if (!encoded) {
-        throw AppError.validation(
-          `Attachment payload is missing for ${storageKey}.`,
-        );
+        throw AppError.validation(`Attachment payload is missing for ${storageKey}.`);
       }
       const data = Buffer.from(encoded, "base64");
       const checksum = createHash("sha256").update(data).digest("hex");
       if (checksum !== row.checksum) {
-        throw AppError.validation(
-          `Attachment checksum validation failed for ${storageKey}.`,
-        );
+        throw AppError.validation(`Attachment checksum validation failed for ${storageKey}.`);
       }
       await this.attachmentStorage.remove(storageKey);
       await this.attachmentStorage.write(storageKey, data);
@@ -124,7 +163,7 @@ export class DevkitSyncRepository {
         .set({
           sync_direction: "outbound",
           sync_status: "synchronized",
-          sync_updated_at: new Date(),
+          sync_updated_at: new Date()
         })
         .where("sync_status", "!=", "deleted")
         .execute();
@@ -155,7 +194,7 @@ export class DevkitSyncRepository {
         last_used_at: null,
         status: "active",
         token_hash: input.hash,
-        uuid,
+        uuid
       })
       .executeTakeFirstOrThrow();
     return uuid;
@@ -198,13 +237,13 @@ export class DevkitSyncRepository {
         remote_revision: 0,
         server_id: "codexsun-cloud",
         server_url: "https://devkit.codexsun.com",
-        status: "bound",
+        status: "bound"
       })
       .onDuplicateKeyUpdate({
         encrypted_token: input.encryptedToken,
         instance_id: input.instanceId,
         last_error: null,
-        status: "bound",
+        status: "bound"
       })
       .executeTakeFirst();
   }
@@ -222,10 +261,8 @@ export class DevkitSyncRepository {
         ...(input.error !== undefined ? { last_error: input.error } : {}),
         ...(input.pulledAt ? { last_pulled_at: input.pulledAt } : {}),
         ...(input.publishedAt ? { last_published_at: input.publishedAt } : {}),
-        ...(input.revision !== undefined
-          ? { remote_revision: input.revision }
-          : {}),
-        ...(input.status ? { status: input.status } : {}),
+        ...(input.revision !== undefined ? { remote_revision: input.revision } : {}),
+        ...(input.status ? { status: input.status } : {})
       })
       .where("server_id", "=", "codexsun-cloud")
       .executeTakeFirst();
@@ -253,7 +290,7 @@ export class DevkitSyncRepository {
         payload_json: input.payload,
         published_by: input.publisher,
         revision: input.revision,
-        server_id: "codexsun-cloud",
+        server_id: "codexsun-cloud"
       })
       .executeTakeFirstOrThrow();
   }
@@ -278,7 +315,7 @@ export class DevkitSyncRepository {
         record_count: 0,
         remote_revision: revision,
         status: "running",
-        uuid,
+        uuid
       })
       .executeTakeFirstOrThrow();
     return uuid;
@@ -291,7 +328,7 @@ export class DevkitSyncRepository {
       records?: number;
       remoteRevision?: number;
       status: "completed" | "conflict" | "failed";
-    },
+    }
   ) {
     await this.database
       .updateTable("devkit_sync_runs")
@@ -299,10 +336,8 @@ export class DevkitSyncRepository {
         completed_at: new Date(),
         error_message: input.error ?? null,
         record_count: input.records ?? 0,
-        ...(input.remoteRevision === undefined
-          ? {}
-          : { remote_revision: input.remoteRevision }),
-        status: input.status,
+        ...(input.remoteRevision === undefined ? {} : { remote_revision: input.remoteRevision }),
+        status: input.status
       })
       .where("uuid", "=", uuid)
       .executeTakeFirst();
@@ -323,7 +358,7 @@ export class DevkitSyncRepository {
         remote_version: input.remoteRevision,
         status: "open",
         table_name: "devkit_sync_snapshot",
-        uuid: newUuid(),
+        uuid: newUuid()
       })
       .executeTakeFirstOrThrow();
   }
@@ -333,8 +368,8 @@ function serializable(row: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(row).map(([key, value]) => [
       key,
-      value instanceof Date ? value.toISOString() : value,
-    ]),
+      value instanceof Date ? value.toISOString() : value
+    ])
   );
 }
 

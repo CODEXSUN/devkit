@@ -2,8 +2,7 @@ export const DEVKIT_SYNC_CLOUD_URL = "https://devkit.codexsun.com";
 
 export type DevkitSyncRole = "cloud" | "disabled" | "local";
 export type DevkitSyncDirection = "inbound" | "local" | "outbound";
-export type DevkitSyncState =
-  "conflict" | "deleted" | "pending" | "synchronized";
+export type DevkitSyncState = "conflict" | "deleted" | "pending" | "synchronized";
 
 export type DevkitSyncSnapshot = {
   attachmentData: Record<string, string>;

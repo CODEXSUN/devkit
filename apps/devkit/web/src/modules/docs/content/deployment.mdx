@@ -1,0 +1,38 @@
+# Docker deployment
+
+The Docker deployment separates application files from mutable Agent state.
+
+## Runtime storage
+
+| Path                        | Purpose                        |
+| --------------------------- | ------------------------------ |
+| `/var/lib/devkit/codex`     | Codex authentication and state |
+| `/srv/devkit/repositories`  | Complete Git repositories      |
+| `/var/lib/devkit/worktrees` | Isolated Agent worktrees       |
+
+## Update the deployment
+
+```sh
+bash update.sh --check
+bash update.sh
+```
+
+The updater checks Git, storage permissions, database backup, migrations, and service health before
+it completes the update.
+
+## Automatic Ubuntu updates
+
+The optional production watcher checks `origin/main` every five minutes. It verifies each candidate
+in an isolated Git worktree, accepts fast-forward changes only, and then delegates backup,
+migration, replacement, rollback, and health verification to the standard updater.
+
+```sh
+cd /home/devkit
+sudo bash .container/update-watcher/install.sh
+sudo /usr/local/sbin/devkit-update-watcher --check
+systemctl status devkit-update-watcher.timer --no-pager
+journalctl -u devkit-update-watcher.service -n 100 --no-pager
+```
+
+Cleanup is restricted to stopped DevKit one-off containers and unused DevKit images. The watcher
+does not remove volumes, reset the database, change secrets, or prune unrelated Docker resources.

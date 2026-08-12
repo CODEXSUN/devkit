@@ -1,0 +1,23 @@
+[Unit]
+Description=Verify and deploy a DevKit production update
+Documentation=file:///home/devkit/assist/deploy.md
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Environment=DEVKIT_WATCHER_REPO_DIR=/home/devkit
+ExecStart=/usr/local/sbin/devkit-update-watcher
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/devkit /var/lib/devkit-update-watcher /var/tmp /run/lock
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=1h
+
+[Install]
+WantedBy=multi-user.target

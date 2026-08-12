@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react";
+import mdx from "@mdx-js/rollup";
 import tailwindcss from "@tailwindcss/vite";
 import { parse } from "dotenv";
 import { defineConfig } from "vite";
@@ -6,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { requireEnvNumber, requireEnvValue } from "@codexsun/framework/env";
+import remarkGfm from "remark-gfm";
 
 const configDir = fileURLToPath(new URL(".", import.meta.url));
 const repositoryDir = resolve(configDir, "../../..");
@@ -129,7 +131,12 @@ export default defineConfig(({ command, mode }) => {
       "import.meta.env.VITE_DEV_AUTO_LOGIN": JSON.stringify(runtimeEnv.DEV_AUTO_LOGIN ?? "0"),
       "import.meta.env.VITE_PLATFORM_API_URL": JSON.stringify("/api/platform")
     },
-    plugins: [reactRefreshPreamble(), tailwindcss(), react()],
+    plugins: [
+      reactRefreshPreamble(),
+      mdx({ providerImportSource: "@mdx-js/react", remarkPlugins: [remarkGfm] }),
+      tailwindcss(),
+      react()
+    ],
     resolve: {
       dedupe: ["@tanstack/react-query", "react", "react-dom"]
     },

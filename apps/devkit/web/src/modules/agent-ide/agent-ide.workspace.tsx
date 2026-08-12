@@ -42,6 +42,12 @@ export function AgentIdeWorkspace() {
   const [projectId, setProjectId] = useState(
     () => new URLSearchParams(window.location.search).get("project") ?? ""
   );
+  const honeyBrief = useMemo(() => {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("source") !== "honey") return undefined;
+    const objective = search.get("objective")?.trim();
+    return objective ? `Honey handoff brief:\n\nObjective: ${objective}\n\nUse the selected project context. Inspect the workspace before changing files.` : undefined;
+  }, []);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentIdeChatMessage[]>([]);
@@ -323,6 +329,7 @@ export function AgentIdeWorkspace() {
           activity={activity}
           disabled={!project || !connected}
           messages={messages}
+          {...(honeyBrief ? { initialMessage: honeyBrief } : {})}
           model={model}
           onAccessChange={changeAccess}
           onApprovalDecision={(decision) => void decideApproval(decision)}

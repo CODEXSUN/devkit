@@ -63,7 +63,7 @@ export function SyncOverview() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold">CodeLogicX Cloud</h2>
+              <h2 className="font-semibold">Local and cloud connection</h2>
               <WorkspaceStatusBadge
                 label={sync?.status ?? "Loading"}
                 tone={
@@ -95,7 +95,7 @@ export function SyncOverview() {
                 icon={<CloudUploadIcon />}
                 onClick={() => void publish()}
               >
-                Publish Live
+                Publish local changes
               </Button>
             </div>
           ) : null}

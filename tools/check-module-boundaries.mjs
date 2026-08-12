@@ -24,6 +24,7 @@ const devkitWebOwned = new Set([
   "agent-ide",
   "dashboard",
   "design-system",
+  "docs",
   "github-dashboard",
   "launch-desk",
   "hostinger-mcp",

@@ -31,9 +31,9 @@ class HoneyRepository {
       .orderBy("created_at", "asc").execute();
   }
 
-  async addMessage(threadUuid: string, actorId: string, role: "assistant" | "user", body: string) {
+  async addMessage(threadUuid: string, actorId: string, role: "assistant" | "user", body: string, context: unknown = {}) {
     await getDevkitDatabase().insertInto("devkit_honey_messages").values({
-      actor_id: actorId, body, role, thread_uuid: threadUuid,
+      actor_id: actorId, body, context_json: JSON.stringify(context), role, thread_uuid: threadUuid,
       uuid: randomBytes(8).toString("hex")
     }).executeTakeFirstOrThrow();
     await getDevkitDatabase().updateTable("devkit_honey_threads").set({ updated_at: new Date() })
@@ -57,9 +57,9 @@ class HoneyRepository {
       .where("actor_id", "=", actorId).orderBy("updated_at", "desc").limit(100).execute();
   }
 
-  async reviewMemory(actorId: string, uuid: string, status: "approved" | "rejected") {
+  async reviewMemory(actorId: string, uuid: string, status: "approved" | "rejected" | "reverted", note = "") {
     const result = await getDevkitDatabase().updateTable("devkit_honey_memory")
-      .set({ status, updated_at: new Date() }).where("actor_id", "=", actorId)
+      .set({ review_note: note, status, updated_at: new Date() }).where("actor_id", "=", actorId)
       .where("uuid", "=", uuid).executeTakeFirst();
     if (Number(result.numUpdatedRows) === 0) throw AppError.notFound("Honey memory was not found.");
   }
@@ -71,7 +71,8 @@ class HoneyRepository {
     if (existing) return;
     await getDevkitDatabase().insertInto("devkit_honey_memory").values({
       actor_id: actorId, content, kind: "conversation-candidate", source_thread_uuid: threadUuid,
-      status: "pending", uuid: randomBytes(8).toString("hex")
+      review_note: "", source_label: `Honey conversation ${threadUuid}`, status: "pending",
+      supersedes_uuid: null, uuid: randomBytes(8).toString("hex"), version: 1
     }).executeTakeFirstOrThrow();
   }
 }

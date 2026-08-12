@@ -6,12 +6,30 @@ import { honeyBusinessKnowledge } from "./honey-business-knowledge.js";
 export class HoneyService {
   async memory(actorId: string) {
     const rows = await honeyRepository.memory(actorId);
-    return rows.map((row) => ({ content: row.content, createdAt: new Date(row.created_at).toISOString(), id: row.uuid, kind: row.kind, status: row.status }));
+    return rows.map((row) => ({ content: row.content, createdAt: new Date(row.created_at).toISOString(), id: row.uuid, kind: row.kind, reviewNote: row.review_note, source: row.source_label, status: row.status, version: row.version }));
   }
 
-  async reviewMemory(uuid: string, status: "approved" | "rejected", actorId: string) {
-    await honeyRepository.reviewMemory(actorId, uuid, status);
+  async reviewMemory(uuid: string, status: "approved" | "rejected" | "reverted", note: string, actorId: string) {
+    await honeyRepository.reviewMemory(actorId, uuid, status, note);
     return this.memory(actorId);
+  }
+
+  async dashboard(actorId: string) {
+    const [memory, conversations] = await Promise.all([this.memory(actorId), this.conversations(actorId)]);
+    return {
+      conversations: conversations.length,
+      conversationReview: conversations.slice(0, 20),
+      approvedSkills: [
+        "Business workflow discovery", "Project and task navigation", "Settings explanation",
+        "Error explanation", "Deployment review preparation", "Project Agent handoff"
+      ],
+      knowledge: memory,
+      reports: {
+        approved: memory.filter((item) => item.status === "approved").length,
+        pending: memory.filter((item) => item.status === "pending").length,
+        unresolved: memory.filter((item) => item.status === "pending").length
+      }
+    };
   }
 
   async conversations(actorId: string) {
@@ -25,7 +43,7 @@ export class HoneyService {
     return {
       id: thread.uuid, title: thread.title,
       messages: messages.map((row, index) => ({
-        actions: row.role === "assistant" ? resolveHoneyActions(findPreviousUserMessage(messages, index)) : [],
+        actions: row.role === "assistant" ? resolveHoneyActions(findPreviousUserMessage(messages, index), readContext(messages[index - 1]?.context_json)) : [],
         id: row.uuid,
         role: row.role,
         body: row.body,
@@ -34,16 +52,16 @@ export class HoneyService {
     };
   }
 
-  async chat(input: { message: string; threadId?: string | null | undefined }, actorId: string) {
+  async chat(input: { context: HoneyPageContext; message: string; threadId?: string | null | undefined }, actorId: string) {
     const thread = input.threadId
       ? await honeyRepository.find(input.threadId, actorId)
       : await honeyRepository.create(actorId, input.message);
-    await honeyRepository.addMessage(thread.uuid, actorId, "user", input.message);
+    await honeyRepository.addMessage(thread.uuid, actorId, "user", input.message, input.context);
     await honeyRepository.rememberCandidate(actorId, thread.uuid, input.message);
     try {
       const memory = await honeyRepository.approvedMemory(actorId);
       const result = await codexAssistantGateway.ask({
-        message: input.message,
+        message: `${input.message}\n\nCurrent page context:\n${contextSummary(input.context)}`,
         system: honeySystemPrompt(memory),
         threadId: thread.codex_thread_id
       });
@@ -58,6 +76,17 @@ export class HoneyService {
       throw error;
     }
   }
+}
+
+export type HoneyPageContext = { pageLabel: string; pathname: string; projectId: string | null; projectTitle: string | null; recentError: string | null; runStatus: string | null; taskId: string | null };
+
+function contextSummary(context: HoneyPageContext) {
+  return Object.entries(context).filter(([, value]) => value).map(([key, value]) => `- ${key}: ${value}`).join("\n") || "- No selected business context.";
+}
+
+function readContext(value: string | undefined): HoneyPageContext | undefined {
+  if (!value) return undefined;
+  try { return JSON.parse(value) as HoneyPageContext; } catch { return undefined; }
 }
 
 function findPreviousUserMessage(messages: Array<{ body: string; role: string }>, assistantIndex: number) {

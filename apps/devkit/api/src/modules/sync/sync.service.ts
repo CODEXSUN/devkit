@@ -4,7 +4,7 @@ import {
   encryptSyncToken,
   generateSyncToken,
   snapshotChecksum,
-  syncTokenHash,
+  syncTokenHash
 } from "./sync.crypto.js";
 import { DevkitSyncRepository, synchronizedTables } from "./sync.repository.js";
 import {
@@ -12,7 +12,7 @@ import {
   type DevkitSyncResult,
   type DevkitSyncRole,
   type DevkitSyncSnapshot,
-  type DevkitSyncStatus,
+  type DevkitSyncStatus
 } from "./sync.types.js";
 
 type CloudSnapshotEnvelope = {
@@ -36,7 +36,7 @@ export class DevkitSyncService {
     const [connection, conflicts, pendingRecords] = await Promise.all([
       this.repository.connection(),
       this.repository.conflictCount(),
-      this.repository.pendingCount(),
+      this.repository.pendingCount()
     ]);
     const role = this.role();
     const connectionStatus =
@@ -51,17 +51,14 @@ export class DevkitSyncService {
       bound: Boolean(connection),
       cloudUrl: DEVKIT_SYNC_CLOUD_URL,
       conflictCount: conflicts,
-      instanceId:
-        connection?.instance_id ??
-        process.env.DEVKIT_SYNC_INSTANCE_ID?.trim() ??
-        "",
+      instanceId: connection?.instance_id ?? process.env.DEVKIT_SYNC_INSTANCE_ID?.trim() ?? "",
       lastError: connection?.last_error ?? null,
       lastPulledAt: iso(connection?.last_pulled_at),
       lastPublishedAt: iso(connection?.last_published_at),
       pendingRecords,
       remoteRevision: connection?.remote_revision ?? 0,
       role,
-      status: connectionStatus,
+      status: connectionStatus
     };
   }
 
@@ -71,12 +68,12 @@ export class DevkitSyncService {
     await this.repository.createToken({
       actor,
       hash: syncTokenHash(token),
-      label: requiredLabel(label),
+      label: requiredLabel(label)
     });
     return {
       createdAt: new Date().toISOString(),
       label: requiredLabel(label),
-      token,
+      token
     };
   }
 
@@ -87,42 +84,105 @@ export class DevkitSyncService {
     await cloudRequest<{ valid: true }>("/v1/status", normalizedToken);
     await this.repository.saveConnection({
       encryptedToken: encryptSyncToken(normalizedToken),
-      instanceId: normalizedInstance,
+      instanceId: normalizedInstance
     });
     return this.status();
+  }
+
+  async verifyProjectConnection() {
+    this.requireRole("local");
+    const connection = await this.requiredConnection();
+    const token = decryptSyncToken(connection.encrypted_token);
+    const remote = await cloudRequest<{
+      label: string;
+      protocolVersion: number;
+      revision: number;
+      serverId: string;
+      valid: true;
+    }>("/v1/status", token);
+    const counts = await this.repository.projectCounts();
+    return {
+      cloudUrl: DEVKIT_SYNC_CLOUD_URL,
+      instanceId: connection.instance_id,
+      localAccepted: true as const,
+      pendingProjects: counts.pending,
+      projectCount: counts.total,
+      remoteAccepted: remote.valid,
+      remoteLabel: remote.label,
+      remoteRevision: remote.revision,
+      verifiedAt: new Date().toISOString()
+    };
+  }
+
+  async projectPreview() {
+    const verification = await this.verifyProjectConnection();
+    return { ...verification, scope: "projects" as const };
+  }
+
+  async publishProjects(acceptLocal: boolean, acceptRemote: boolean): Promise<DevkitSyncResult> {
+    if (!acceptLocal || !acceptRemote) {
+      throw AppError.validation("Local and remote acceptance are required before project sync.");
+    }
+    const verification = await this.verifyProjectConnection();
+    if (!verification.remoteAccepted)
+      throw AppError.validation("Cloud portal verification failed.");
+    const connection = await this.requiredConnection();
+    const run = await this.repository.startRun("push", connection.remote_revision);
+    try {
+      const token = decryptSyncToken(connection.encrypted_token);
+      const snapshot = await this.repository.exportProjectSnapshot(connection.instance_id);
+      const response = await cloudRequest<{
+        records: number;
+        revision: number;
+        synchronizedAt: string;
+      }>("/v1/snapshot", token, { baseRevision: connection.remote_revision, snapshot });
+      await this.repository.updateConnection({
+        error: null,
+        publishedAt: new Date(response.synchronizedAt),
+        revision: response.revision,
+        status: "bound"
+      });
+      await this.repository.markProjectsPublished();
+      await this.repository.finishRun(run, {
+        records: response.records,
+        remoteRevision: response.revision,
+        status: "completed"
+      });
+      return { direction: "push", ...response };
+    } catch (error) {
+      const message = errorMessage(error);
+      await this.repository.updateConnection({ error: message, status: "error" });
+      await this.repository.finishRun(run, { error: message, status: "failed" });
+      throw error;
+    }
   }
 
   async publish(): Promise<DevkitSyncResult> {
     this.requireRole("local");
     const connection = await this.requiredConnection();
-    const run = await this.repository.startRun(
-      "push",
-      connection.remote_revision,
-    );
+    const run = await this.repository.startRun("push", connection.remote_revision);
     try {
       const token = decryptSyncToken(connection.encrypted_token);
-      const snapshot = await this.repository.exportSnapshot(
-        connection.instance_id,
-      );
+      const snapshot = await this.repository.exportSnapshot(connection.instance_id);
       const response = await cloudRequest<{
         records: number;
         revision: number;
         synchronizedAt: string;
       }>("/v1/snapshot", token, {
         baseRevision: connection.remote_revision,
-        snapshot,
+        snapshot
       });
       await this.repository.updateConnection({
         error: null,
         publishedAt: new Date(response.synchronizedAt),
         revision: response.revision,
-        status: "bound",
+        status: "bound"
       });
       await this.repository.markPublished();
       await this.repository.finishRun(run, {
         records: response.records,
         remoteRevision: response.revision,
-        status: "completed",
+        status: "completed"
       });
       return { direction: "push", ...response };
     } catch (error) {
@@ -130,19 +190,19 @@ export class DevkitSyncService {
       const conflict = error instanceof AppError && error.statusCode === 409;
       await this.repository.updateConnection({
         error: message,
-        status: conflict ? "conflict" : "error",
+        status: conflict ? "conflict" : "error"
       });
       if (conflict) {
         await this.repository.recordConflict({
           instanceId: connection.instance_id,
           localRevision: connection.remote_revision,
           message,
-          remoteRevision: remoteRevision(message),
+          remoteRevision: remoteRevision(message)
         });
       }
       await this.repository.finishRun(run, {
         error: message,
-        status: conflict ? "conflict" : "failed",
+        status: conflict ? "conflict" : "failed"
       });
       throw error;
     }
@@ -151,16 +211,21 @@ export class DevkitSyncService {
   async pull(): Promise<DevkitSyncResult> {
     this.requireRole("local");
     const connection = await this.requiredConnection();
-    const run = await this.repository.startRun(
-      "pull",
-      connection.remote_revision,
-    );
+    const run = await this.repository.startRun("pull", connection.remote_revision);
     try {
       const token = decryptSyncToken(connection.encrypted_token);
-      const response = await cloudRequest<CloudSnapshotEnvelope>(
-        "/v1/snapshot",
-        token,
-      );
+      const response = await cloudRequest<CloudSnapshotEnvelope>("/v1/snapshot", token);
+      const pendingRecords = await this.repository.pendingCount();
+      if (pendingRecords > 0 && response.revision > connection.remote_revision) {
+        const message = `Cloud revision is ${response.revision}, but this installation has ${pendingRecords} pending local records. Publish or resolve local changes before pulling.`;
+        await this.repository.recordConflict({
+          instanceId: connection.instance_id,
+          localRevision: connection.remote_revision,
+          message,
+          remoteRevision: response.revision
+        });
+        throw AppError.conflict(message);
+      }
       const payload = JSON.stringify(response.snapshot);
       if (snapshotChecksum(payload) !== response.checksum) {
         throw AppError.validation("Cloud snapshot checksum validation failed.");
@@ -171,23 +236,30 @@ export class DevkitSyncService {
         error: null,
         pulledAt: new Date(synchronizedAt),
         revision: response.revision,
-        status: "bound",
+        status: "bound"
       });
       await this.repository.finishRun(run, {
         records,
         remoteRevision: response.revision,
-        status: "completed",
+        status: "completed"
       });
       return {
         direction: "pull",
         records,
         revision: response.revision,
-        synchronizedAt,
+        synchronizedAt
       };
     } catch (error) {
       const message = errorMessage(error);
-      await this.repository.updateConnection({ error: message, status: "error" });
-      await this.repository.finishRun(run, { error: message, status: "failed" });
+      const conflict = error instanceof AppError && error.statusCode === 409;
+      await this.repository.updateConnection({
+        error: message,
+        status: conflict ? "conflict" : "error"
+      });
+      await this.repository.finishRun(run, {
+        error: message,
+        status: conflict ? "conflict" : "failed"
+      });
       throw error;
     }
   }
@@ -195,9 +267,7 @@ export class DevkitSyncService {
   async authenticateCloudToken(token: string) {
     this.requireRole("cloud");
     const normalized = requiredToken(token);
-    const record = await this.repository.findActiveToken(
-      syncTokenHash(normalized),
-    );
+    const record = await this.repository.findActiveToken(syncTokenHash(normalized));
     if (!record) throw AppError.unauthorized("DevKit sync token is invalid.");
     await this.repository.touchToken(record.uuid);
     return record;
@@ -211,7 +281,7 @@ export class DevkitSyncService {
       protocolVersion: 1,
       revision: snapshot?.revision ?? 0,
       serverId: "codexsun-cloud",
-      valid: true as const,
+      valid: true as const
     };
   }
 
@@ -225,22 +295,18 @@ export class DevkitSyncService {
     return {
       checksum: current?.checksum ?? snapshotChecksum(payload),
       revision: current?.revision ?? 0,
-      snapshot,
+      snapshot
     };
   }
 
-  async cloudPublish(
-    token: string,
-    baseRevision: number,
-    snapshot: DevkitSyncSnapshot,
-  ) {
+  async cloudPublish(token: string, baseRevision: number, snapshot: DevkitSyncSnapshot) {
     const tokenRecord = await this.authenticateCloudToken(token);
     validateSnapshot(snapshot);
     const current = await this.repository.latestSnapshot();
     const currentRevision = current?.revision ?? 0;
     if (baseRevision !== currentRevision) {
       throw AppError.conflict(
-        `Cloud revision is ${currentRevision}; pull before publishing again.`,
+        `Cloud revision is ${currentRevision}; pull before publishing again.`
       );
     }
     const payload = JSON.stringify(snapshot);
@@ -250,47 +316,39 @@ export class DevkitSyncService {
       checksum: snapshotChecksum(payload),
       payload,
       publisher: `${tokenRecord.label}:${snapshot.instanceId}`,
-      revision,
+      revision
     });
     return {
       records,
       revision,
-      synchronizedAt: new Date().toISOString(),
+      synchronizedAt: new Date().toISOString()
     };
   }
 
   private async requiredConnection() {
     const connection = await this.repository.connection();
     if (!connection)
-      throw AppError.validation(
-        "Bind this DevKit installation to the cloud before synchronizing.",
-      );
+      throw AppError.validation("Bind this DevKit installation to the cloud before synchronizing.");
     return connection;
   }
 
   private requireRole(expected: DevkitSyncRole) {
     if (this.role() !== expected) {
-      throw AppError.forbidden(
-        `DevKit sync operation requires the ${expected} runtime role.`,
-      );
+      throw AppError.forbidden(`DevKit sync operation requires the ${expected} runtime role.`);
     }
   }
 }
 
-async function cloudRequest<T>(
-  path: string,
-  token: string,
-  body?: unknown,
-): Promise<T> {
+async function cloudRequest<T>(path: string, token: string, body?: unknown): Promise<T> {
   const response = await fetch(`${cloudUrl()}${path}`, {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     headers: {
       accept: "application/json",
       ...(body === undefined ? {} : { "content-type": "application/json" }),
-      "x-devkit-sync-token": token,
+      "x-devkit-sync-token": token
     },
     method: body === undefined ? "GET" : "POST",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(15_000)
   });
   const result = (await response.json().catch(() => null)) as {
     data?: T;
@@ -301,9 +359,8 @@ async function cloudRequest<T>(
     throw new AppError({
       code: response.status === 409 ? "SYNC_CONFLICT" : "SYNC_REMOTE_ERROR",
       message:
-        result?.error?.message ??
-        `DevKit cloud synchronization failed (${response.status}).`,
-      statusCode: response.status === 409 ? 409 : 502,
+        result?.error?.message ?? `DevKit cloud synchronization failed (${response.status}).`,
+      statusCode: response.status === 409 ? 409 : 502
     });
   }
   return result.data;
@@ -311,19 +368,13 @@ async function cloudRequest<T>(
 
 function cloudUrl() {
   const testUrl =
-    process.env.NODE_ENV === "test"
-      ? process.env.DEVKIT_SYNC_TEST_CLOUD_URL?.trim()
-      : "";
-  return `${testUrl || `${DEVKIT_SYNC_CLOUD_URL}/api/devkit-sync`}`.replace(
-    /\/+$/u,
-    "",
-  );
+    process.env.NODE_ENV === "test" ? process.env.DEVKIT_SYNC_TEST_CLOUD_URL?.trim() : "";
+  return `${testUrl || `${DEVKIT_SYNC_CLOUD_URL}/api/devkit/sync/cloud`}`.replace(/\/+$/u, "");
 }
 
 function requiredLabel(value: string) {
   const label = value.trim();
-  if (!label || label.length > 160)
-    throw AppError.validation("Sync token label is required.");
+  if (!label || label.length > 160) throw AppError.validation("Sync token label is required.");
   return label;
 }
 
@@ -338,7 +389,7 @@ function requiredInstanceId(value: string) {
   const instanceId = value.trim();
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{1,79}$/u.test(instanceId)) {
     throw AppError.validation(
-      "Instance ID must contain 2-80 letters, numbers, underscores, or hyphens.",
+      "Instance ID must contain 2-80 letters, numbers, underscores, or hyphens."
     );
   }
   return instanceId;
@@ -348,9 +399,7 @@ function validateSnapshot(snapshot: DevkitSyncSnapshot) {
   if (snapshot.protocolVersion !== 1)
     throw AppError.validation("DevKit sync protocol version is unsupported.");
   for (const table of Object.keys(snapshot.tables)) {
-    if (
-      !synchronizedTables.includes(table as (typeof synchronizedTables)[number])
-    ) {
+    if (!synchronizedTables.includes(table as (typeof synchronizedTables)[number])) {
       throw AppError.validation(`DevKit sync table is not allowed: ${table}.`);
     }
   }

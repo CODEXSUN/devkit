@@ -51,6 +51,10 @@ The current orchestration slice provides these implemented controls:
   returns the token to the browser or stores it in the generated Codex configuration.
 - The read-only Hostinger dashboard retrieves VPS capacity and six-hour health metrics together
   with Docker project, container, image-version, health, and published-port inventory through MCP.
+- The local-first Sync module connects an approved local installation to CodeLogicX Cloud through
+  an outbound authenticated API. Manual publish and pull operations transfer revisioned work data,
+  registry documentation, and project attachments. A pull stops when pending local records could
+  be overwritten.
 
 Orchestration owns runtime persistence through an additive migration and actor-scoped repositories.
 The local executor enforces the recorded run limits through the Codex turn interrupt contract.

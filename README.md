@@ -91,5 +91,28 @@ npm run test:e2e:agent-worktree
 npm run test:e2e:codex-chat
 ```
 
+## Project cloud sync
+
+The first sync phase sends Project records only. It does not send tasks, files, credentials, or
+Agent history. Each upload needs a verified connection and a user confirmation.
+
+Configure the online portal:
+
+1. Set `DEVKIT_SYNC_ROLE=cloud` in the online `.env` file.
+2. Set `DEVKIT_SYNC_ENCRYPTION_KEY` and `DEVKIT_SYNC_TOKEN_PEPPER` to separate 32-character secrets.
+3. Run the database migration and restart the online API.
+4. Open `/app/devkit/project-sync` on `https://devkit.codexsun.com`.
+5. Generate an acceptance token for the local installation.
+
+Configure the local installation:
+
+1. Keep `DEVKIT_SYNC_ROLE=local` in the local `.env` file.
+2. Set `DEVKIT_SYNC_INSTANCE_ID` to a unique installation name.
+3. Set `DEVKIT_SYNC_ENCRYPTION_KEY` to a 32-character local secret.
+4. Restart the local API.
+5. Open `/app/devkit/project-sync` and enter the acceptance token.
+6. Verify the connection before you sync Projects.
+7. Review the Project count and confirm the upload.
+
 Read `assist/AGENT-GUIDE.md` before changing architecture or module ownership. The product and
 technical naming boundary is defined in `assist/architecture/engineering-orchestration.md`.

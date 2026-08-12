@@ -12,8 +12,8 @@
 - `apps/devkit/api`: Project Manager, Task Manager, Planning, GitHub Dashboard, Orchestration,
   Skills, Sync, MariaDB lifecycle, and public host contracts.
 - `apps/devkit/web`: Today, Projects, Tasks, Platform Registry, Whiteboards, GitHub Dashboard,
-  Engineering Command Center, Project Agent, Skill Library, Design System, Work Hub, and Sync
-  workspaces.
+  Engineering Command Center, Project Agent, Skill Library, Design System, MDX Documentation,
+  Work Hub, and Sync workspaces.
 - `assist/skills/library`: Repository-owned physical skill folders used for Agent prompting and
   review workflows. DevKit generates the hidden `SKILL.md` manifest and links each user-managed
   reference file from it so agents can load the relevant knowledge progressively.
@@ -32,6 +32,11 @@
   `HOSTINGER_API_TOKEN` remains server-side and is forwarded by name at runtime.
 - Orchestration owns registered verification commands, verification attempts, rework state, and
   approved local commits. It does not push Agent branches.
+- Sync owns encrypted local-to-cloud bindings, cloud acceptance tokens, revisioned snapshots,
+  checksums, conflict records, and manual two-way transfer with `https://devkit.codexsun.com`.
+  Projects, tasks, planning records, registry documentation, activity, and project attachments can
+  synchronize. Repositories, worktrees, environment files, builds, Docker images, and provider
+  secrets remain local.
 
 ## Shared Dependencies
 

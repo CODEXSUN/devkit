@@ -2,8 +2,10 @@ import type { SidemenuItem } from "@codexsun/ui/blocks/menu/sidemenu/sub/sidemen
 import type { TopMenuWorkspaceItem } from "@codexsun/ui/blocks/menu/sidemenu/top-menu";
 import {
   BotIcon,
+  BookOpenIcon,
   BriefcaseBusinessIcon,
   CableIcon,
+  CloudCogIcon,
   GitBranchIcon,
   LayoutDashboardIcon,
   LibraryBigIcon,
@@ -44,6 +46,11 @@ const workspaces = Object.freeze([
       default: module.AppDeskWorkspace
     }))
   ),
+  workspace("docs", "Documentation", "Knowledge", () =>
+    import("./modules/docs").then((module) => ({
+      default: module.DocsWorkspace
+    }))
+  ),
   workspace("hostinger", "Hostinger VPS", "Infrastructure", () =>
     import("./modules/hostinger-mcp").then((module) => ({
       default: module.HostingerMcpWorkspace
@@ -52,6 +59,11 @@ const workspaces = Object.freeze([
   workspace("hostinger-details", "Hostinger details", "Infrastructure", () =>
     import("./modules/hostinger-mcp").then((module) => ({
       default: module.HostingerDetailWorkspace
+    }))
+  ),
+  workspace("project-sync", "Local-first Sync", "Cloud", () =>
+    import("./modules/sync").then((module) => ({
+      default: module.ProjectSyncSettingsWorkspace
     }))
   ),
   workspace("orchestration", "Engineering Command Center", "Orchestration", () =>
@@ -88,15 +100,20 @@ const workspaces = Object.freeze([
     }))
   ),
   workspace("projects", "Projects", "Work", () =>
-    Promise.all([import("./modules/work-automation"), import("./modules/work-hub")]).then(
-      ([work, hub]) => ({
-        default: () => (
-          <hub.WorkShell current="Projects">
-            <work.WorkAutomationWorkspace />
-          </hub.WorkShell>
-        )
-      })
-    )
+    Promise.all([
+      import("./modules/work-automation"),
+      import("./modules/work-hub"),
+      import("./modules/sync")
+    ]).then(([work, hub, sync]) => ({
+      default: () => (
+        <hub.WorkShell current="Projects">
+          <div className="flex justify-end border-b px-5 py-3 lg:px-8">
+            <sync.ProjectSyncButton />
+          </div>
+          <work.WorkAutomationWorkspace />
+        </hub.WorkShell>
+      )
+    }))
   ),
   workspace("roadmap", "Roadmap", "Work", () =>
     Promise.all([import("./modules/work-automation"), import("./modules/work-hub")]).then(
@@ -210,6 +227,12 @@ export const devkitWebBundle = Object.freeze({
         url: "/app/devkit/dashboard"
       },
       {
+        icon: BookOpenIcon,
+        isActive: activeWorkspaceId === "docs",
+        title: "Documentation",
+        url: "/app/devkit/docs"
+      },
+      {
         icon: BriefcaseBusinessIcon,
         isActive: workWorkspaceIds.includes(activeWorkspaceId),
         items: workMenuItems.map((item) => ({
@@ -273,6 +296,18 @@ export const devkitWebBundle = Object.freeze({
           }
         ],
         title: "Deployment"
+      },
+      {
+        icon: CloudCogIcon,
+        isActive: activeWorkspaceId === "project-sync",
+        items: [
+          {
+            isActive: activeWorkspaceId === "project-sync",
+            title: "Local-first Sync",
+            url: "/app/devkit/project-sync"
+          }
+        ],
+        title: "Cloud"
       }
     ];
   },

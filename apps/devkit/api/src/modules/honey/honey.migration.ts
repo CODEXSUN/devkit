@@ -2,8 +2,8 @@ import { sql, type Kysely } from "kysely";
 import type { DevkitDatabase } from "../../database/schema.js";
 
 export const honeyMigration = {
-  description: "Actor-owned Honey conversations and reviewed memory.",
-  key: "devkit.honey.sql.v2"
+  description: "Versioned Honey knowledge, context, and review controls.",
+  key: "devkit.honey.sql.v3"
 } as const;
 
 export async function migrateHoneyModule(database: Kysely<DevkitDatabase>) {
@@ -35,5 +35,12 @@ export async function migrateHoneyModule(database: Kysely<DevkitDatabase>) {
     UNIQUE KEY uq_devkit_honey_memory_uuid (uuid),
     KEY idx_devkit_honey_memory_actor (actor_id, status, updated_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`.execute(database);
+  await sql`ALTER TABLE devkit_honey_messages
+    ADD COLUMN IF NOT EXISTS context_json TEXT NOT NULL DEFAULT ('{}') AFTER body`.execute(database);
+  await sql`ALTER TABLE devkit_honey_memory
+    ADD COLUMN IF NOT EXISTS source_label VARCHAR(240) NOT NULL DEFAULT 'Conversation' AFTER source_thread_uuid,
+    ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1 AFTER source_label,
+    ADD COLUMN IF NOT EXISTS supersedes_uuid CHAR(16) NULL AFTER version,
+    ADD COLUMN IF NOT EXISTS review_note VARCHAR(500) NOT NULL DEFAULT '' AFTER status`.execute(database);
   return honeyMigration;
 }

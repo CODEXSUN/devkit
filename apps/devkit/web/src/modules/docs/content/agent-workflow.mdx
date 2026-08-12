@@ -1,0 +1,18 @@
+# Agent workflow
+
+The Project Agent uses the selected Project and repository as its work context.
+
+## Access modes
+
+- **Plan** creates a delivery plan without code changes.
+- **Read only** lets the Agent inspect the repository.
+- **Ask for approval** pauses before a protected action.
+- **Full access** permits approved changes inside the selected repository scope.
+
+## Review flow
+
+1. Describe the expected result.
+2. Review the Agent plan and file scope.
+3. Approve the work when the scope is correct.
+4. Review changed files and verification results.
+5. Accept the result or return it for rework.

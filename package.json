@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@mdx-js/rollup": "^3.1.1",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.3.3",
     "@tiptap/extension-text-style": "^3.29.2",
@@ -70,6 +71,7 @@
     "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^10.8.0",
     "prettier": "^3.9.6",
+    "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",

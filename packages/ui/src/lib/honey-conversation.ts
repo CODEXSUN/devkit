@@ -1,4 +1,4 @@
-export type HoneyConversationState = "inactive" | "idle" | "listening" | "thinking" | "answered";
+export type HoneyConversationState = "inactive" | "idle" | "listening" | "thinking" | "success" | "warning" | "error";
 
 export const honeyConversationEvent = "devkit:honey-conversation-state";
 let currentHoneyConversationState: HoneyConversationState = "inactive";

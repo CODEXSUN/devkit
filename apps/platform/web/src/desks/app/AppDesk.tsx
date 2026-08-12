@@ -47,6 +47,12 @@ export function AppDesk() {
     }
   }, [invalidIdentityPage, invalidPath, navigate]);
 
+  useEffect(() => {
+    if (pathname !== "/app/devkit/honey") {
+      window.sessionStorage.setItem("devkit.honey.last-page", pathname);
+    }
+  }, [pathname]);
+
   const showingIdentity = Boolean(identityPage && !invalidIdentityPage);
   const showingGitHub = workspace?.group === "GitHub";
   const headerTitle = showingIdentity

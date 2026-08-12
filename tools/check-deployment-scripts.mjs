@@ -8,6 +8,10 @@ const compose = read(".container/docker-compose.yml");
 const deployExample = read(".container/deploy.env.example");
 const rootUpdater = read("update.sh");
 const compatibilityUpdater = read("updat.sh");
+const watcher = read(".container/update-watcher/devkit-update-watcher.sh");
+const watcherInstaller = read(".container/update-watcher/install.sh");
+const watcherService = read(".container/update-watcher/devkit-update-watcher.service");
+const watcherTimer = read(".container/update-watcher/devkit-update-watcher.timer");
 
 requireTokens(".container/update.sh", updater, [
   "umask 077",
@@ -37,6 +41,30 @@ requireTokens(".container/deploy.env.example", deployExample, [
 ]);
 requireTokens("update.sh", rootUpdater, ['exec bash "$ROOT_DIR/.container/update.sh" "$@"']);
 requireTokens("updat.sh", compatibilityUpdater, ['exec bash "$ROOT_DIR/update.sh" "$@"']);
+requireTokens(".container/update-watcher/devkit-update-watcher.sh", watcher, [
+  "flock -n 9",
+  "merge-base --is-ancestor",
+  "worktree add --detach",
+  "docker build --target verify",
+  "merge --ff-only",
+  "bash \"$REPO_DIR/update.sh\" --check",
+  "bash \"$REPO_DIR/update.sh\" --yes",
+  "com.docker.compose.oneoff=True",
+  "last-successful-commit"
+]);
+requireTokens(".container/update-watcher/install.sh", watcherInstaller, [
+  "/usr/local/sbin/devkit-update-watcher",
+  "systemctl enable --now devkit-update-watcher.timer"
+]);
+requireTokens(".container/update-watcher/devkit-update-watcher.service", watcherService, [
+  "Type=oneshot",
+  "Requires=docker.service",
+  "TimeoutStartSec=1h"
+]);
+requireTokens(".container/update-watcher/devkit-update-watcher.timer", watcherTimer, [
+  "OnUnitActiveSec=5min",
+  "Persistent=true"
+]);
 
 console.info("DevKit deployment scripts verified.");
 

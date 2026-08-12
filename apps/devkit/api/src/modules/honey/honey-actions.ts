@@ -4,6 +4,7 @@ export type HoneyAction = {
   label: string;
   prompt?: string;
 };
+type HoneyContext = { projectId?: string | null; projectTitle?: string | null };
 
 const actions: Record<HoneyAction["id"], HoneyAction> = {
   "explain-error": {
@@ -21,12 +22,21 @@ const actions: Record<HoneyAction["id"], HoneyAction> = {
   "view-task": { href: "/app/devkit/tasks", id: "view-task", label: "View task" }
 };
 
-export function resolveHoneyActions(request: string): HoneyAction[] {
+export function resolveHoneyActions(request: string, context?: HoneyContext): HoneyAction[] {
   const ids: HoneyAction["id"][] = [];
   if (/\b(?:error|failed|failure|exception|broken|issue|troubleshoot)\b/iu.test(request)) ids.push("explain-error");
   if (/\b(?:deploy|deployment|production|release|rollback|hostinger)\b/iu.test(request)) ids.push("review-deployment");
   if (/\b(?:task|todo|work item|next step)\b/iu.test(request)) ids.push("view-task");
   if (/\b(?:project|repository|workspace|roadmap)\b/iu.test(request)) ids.push("open-project");
   ids.push("start-agent", "open-project", "view-task");
-  return [...new Set(ids)].slice(0, 3).map((id) => actions[id]);
+  return [...new Set(ids)].slice(0, 3).map((id) => {
+    if (id !== "start-agent") return id === "open-project" && context?.projectId
+      ? { ...actions[id], href: `/app/devkit/projects?project=${encodeURIComponent(context.projectId)}` }
+      : actions[id];
+    const params = new URLSearchParams();
+    if (context?.projectId) params.set("project", context.projectId);
+    params.set("objective", request.slice(0, 800));
+    params.set("source", "honey");
+    return { ...actions[id], href: `/app/devkit/agent-ide?${params.toString()}`, label: context?.projectTitle ? `Start Project Agent for ${context.projectTitle}` : actions[id].label };
+  });
 }

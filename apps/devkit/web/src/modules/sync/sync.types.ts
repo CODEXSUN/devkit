@@ -26,3 +26,16 @@ export type SyncResult = {
   revision: number;
   synchronizedAt: string;
 };
+
+export type ProjectSyncVerification = {
+  cloudUrl: string;
+  instanceId: string;
+  localAccepted: true;
+  pendingProjects: number;
+  projectCount: number;
+  remoteAccepted: boolean;
+  remoteLabel: string;
+  remoteRevision: number;
+  scope?: "projects";
+  verifiedAt: string;
+};

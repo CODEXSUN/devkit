@@ -61,6 +61,7 @@ export type HoneyThreadsTable = {
 export type HoneyMessagesTable = {
   actor_id: string;
   body: string;
+  context_json: string;
   created_at: TimestampColumn;
   id: Generated<number>;
   role: string;
@@ -74,6 +75,10 @@ export type HoneyMemoryTable = {
   created_at: TimestampColumn;
   id: Generated<number>;
   kind: string;
+  review_note: string;
+  source_label: string;
+  supersedes_uuid: string | null;
+  version: number;
   source_thread_uuid: string | null;
   status: string;
   updated_at: TimestampColumn;

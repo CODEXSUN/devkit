@@ -26,6 +26,7 @@ type Props = {
   activity: string;
   disabled: boolean;
   messages: AgentIdeChatMessage[];
+  initialMessage?: string;
   model: AgentIdeModel;
   onAccessChange: (access: AgentIdeAccess) => void;
   onApprovalDecision: (decision: "accept" | "acceptForSession" | "decline") => void;
@@ -49,6 +50,7 @@ export function AgentIdeChat({
   activity,
   disabled,
   messages,
+  initialMessage,
   model,
   onAccessChange,
   onApprovalDecision,
@@ -59,7 +61,7 @@ export function AgentIdeChat({
   projectTitle,
   running
 }: Props) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage ?? "");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 

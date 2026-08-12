@@ -12,13 +12,13 @@ const snapshotSchema = z
     instanceId: z.string().min(2).max(80),
     protocolVersion: z.literal(1),
     publishedAt: z.string().datetime(),
-    tables: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))),
+    tables: z.record(z.string(), z.array(z.record(z.string(), z.unknown())))
   })
   .strict();
 
 export async function registerSyncRoutes(app: FastifyInstance) {
   app.get("/admin/sync/status", async (request) =>
-    ok(await service.status(), { requestId: request.id }),
+    ok(await service.status(), { requestId: request.id })
   );
   app.post("/admin/sync/cloud/tokens", async (request) => {
     const body = z
@@ -26,7 +26,7 @@ export async function registerSyncRoutes(app: FastifyInstance) {
       .strict()
       .parse(request.body);
     return ok(await service.generateCloudToken(body.label, actor(request)), {
-      requestId: request.id,
+      requestId: request.id
     });
   });
   app.post("/admin/sync/bind", async (request) => {
@@ -35,47 +35,53 @@ export async function registerSyncRoutes(app: FastifyInstance) {
       .strict()
       .parse(request.body);
     return ok(await service.bind(body.token, body.instanceId), {
-      requestId: request.id,
+      requestId: request.id
     });
   });
   app.post("/admin/sync/publish", async (request) =>
-    ok(await service.publish(), { requestId: request.id }),
+    ok(await service.publish(), { requestId: request.id })
   );
   app.post("/admin/sync/pull", async (request) =>
-    ok(await service.pull(), { requestId: request.id }),
+    ok(await service.pull(), { requestId: request.id })
   );
+  app.get("/admin/sync/projects/verify", async (request) =>
+    ok(await service.verifyProjectConnection(), { requestId: request.id })
+  );
+  app.get("/admin/sync/projects/preview", async (request) =>
+    ok(await service.projectPreview(), { requestId: request.id })
+  );
+  app.post("/admin/sync/projects/publish", async (request) => {
+    const body = z
+      .object({ acceptLocal: z.literal(true), acceptRemote: z.literal(true) })
+      .strict()
+      .parse(request.body);
+    return ok(await service.publishProjects(body.acceptLocal, body.acceptRemote), {
+      requestId: request.id
+    });
+  });
 
   app.get("/sync/cloud/v1/status", async (request) =>
     ok(await service.cloudStatus(syncToken(request)), {
-      requestId: request.id,
-    }),
+      requestId: request.id
+    })
   );
   app.get("/sync/cloud/v1/snapshot", async (request) =>
     ok(await service.cloudSnapshot(syncToken(request)), {
-      requestId: request.id,
-    }),
+      requestId: request.id
+    })
   );
-  app.post(
-    "/sync/cloud/v1/snapshot",
-    { bodyLimit: 64 * 1024 * 1024 },
-    async (request) => {
-      const body = z
-        .object({
-          baseRevision: z.number().int().nonnegative(),
-          snapshot: snapshotSchema,
-        })
-        .strict()
-        .parse(request.body);
-      return ok(
-        await service.cloudPublish(
-          syncToken(request),
-          body.baseRevision,
-          body.snapshot,
-        ),
-        { requestId: request.id },
-      );
-    },
-  );
+  app.post("/sync/cloud/v1/snapshot", { bodyLimit: 64 * 1024 * 1024 }, async (request) => {
+    const body = z
+      .object({
+        baseRevision: z.number().int().nonnegative(),
+        snapshot: snapshotSchema
+      })
+      .strict()
+      .parse(request.body);
+    return ok(await service.cloudPublish(syncToken(request), body.baseRevision, body.snapshot), {
+      requestId: request.id
+    });
+  });
 }
 
 function syncToken(request: FastifyRequest) {
@@ -83,7 +89,5 @@ function syncToken(request: FastifyRequest) {
 }
 
 function actor(request: FastifyRequest) {
-  return (
-    requireDevkitActor().email?.trim() || requireDevkitActor().id || request.id
-  );
+  return requireDevkitActor().email?.trim() || requireDevkitActor().id || request.id;
 }

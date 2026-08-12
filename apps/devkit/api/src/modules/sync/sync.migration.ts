@@ -4,7 +4,7 @@ import type { DevkitDatabase } from "../../database/schema.js";
 export const syncMigration = {
   description:
     "DevKit cloud tokens, local bindings, canonical snapshots, runs, conflicts, and per-record sync state.",
-  key: "devkit.sync.sql.v1",
+  key: "devkit.sync.sql.v1"
 } as const;
 
 const ownedTables = [
@@ -20,7 +20,7 @@ const ownedTables = [
   "devkit_project_manager_attachments",
   "devkit_task_manager_todos",
   "devkit_task_manager_lookups",
-  "devkit_task_manager_activity",
+  "devkit_task_manager_activity"
 ] as const;
 
 export async function migrateSyncModule(database: Kysely<DevkitDatabase>) {
@@ -33,7 +33,7 @@ export async function migrateSyncModule(database: Kysely<DevkitDatabase>) {
       ADD COLUMN IF NOT EXISTS sync_status VARCHAR(24) NOT NULL DEFAULT 'pending',
       ADD COLUMN IF NOT EXISTS sync_version INT UNSIGNED NOT NULL DEFAULT 1,
       ADD COLUMN IF NOT EXISTS sync_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    `,
+    `
       )
       .execute(database);
   }

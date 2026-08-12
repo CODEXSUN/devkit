@@ -15,6 +15,7 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
       start() {
         window.setTimeout(() => {
           this.onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "Open my tasks" }, isFinal: true }] });
+          this.onend?.();
         }, 50);
       }
 
@@ -24,9 +25,21 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
     }
     window.SpeechRecognition = MockSpeechRecognition;
     window.localStorage.setItem("devkit.screen-companion.visible", "true");
-    window.localStorage.setItem("devkit.screen-companion.honey-introduced", "true");
+    window.sessionStorage.setItem("devkit.screen-companion.honey-introduced", "true");
     window.localStorage.setItem("devkit.screen-companion.position", JSON.stringify({ x: 64, y: 420 }));
     window.localStorage.setItem("devkit.screen-companion.behavior", "stay");
+  });
+  await page.route("**/api/devkit/honey/**", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const now = new Date().toISOString();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return route.fulfill({
+      contentType: "application/json",
+      json: { data: { id: "mascot-voice-thread", messages: [
+        { body: "Open my tasks", createdAt: now, id: "voice-user", role: "user" },
+        { body: "Here are your current tasks.", createdAt: now, id: "voice-honey", role: "assistant" }
+      ], title: "Open my tasks" }, success: true }
+    });
   });
 
   await page.goto("/login");
@@ -78,9 +91,11 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
   await mascot.hover();
   await expect(voiceButton).toHaveCSS("opacity", "1");
   await voiceButton.click();
-  await expect(page.getByText("Open my tasks")).toBeVisible();
-  await page.getByRole("button", { name: "Close Honey message" }).click();
-  await expect(page.getByText("Open my tasks")).toBeHidden();
+  await expect(page.getByText("Let me think about that.")).toBeVisible();
+  await expect(page.getByText("Latest three messages")).toBeVisible();
+  await expect(page.getByText("Open my tasks", { exact: true })).toBeVisible();
+  await mascot.hover();
+  await expect(page.getByRole("button", { name: "Close Honey message" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Start Honey voice input" })).toBeAttached();
 
   await mascot.hover();
@@ -112,7 +127,7 @@ test("Honey submits a completed voice turn and reacts without roaming", async ({
     }
     window.SpeechRecognition = MockSpeechRecognition;
     window.localStorage.setItem("devkit.screen-companion.visible", "true");
-    window.localStorage.setItem("devkit.screen-companion.honey-introduced", "true");
+    window.sessionStorage.setItem("devkit.screen-companion.honey-introduced", "true");
     window.localStorage.setItem("devkit.screen-companion.position", JSON.stringify({ x: 900, y: 500 }));
     window.localStorage.setItem("devkit.screen-companion.behavior", "roam");
   });

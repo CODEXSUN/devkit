@@ -2,18 +2,28 @@ import { ArrowUpIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MascotChatConfig, MascotChatConversation } from "./mascot.contract";
 
-export function MascotChat({ chat, onClose }: { chat: MascotChatConfig; onClose: () => void }) {
-  const [conversation, setConversation] = useState<MascotChatConversation | null>(null);
+export function MascotChat({ chat, initialConversation, onClose, onConversationChange }: { chat: MascotChatConfig; initialConversation?: MascotChatConversation | null; onClose: () => void; onConversationChange?: (conversation: MascotChatConversation) => void }) {
+  const [conversation, setConversation] = useState<MascotChatConversation | null>(initialConversation ?? null);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { void chat.load(null).then(setConversation).catch(() => setError("Honey chat is unavailable.")); }, [chat]);
+  useEffect(() => {
+    if (initialConversation) {
+      setConversation(initialConversation);
+      return;
+    }
+    void chat.load(null).then(setConversation).catch(() => setError("Honey chat is unavailable."));
+  }, [chat, initialConversation]);
   const preview = conversation?.messages.slice(-3) ?? [];
 
   async function send() {
     if (!message.trim() || pending) return;
     const body = message.trim(); setMessage(""); setPending(true); setError("");
-    try { setConversation(await chat.send(body, conversation?.id ?? null)); }
+    try {
+      const next = await chat.send(body, conversation?.id ?? null);
+      setConversation(next);
+      onConversationChange?.(next);
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Honey could not answer."); }
     finally { setPending(false); }
   }

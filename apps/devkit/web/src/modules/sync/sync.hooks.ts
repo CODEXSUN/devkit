@@ -4,7 +4,7 @@ import {
   generateSyncToken,
   getSyncStatus,
   publishSyncCloud,
-  pullSyncCloud,
+  pullSyncCloud
 } from "./sync.services";
 
 export const syncStatusKey = ["devkit", "sync", "status"] as const;
@@ -13,7 +13,7 @@ export function useSyncStatus() {
   return useQuery({
     queryFn: getSyncStatus,
     queryKey: syncStatusKey,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: false
   });
 }
 
@@ -22,23 +22,18 @@ export function useSyncActions() {
   const refresh = () => client.invalidateQueries({ queryKey: syncStatusKey });
   return {
     bind: useMutation({
-      mutationFn: ({
-        instanceId,
-        token,
-      }: {
-        instanceId: string;
-        token: string;
-      }) => bindSyncCloud(instanceId, token),
-      onSuccess: refresh,
+      mutationFn: ({ instanceId, token }: { instanceId: string; token: string }) =>
+        bindSyncCloud(instanceId, token),
+      onSuccess: refresh
     }),
     generate: useMutation({ mutationFn: generateSyncToken }),
     publish: useMutation({
       mutationFn: publishSyncCloud,
-      onSuccess: refresh,
+      onSuccess: refresh
     }),
     pull: useMutation({
       mutationFn: pullSyncCloud,
-      onSuccess: refresh,
-    }),
+      onSuccess: refresh
+    })
   };
 }
