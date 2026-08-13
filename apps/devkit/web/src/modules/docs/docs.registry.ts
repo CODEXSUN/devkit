@@ -18,32 +18,18 @@ const page = (
 
 export const docsPages = [
   page(
-    "introduction",
-    "Introduction",
-    "Learn the CodeLogicX workspace structure.",
-    "Get started",
-    () => import("./content/introduction.mdx")
+    "architecture",
+    "Architecture",
+    "Understand the CodeLogicX engineering platform structure.",
+    "Foundation",
+    () => import("./content/architecture.mdx")
   ),
   page(
-    "projects",
-    "Projects",
-    "Create projects and connect cloud sync.",
-    "Work",
-    () => import("./content/projects.mdx")
-  ),
-  page(
-    "agent-workflow",
-    "Agent workflow",
-    "Plan, approve, implement, and review Agent work.",
-    "Agents",
-    () => import("./content/agent-workflow.mdx")
-  ),
-  page(
-    "deployment",
-    "Docker deployment",
-    "Install and update the container runtime.",
-    "Operations",
-    () => import("./content/deployment.mdx")
+    "product-structure",
+    "Product structure",
+    "Understand product ownership and shared platform boundaries.",
+    "Foundation",
+    () => import("./content/product-structure.mdx")
   )
 ] as const;
 

@@ -42,6 +42,14 @@ const envSchema = z.object({
   TELEGRAM_SESSION_ENCRYPTION_KEY: z.string().default(""),
   TELEGRAM_WEBHOOK_SECRET: z.string().default(""),
   TELEGRAM_WEBHOOK_PUBLIC_URL: z.union([z.literal(""), z.string().url()]).default(""),
+  REDIS_URL: z.union([z.literal(""), z.string().url()]).default(""),
+  MAIL_SMTP_HOST: z.string().default(""),
+  MAIL_SMTP_PORT: z.coerce.number().int().positive().default(587),
+  MAIL_SMTP_SECURE: z.enum(["0", "1"]).default("0"),
+  MAIL_SMTP_USERNAME: z.string().default(""),
+  MAIL_SMTP_PASSWORD: z.string().default(""),
+  MAIL_FROM_EMAIL: z.string().default(""),
+  MAIL_FROM_NAME: z.string().default("CodeLogicX"),
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required")
 });
 

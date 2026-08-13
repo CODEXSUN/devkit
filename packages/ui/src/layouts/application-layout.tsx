@@ -14,6 +14,7 @@ import type { TopMenuWorkspaceItem } from "../blocks/menu/sidemenu/top-menu";
 import type { GlobalSearchItem } from "../blocks/menu/sidemenu/global-search";
 import type { SidemenuItem } from "../blocks/menu/sidemenu/sub/sidemenu-section";
 import type { ScreenCompanionConfig } from "../blocks/companion/screen-companion";
+import type { TopMenuNotification } from "../blocks/menu/sidemenu/techmedia-top-menu";
 
 type ApplicationLayoutProps = {
   actions?: ReactNode;
@@ -26,6 +27,8 @@ type ApplicationLayoutProps = {
   globalSearchItems?: GlobalSearchItem[];
   homeHref?: string;
   onLogout?: () => void | Promise<void>;
+  notifications?: TopMenuNotification[];
+  onNotificationRead?: (id: string) => void;
   profileHref?: string;
   showHomeAction?: boolean;
   showSidebarUser?: boolean;
@@ -98,6 +101,8 @@ export function ApplicationLayout({
   homeHref = "/",
   menuItems = applicationMenuItems,
   onLogout,
+  notifications,
+  onNotificationRead,
   profileHref,
   showHomeAction = true,
   showSidebarUser = true,
@@ -124,6 +129,8 @@ export function ApplicationLayout({
       logoutHref="/login"
       menuItems={menuItems}
       {...(onLogout ? { onLogout } : {})}
+      {...(notifications ? { notifications } : {})}
+      {...(onNotificationRead ? { onNotificationRead } : {})}
       {...(profileHref ? { profileHref } : {})}
       showHomeAction={showHomeAction}
       showSidebarUser={showSidebarUser}

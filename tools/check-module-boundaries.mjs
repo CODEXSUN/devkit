@@ -11,6 +11,7 @@ const failures = [];
 const devkitApiOwned = new Set([
   "github-dashboard",
   "honey",
+  "notification",
   "orchestration",
   "planning",
   "project-manager",
@@ -29,6 +30,7 @@ const devkitWebOwned = new Set([
   "launch-desk",
   "hostinger-mcp",
   "honey",
+  "notification",
   "orchestration",
   "planning",
   "platform-registry",

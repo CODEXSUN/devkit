@@ -2,23 +2,29 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { Kysely, sql } from "kysely";
 import {
   migrateProjectManagerModule,
-  projectManagerMigration,
+  projectManagerMigration
 } from "../modules/project-manager/project-manager.migration.js";
 import {
   migrateTaskManagerModule,
-  taskManagerMigration,
+  taskManagerMigration
 } from "../modules/task-manager/task-manager.migration.js";
-import {
-  migrateSyncModule,
-  syncMigration,
-} from "../modules/sync/sync.migration.js";
+import { migrateSyncModule, syncMigration } from "../modules/sync/sync.migration.js";
 import type { DevkitDatabase } from "./schema.js";
 import {
   migratePlanningModule,
-  planningMigration,
+  planningMigration
 } from "../modules/planning/planning.migration.js";
-import { migrateTelegramMtprotoModule, migrateTelegramSupportModule, telegramMtprotoMigration, telegramSupportMigration } from "../modules/telegram-support/telegram-support.migration.js";
+import {
+  migrateTelegramMtprotoModule,
+  migrateTelegramSupportModule,
+  telegramMtprotoMigration,
+  telegramSupportMigration
+} from "../modules/telegram-support/telegram-support.migration.js";
 import { honeyMigration, migrateHoneyModule } from "../modules/honey/honey.migration.js";
+import {
+  migrateNotificationModule,
+  notificationMigration
+} from "../modules/notification/notification.migration.js";
 import {
   migrateOrchestrationChat,
   orchestrationChatMigration
@@ -29,58 +35,50 @@ import {
 } from "../modules/orchestration/agent-run.migration.js";
 
 const databaseContext = new AsyncLocalStorage<Kysely<DevkitDatabase>>();
-const bootstrapPromises = new WeakMap<
-  Kysely<DevkitDatabase>,
-  Promise<void>
->();
+const bootstrapPromises = new WeakMap<Kysely<DevkitDatabase>, Promise<void>>();
 const requestDatabase = new Proxy({} as Kysely<DevkitDatabase>, {
   get(_target, property) {
     const database = databaseContext.getStore();
-    if (!database)
-      throw new Error("DevKit requires a CXApp-provided request database.");
+    if (!database) throw new Error("DevKit requires a CXApp-provided request database.");
     const value = Reflect.get(database, property, database) as unknown;
     return typeof value === "function" ? value.bind(database) : value;
-  },
+  }
 });
 
 const migrationSteps = [
   {
     migrate: migrateProjectManagerModule,
-    name: projectManagerMigration.key,
+    name: projectManagerMigration.key
   },
   {
     migrate: migrateTaskManagerModule,
-    name: taskManagerMigration.key,
+    name: taskManagerMigration.key
   },
   {
     migrate: migratePlanningModule,
-    name: planningMigration.key,
+    name: planningMigration.key
   },
   {
     migrate: migrateSyncModule,
-    name: syncMigration.key,
+    name: syncMigration.key
   },
   { migrate: migrateTelegramSupportModule, name: telegramSupportMigration.key },
   { migrate: migrateTelegramMtprotoModule, name: telegramMtprotoMigration.key },
   { migrate: migrateHoneyModule, name: honeyMigration.key },
+  { migrate: migrateNotificationModule, name: notificationMigration.key },
   { migrate: migrateOrchestrationChat, name: orchestrationChatMigration.key },
-  { migrate: migrateAgentRuns, name: agentRunMigration.key },
+  { migrate: migrateAgentRuns, name: agentRunMigration.key }
 ] as const;
 
 export function getDevkitDatabase() {
   return requestDatabase;
 }
 
-export function runWithDevkitDatabase<T>(
-  database: Kysely<DevkitDatabase>,
-  callback: () => T,
-) {
+export function runWithDevkitDatabase<T>(database: Kysely<DevkitDatabase>, callback: () => T) {
   return databaseContext.run(database, callback);
 }
 
-export function bootstrapDevkitDatabase(
-  database: Kysely<DevkitDatabase>,
-) {
+export function bootstrapDevkitDatabase(database: Kysely<DevkitDatabase>) {
   const existing = bootstrapPromises.get(database);
   if (existing) return existing;
   const bootstrap = (async () => {
@@ -96,12 +94,10 @@ export async function migrateDevkitDatabase(db: Kysely<DevkitDatabase>) {
     .createTable("schema_migrations")
     .ifNotExists()
     .addColumn("id", "integer", (column) => column.primaryKey().autoIncrement())
-    .addColumn("package_id", "varchar(160)", (column) =>
-      column.notNull().defaultTo("legacy"),
-    )
+    .addColumn("package_id", "varchar(160)", (column) => column.notNull().defaultTo("legacy"))
     .addColumn("name", "varchar(160)", (column) => column.notNull().unique())
     .addColumn("applied_at", "datetime", (column) =>
-      column.notNull().defaultTo(sql`CURRENT_TIMESTAMP`),
+      column.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .execute();
   await sql`
@@ -146,5 +142,5 @@ export const devkitDatabaseLifecycle = Object.freeze({
   seeders: Object.freeze([]),
   async runSql({ database }: { database: unknown }) {
     await bootstrapDevkitDatabase(database as Kysely<DevkitDatabase>);
-  },
+  }
 });

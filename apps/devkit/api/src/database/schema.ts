@@ -40,11 +40,50 @@ export type DevkitDatabase = {
   devkit_honey_threads: HoneyThreadsTable;
   devkit_honey_messages: HoneyMessagesTable;
   devkit_honey_memory: HoneyMemoryTable;
+  devkit_notifications: NotificationsTable;
+  devkit_notification_jobs: NotificationJobsTable;
   devkit_sync_conflicts: DevkitSyncConflictsTable;
   devkit_sync_connections: DevkitSyncConnectionsTable;
   devkit_sync_runs: DevkitSyncRunsTable;
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
+};
+
+export type NotificationsTable = {
+  action_url: string | null;
+  actor_id: string;
+  body: string;
+  category: string;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  metadata_json: string;
+  read_at: TimestampColumn | null;
+  recipient_actor_id: string;
+  recipient_email: string | null;
+  status: string;
+  title: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type NotificationJobsTable = {
+  attempts: Generated<number>;
+  available_at: TimestampColumn;
+  backend: string;
+  channel: string;
+  completed_at: TimestampColumn | null;
+  created_at: TimestampColumn;
+  failed_at: TimestampColumn | null;
+  id: Generated<number>;
+  idempotency_key: string;
+  last_error: string;
+  locked_at: TimestampColumn | null;
+  max_attempts: number;
+  notification_uuid: string;
+  queue_name: string;
+  status: string;
+  updated_at: TimestampColumn;
+  uuid: string;
 };
 
 export type HoneyThreadsTable = {

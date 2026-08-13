@@ -2,6 +2,7 @@ import { codexAssistantGateway } from "../orchestration/index.js";
 import { resolveHoneyActions } from "./honey-actions.js";
 import { honeyRepository } from "./honey.repository.js";
 import { honeyBusinessKnowledge } from "./honey-business-knowledge.js";
+import { notificationPublisher } from "../notification/index.js";
 
 export class HoneyService {
   async memory(actorId: string) {
@@ -109,6 +110,19 @@ export class HoneyService {
         await honeyRepository.setCodexThread(thread.uuid, actorId, result.threadId);
       }
       await honeyRepository.addMessage(thread.uuid, actorId, "assistant", result.message);
+      await notificationPublisher
+        .publish(actorId, {
+          actionUrl: `/app/devkit/honey?thread=${thread.uuid}`,
+          body: result.message.slice(0, 1000),
+          category: "honey.answer",
+          channels: ["realtime"],
+          idempotencyKey: `honey:${thread.uuid}:${Date.now()}`,
+          recipientActorId: actorId,
+          title: "Honey has answered"
+        })
+        .catch((error: unknown) => {
+          console.warn("[honey.notification] delivery enqueue failed", error);
+        });
       return this.conversation(thread.uuid, actorId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Honey could not reach Codex.";

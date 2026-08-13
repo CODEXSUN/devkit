@@ -10,7 +10,7 @@
 ## DevKit Owner Workspaces
 
 - `apps/devkit/api`: Project Manager, Task Manager, Planning, GitHub Dashboard, Orchestration,
-  Skills, Sync, MariaDB lifecycle, and public host contracts.
+  Skills, Sync, Notifications, MariaDB lifecycle, and public host contracts.
 - `apps/devkit/web`: Today, Projects, Tasks, Platform Registry, Whiteboards, GitHub Dashboard,
   Engineering Command Center, Project Agent, Skill Library, Design System, MDX Documentation,
   Work Hub, and Sync workspaces.
@@ -37,6 +37,9 @@
   Projects, tasks, planning records, registry documentation, activity, and project attachments can
   synchronize. Repositories, worktrees, environment files, builds, Docker images, and provider
   secrets remain local.
+- Notifications owns the durable inbox and database delivery queue. BullMQ and Redis accelerate
+  delivery but do not replace MariaDB. The module owns retries, dead letters, SMTP delivery,
+  Socket.IO events, queue inspection, and failed-job retry.
 
 ## Shared Dependencies
 

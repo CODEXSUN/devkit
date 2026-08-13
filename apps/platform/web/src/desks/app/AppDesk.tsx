@@ -3,6 +3,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import { devkitWebBundle } from "@codexsun/devkit-web";
 import { honeyChatClient } from "@codexsun/devkit-web/modules/honey";
+import { useNotificationCenter } from "@codexsun/devkit-web/modules/notification";
 import { GlobalLoader } from "@codexsun/ui/components/global-loader";
 import { ApplicationLayout } from "@codexsun/ui/layouts/application-layout";
 import type { SidemenuItem } from "@codexsun/ui/blocks/menu/sidemenu/sub/sidemenu-section";
@@ -34,6 +35,7 @@ export function AppDesk() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const claims = readClaims();
+  const notifications = useNotificationCenter();
   const administrator = canAccessAdministratorSettings(claims.role);
   const identityPage = identityPageFromPath(pathname);
   const workspace = devkitWebBundle.resolveWorkspace(pathname);
@@ -91,6 +93,8 @@ export function AppDesk() {
           await logout();
           await navigate({ to: "/login" });
         }}
+        notifications={notifications.items}
+        onNotificationRead={notifications.markRead}
         profileHref="/app/identity/profile"
         showHomeAction={false}
         showSidebarUser={false}

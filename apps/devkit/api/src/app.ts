@@ -12,6 +12,7 @@ import { orchestrationModule } from "./modules/orchestration/index.js";
 import { skillsModule } from "./modules/skills/index.js";
 import { telegramSupportModule } from "./modules/telegram-support/index.js";
 import { honeyModule } from "./modules/honey/index.js";
+import { notificationModule } from "./modules/notification/index.js";
 import { runWithDevkitActor, type DevkitActor } from "./request-context.js";
 
 export const devkitApiModuleKeys = [
@@ -23,6 +24,7 @@ export const devkitApiModuleKeys = [
   skillsModule.key,
   telegramSupportModule.key,
   honeyModule.key,
+  notificationModule.key,
   syncModule.key
 ] as const;
 
@@ -49,11 +51,12 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
   await app.register(async (devkitApp) => {
     const contexts = new WeakMap<FastifyRequest, DevkitHostRequestContext>();
     devkitApp.addHook("onRequest", (request, _reply, done) => {
-      const resolve = request.url.includes("/telegram/webhook") && adapter.resolvePublicWebhook
-        ? adapter.resolvePublicWebhook
-        : request.url.includes("/sync/cloud/") && adapter.resolveCloudSync
-          ? adapter.resolveCloudSync
-          : adapter.resolve;
+      const resolve =
+        request.url.includes("/telegram/webhook") && adapter.resolvePublicWebhook
+          ? adapter.resolvePublicWebhook
+          : request.url.includes("/sync/cloud/") && adapter.resolveCloudSync
+            ? adapter.resolveCloudSync
+            : adapter.resolve;
       void Promise.resolve(resolve.call(adapter, request))
         .then((context) => {
           contexts.set(request, context);
@@ -75,6 +78,7 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
     await skillsModule.register({ app: devkitApp });
     await telegramSupportModule.register({ app: devkitApp });
     await honeyModule.register({ app: devkitApp });
+    await notificationModule.register({ app: devkitApp });
     await syncModule.register({ app: devkitApp });
   });
 }

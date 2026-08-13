@@ -28,6 +28,8 @@ type TechmediaTopMenuProps = {
   logoutHref?: string;
   onLogout?: () => void | Promise<void>;
   onCompanionVisibleChange?: (visible: boolean) => void;
+  notifications?: TopMenuNotification[];
+  onNotificationRead?: (id: string) => void;
   pageTitle?: string;
   profileHref?: string;
   searchPlaceholder?: string;
@@ -38,6 +40,14 @@ type TechmediaTopMenuProps = {
   workspaceItems: TopMenuWorkspaceItem[];
 };
 
+export type TopMenuNotification = {
+  actionUrl?: string | null;
+  body: string;
+  id: string;
+  status: string;
+  title: string;
+};
+
 export function TechmediaTopMenu({
   companionLabel,
   companionVisible = false,
@@ -46,6 +56,8 @@ export function TechmediaTopMenu({
   logoutHref = "/login",
   onLogout,
   onCompanionVisibleChange,
+  notifications,
+  onNotificationRead,
   pageTitle = "Workspace",
   profileHref,
   searchPlaceholder = "Search CodeLogicX",
@@ -85,7 +97,12 @@ export function TechmediaTopMenu({
         </div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1 px-3">
-        <NotificationMenu user={user} workspaceTitle={activeWorkspace?.title ?? "workspace"} />
+        <NotificationMenu
+          {...(notifications ? { notifications } : {})}
+          {...(onNotificationRead ? { onRead: onNotificationRead } : {})}
+          user={user}
+          workspaceTitle={activeWorkspace?.title ?? "workspace"}
+        />
         {showHomeAction ? (
           <Button asChild className="hidden h-8 px-3 sm:inline-flex" size="sm" variant="outline">
             <a href={homeHref}>
@@ -119,24 +136,33 @@ export function TechmediaTopMenu({
 }
 
 function NotificationMenu({
+  notifications,
+  onRead,
   user,
   workspaceTitle
 }: {
+  notifications?: TopMenuNotification[];
+  onRead?: (id: string) => void;
   user: TopUserMenuUser;
   workspaceTitle: string;
 }) {
   const [showWelcome, setShowWelcome] = useState(true);
+  const items = notifications ?? [];
+  const unread = items.filter((item) => item.status === "unread").length;
+  const showDefaultWelcome = notifications === undefined && showWelcome;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          aria-label={showWelcome ? "Notifications, 1 unread" : "Notifications"}
+          aria-label={
+            unread || showDefaultWelcome ? `Notifications, ${unread || 1} unread` : "Notifications"
+          }
           className="relative size-9 rounded-full"
           size="icon"
           variant="ghost"
         >
           <BellIcon />
-          {showWelcome ? (
+          {unread || showDefaultWelcome ? (
             <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full border-2 border-background bg-destructive" />
           ) : null}
         </Button>
@@ -145,7 +171,33 @@ function NotificationMenu({
         <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold">
           Notifications
         </DropdownMenuLabel>
-        {showWelcome ? (
+        {items.length ? (
+          <div className="max-h-80 space-y-1 overflow-y-auto">
+            {items.slice(0, 20).map((item) => (
+              <div className="rounded-xl px-3 py-2.5 hover:bg-muted" key={item.id}>
+                <div className="flex items-start gap-2">
+                  <a className="min-w-0 flex-1" href={item.actionUrl || "#"}>
+                    <p className="truncate text-sm font-semibold">{item.title}</p>
+                    <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+                      {item.body}
+                    </p>
+                  </a>
+                  {item.status === "unread" ? (
+                    <Button
+                      aria-label={`Mark ${item.title} as read`}
+                      className="size-7 shrink-0"
+                      onClick={() => onRead?.(item.id)}
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <CheckIcon className="size-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : showDefaultWelcome ? (
           <div className="relative rounded-xl border bg-background px-3 py-3 pr-10 shadow-sm">
             <p className="text-sm font-semibold">Welcome to {workspaceTitle}</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">

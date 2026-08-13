@@ -1,15 +1,40 @@
 "use client";
 
 import { animate, motion, useMotionValue } from "framer-motion";
-import { useEffect, useRef, useState, type KeyboardEvent, type MutableRefObject, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MutableRefObject,
+  type PointerEvent
+} from "react";
 import { AudioWaveformIcon } from "lucide-react";
 
-import { getHoneyConversationState, honeyConversationEvent, type HoneyConversationState } from "../../lib/honey-conversation";
-import { mascotStorage, type MascotBehavior, type MascotChatConversation, type MascotMode, type Position, type ScreenCompanionConfig } from "./mascot.contract";
+import {
+  getHoneyConversationState,
+  honeyConversationEvent,
+  type HoneyConversationState
+} from "../../lib/honey-conversation";
+import {
+  mascotStorage,
+  type MascotBehavior,
+  type MascotChatConversation,
+  type MascotMode,
+  type Position,
+  type ScreenCompanionConfig
+} from "./mascot.contract";
 import { MascotControls } from "./mascot-controls";
 import { MascotChat } from "./mascot-chat";
-import { bottomEdge, clampPosition, HOME_X, nextRoamingPosition, rightEdge, travelDuration, walkingMode } from "./mascot-motion";
+import {
+  clampPosition,
+  HOME_X,
+  nextRoamingPosition,
+  travelDuration,
+  walkingMode
+} from "./mascot-motion";
 import { MascotSprite } from "./mascot-sprite";
+import { mascotState } from "./mascot-state";
 import { MascotStatus, type MascotStatusPlacement } from "./mascot-status";
 import { useMascotVoice } from "./use-mascot-voice";
 
@@ -25,7 +50,8 @@ export function ScreenMascot({ chat, label, spriteSheetUrl, visible }: ScreenMas
   const y = useMotionValue(20);
   const [position, setPosition] = useState<Position>({ x: HOME_X, y: 20 });
   const [mode, setMode] = useState<MascotMode>("idle");
-  const [behavior, setBehavior] = useState<MascotBehavior>(readStoredBehavior);
+  const [behavior, setBehavior] = useState<MascotBehavior>(() => mascotState.readBehavior());
+  const [positionPinned, setPositionPinned] = useState(() => mascotState.isPositionPinned());
   const [ready, setReady] = useState(false);
   const [showIntroduction, setShowIntroduction] = useState(false);
   const [statusPlacement, setStatusPlacement] = useState<MascotStatusPlacement>("above");
@@ -34,48 +60,45 @@ export function ScreenMascot({ chat, label, spriteSheetUrl, visible }: ScreenMas
   const [mascotConversation, setMascotConversation] = useState<MascotChatConversation | null>(null);
   const [voiceReaction, setVoiceReaction] = useState<HoneyConversationState>("inactive");
   const [conversationState, setConversationState] = useState<HoneyConversationState>("inactive");
-  const voice = useMascotVoice((transcript) => { void sendVoiceMessage(transcript); });
+  const voice = useMascotVoice((transcript) => {
+    void sendVoiceMessage(transcript);
+  });
   const documentationMode = window.location.pathname.startsWith("/app/devkit/docs");
   const activeConversationState = voiceReaction !== "inactive" ? voiceReaction : conversationState;
   const conversationMessage = getConversationMessage(activeConversationState);
-  const effectiveBehavior = documentationMode || activeConversationState !== "inactive" ? "stay" : behavior;
+  const effectiveBehavior =
+    documentationMode || activeConversationState !== "inactive" ? "stay" : behavior;
 
   useEffect(() => {
     if (!visible) return;
-    const stored = readStoredPosition();
+    const stored = mascotState.readPosition();
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let initialized = false;
     shouldIntroduceRef.current = !window.sessionStorage.getItem(mascotStorage.introduction);
-    const initial = clampPosition(stored ?? { x: reducedMotion ? HOME_X : rightEdge(), y: bottomEdge() });
-    x.set(initial.x);
-    y.set(initial.y);
-    setPosition(initial);
-    setMode("idle");
-    setReady(true);
-    if (!stored && !reducedMotion) {
-      window.requestAnimationFrame(() => startWalk({ ...initial, x: HOME_X }));
-    }
-  }, [visible, x, y]);
-  useEffect(() => {
-    if (!visible || !ready) return;
-    const placeMascot = () => {
-      const next = documentationMode ? documentationAnchorPosition() : readStoredPosition();
-      if (!next) return;
+    const restore = () => {
+      const next = mascotState.initialPosition(documentationMode);
+      if (!next) return false;
       stopActiveMotion(horizontalAnimationRef, verticalAnimationRef);
-      const position = clampPosition(next);
-      x.set(position.x);
-      y.set(position.y);
-      setPosition(position);
+      x.set(next.x);
+      y.set(next.y);
+      setPosition(next);
       setMode("idle");
+      setReady(true);
+      if (!initialized && !documentationMode && !stored && !reducedMotion) {
+        window.requestAnimationFrame(() => startWalk({ ...next, x: HOME_X }));
+      }
+      initialized = true;
+      return true;
     };
-    const frame = window.requestAnimationFrame(placeMascot);
-    window.addEventListener("devkit:honey-documentation-anchor-ready", placeMascot);
-    window.addEventListener("resize", placeMascot);
+    const frame = window.requestAnimationFrame(restore);
+    window.addEventListener("devkit:honey-documentation-anchor-ready", restore);
+    window.addEventListener("resize", restore);
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("devkit:honey-documentation-anchor-ready", placeMascot);
-      window.removeEventListener("resize", placeMascot);
+      window.removeEventListener("devkit:honey-documentation-anchor-ready", restore);
+      window.removeEventListener("resize", restore);
     };
-  }, [documentationMode, ready, visible, x, y]);
+  }, [documentationMode, visible, x, y]);
   useIntroduction(visible, ready, mode, shouldIntroduceRef, setShowIntroduction);
   useNaturalRoaming(visible, ready, mode, effectiveBehavior, position, startWalk);
   useEffect(() => {
@@ -88,7 +111,11 @@ export function ScreenMascot({ chat, label, spriteSheetUrl, visible }: ScreenMas
       if (nextState !== "idle") setStatusDismissed(false);
     }
     window.addEventListener(honeyConversationEvent, handleConversation);
-    handleConversation(new CustomEvent<HoneyConversationState>(honeyConversationEvent, { detail: getHoneyConversationState() }));
+    handleConversation(
+      new CustomEvent<HoneyConversationState>(honeyConversationEvent, {
+        detail: getHoneyConversationState()
+      })
+    );
     return () => window.removeEventListener(honeyConversationEvent, handleConversation);
   }, []);
   useEffect(() => {
@@ -140,7 +167,17 @@ export function ScreenMascot({ chat, label, spriteSheetUrl, visible }: ScreenMas
       data-testid="screen-mascot"
       initial={false}
       onKeyDown={(event) => handleKeyMove(event, position, setPosition)}
-      onPointerDown={(event) => startPointerDrag(event, x, y, grabOffsetRef, horizontalAnimationRef, verticalAnimationRef, setMode)}
+      onPointerDown={(event) =>
+        startPointerDrag(
+          event,
+          x,
+          y,
+          grabOffsetRef,
+          horizontalAnimationRef,
+          verticalAnimationRef,
+          setMode
+        )
+      }
       onPointerMove={(event) => moveWithPointer(event, x, y, grabOffsetRef)}
       onPointerUp={(event) => finishPointerDrag(event, x, y, setPosition, setMode)}
       role="img"
@@ -148,29 +185,64 @@ export function ScreenMascot({ chat, label, spriteSheetUrl, visible }: ScreenMas
       tabIndex={0}
       title={`Hi, I'm ${label}. I'm waiting to help you. Drag me anywhere on the screen.`}
     >
-      {chatOpen && chat ? <MascotChat chat={chat} initialConversation={mascotConversation} onClose={() => setChatOpen(false)} onConversationChange={setMascotConversation} /> : null}
-      {!chatOpen ? <MascotStatus
+      {chatOpen && chat ? (
+        <MascotChat
+          chat={chat}
+          initialConversation={mascotConversation}
+          onClose={() => setChatOpen(false)}
+          onConversationChange={setMascotConversation}
+        />
+      ) : null}
+      {!chatOpen ? (
+        <MascotStatus
           dismissed={statusDismissed}
           label={label}
           listening={voice.listening || activeConversationState === "listening"}
-          message={voice.listening && voice.message ? voice.message : conversationMessage || voice.message}
+          message={
+            voice.listening && voice.message ? voice.message : conversationMessage || voice.message
+          }
           onDismiss={() => {
             setShowIntroduction(false);
             setStatusDismissed(true);
             voice.clear();
           }}
           placement={statusPlacement}
-          visible={showIntroduction || voice.listening || Boolean(voice.message) || Boolean(conversationMessage)}
-        /> : null}
+          visible={
+            showIntroduction ||
+            voice.listening ||
+            Boolean(voice.message) ||
+            Boolean(conversationMessage)
+          }
+        />
+      ) : null}
       <MascotSprite mode={mode} spriteSheetUrl={spriteSheetUrl} />
       <MascotControls
         behavior={behavior}
         {...(chat ? { chatHref: chat.href, onChatOpen: openQuickChat } : {})}
         onBehaviorChange={(nextBehavior) => {
           setBehavior(nextBehavior);
-          window.localStorage.setItem(mascotStorage.behavior, nextBehavior);
+          mascotState.saveBehavior(nextBehavior);
           if (nextBehavior === "stay") setMode("idle");
         }}
+        onPinPosition={() => {
+          const current = clampPosition({ x: x.get(), y: y.get() });
+          mascotState.pinPosition(current);
+          setPosition(current);
+          setPositionPinned(true);
+          setBehavior("stay");
+          mascotState.saveBehavior("stay");
+          setMode("idle");
+        }}
+        onResetPosition={() => {
+          mascotState.resetPosition();
+          const next = mascotState.defaultPosition(documentationMode);
+          x.set(next.x);
+          y.set(next.y);
+          setPosition(next);
+          setPositionPinned(false);
+          setMode("idle");
+        }}
+        positionPinned={positionPinned}
       />
       <button
         aria-label={voice.listening ? "Stop Honey voice input" : "Start Honey voice input"}
@@ -223,14 +295,24 @@ function useNaturalRoaming(
   startWalk: (target: Position) => void
 ) {
   useEffect(() => {
-    if (!visible || !ready || mode !== "idle" || behavior !== "roam" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timeout = window.setTimeout(() => startWalk(nextRoamingPosition(position)), 6500 + Math.random() * 4500);
+    if (
+      !visible ||
+      !ready ||
+      mode !== "idle" ||
+      behavior !== "roam" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
+    const timeout = window.setTimeout(
+      () => startWalk(nextRoamingPosition(position)),
+      6500 + Math.random() * 4500
+    );
     return () => window.clearTimeout(timeout);
   }, [behavior, mode, position, ready, startWalk, visible]);
 }
 
 function finishWalk(position: Position, setMode: (mode: MascotMode) => void) {
-  savePosition(position);
+  mascotState.savePosition(position);
   setMode("idle");
 }
 
@@ -279,7 +361,7 @@ function finishPointerDrag(
   x.set(next.x);
   y.set(next.y);
   setPosition(next);
-  savePosition(next);
+  mascotState.savePosition(next);
   setMode("idle");
 }
 
@@ -291,32 +373,23 @@ function stopActiveMotion(
   vertical.current?.stop();
 }
 
-function handleKeyMove(event: KeyboardEvent<HTMLDivElement>, position: Position, setPosition: (position: Position) => void) {
-  const movement: Record<string, Position> = { ArrowDown: { x: 0, y: 12 }, ArrowLeft: { x: -12, y: 0 }, ArrowRight: { x: 12, y: 0 }, ArrowUp: { x: 0, y: -12 } };
+function handleKeyMove(
+  event: KeyboardEvent<HTMLDivElement>,
+  position: Position,
+  setPosition: (position: Position) => void
+) {
+  const movement: Record<string, Position> = {
+    ArrowDown: { x: 0, y: 12 },
+    ArrowLeft: { x: -12, y: 0 },
+    ArrowRight: { x: 12, y: 0 },
+    ArrowUp: { x: 0, y: -12 }
+  };
   const delta = movement[event.key];
   if (!delta) return;
   event.preventDefault();
   const next = clampPosition({ x: position.x + delta.x, y: position.y + delta.y });
   setPosition(next);
-  savePosition(next);
-}
-
-function readStoredPosition(): Position | null {
-  try {
-    const value = window.localStorage.getItem(mascotStorage.position);
-    return value ? (JSON.parse(value) as Position) : null;
-  } catch {
-    return null;
-  }
-}
-
-function savePosition(position: Position) {
-  window.localStorage.setItem(mascotStorage.position, JSON.stringify(position));
-}
-
-function readStoredBehavior(): MascotBehavior {
-  if (typeof window === "undefined") return "roam";
-  return window.localStorage.getItem(mascotStorage.behavior) === "stay" ? "stay" : "roam";
+  mascotState.savePosition(next);
 }
 
 function randomStatusPlacement(position: Position): MascotStatusPlacement {
@@ -325,16 +398,6 @@ function randomStatusPlacement(position: Position): MascotStatusPlacement {
   if (position.x > 250) placements.push("left");
   if (position.x < window.innerWidth - 350) placements.push("right");
   return placements[Math.floor(Math.random() * placements.length)] ?? "above";
-}
-
-function documentationAnchorPosition(): Position | null {
-  const anchor = document.querySelector<HTMLElement>("[data-honey-documentation-anchor]");
-  if (!anchor) return null;
-  const bounds = anchor.getBoundingClientRect();
-  return {
-    x: bounds.left + Math.max(0, (bounds.width - 96) / 2),
-    y: bounds.top + Math.max(0, (bounds.height - 104) / 2)
-  };
 }
 
 function getConversationMessage(state: HoneyConversationState) {

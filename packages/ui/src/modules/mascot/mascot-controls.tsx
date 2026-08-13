@@ -1,6 +1,14 @@
 "use client";
 
-import { CheckIcon, EllipsisVerticalIcon, MessageCircleIcon, MoveHorizontalIcon, PauseIcon } from "lucide-react";
+import {
+  CheckIcon,
+  EllipsisVerticalIcon,
+  MapPinIcon,
+  MessageCircleIcon,
+  MoveHorizontalIcon,
+  PauseIcon,
+  RotateCcwIcon
+} from "lucide-react";
 
 import {
   DropdownMenu,
@@ -15,12 +23,18 @@ export function MascotControls({
   behavior,
   chatHref,
   onChatOpen,
-  onBehaviorChange
+  onBehaviorChange,
+  onPinPosition,
+  onResetPosition,
+  positionPinned
 }: {
   behavior: MascotBehavior;
   chatHref?: string;
   onChatOpen?: () => void;
   onBehaviorChange: (behavior: MascotBehavior) => void;
+  onPinPosition: () => void;
+  onResetPosition: () => void;
+  positionPinned: boolean;
 }) {
   return (
     <DropdownMenu>
@@ -34,15 +48,57 @@ export function MascotControls({
           <EllipsisVerticalIcon className="size-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-48 rounded-2xl border-amber-200/70 bg-[#fffaf0]/98 p-1.5 dark:border-amber-200/15 dark:bg-[#272219]/98" side="right" sideOffset={8}>
-        <DropdownMenuLabel className="px-3 text-xs text-muted-foreground">Honey movement</DropdownMenuLabel>
-        <MovementItem active={behavior === "stay"} icon={PauseIcon} label="Stay in place" onSelect={() => onBehaviorChange("stay")} />
-        <MovementItem active={behavior === "roam"} icon={MoveHorizontalIcon} label="Roam left and right" onSelect={() => onBehaviorChange("roam")} />
-        {chatHref ? <>
-          <DropdownMenuLabel className="px-3 pt-2 text-xs text-muted-foreground">Honey assistant</DropdownMenuLabel>
-          <DropdownMenuItem className="h-10 rounded-xl px-3" onSelect={() => onChatOpen?.()}><MessageCircleIcon /><span>Quick chat</span></DropdownMenuItem>
-          <DropdownMenuItem asChild className="h-10 rounded-xl px-3"><a href={chatHref}><MessageCircleIcon /><span>Open Honey Chat</span></a></DropdownMenuItem>
-        </> : null}
+      <DropdownMenuContent
+        align="start"
+        className="w-48 rounded-2xl border-amber-200/70 bg-[#fffaf0]/98 p-1.5 dark:border-amber-200/15 dark:bg-[#272219]/98"
+        side="right"
+        sideOffset={8}
+      >
+        <DropdownMenuLabel className="px-3 text-xs text-muted-foreground">
+          Honey movement
+        </DropdownMenuLabel>
+        <MovementItem
+          active={behavior === "stay"}
+          icon={PauseIcon}
+          label="Stay in place"
+          onSelect={() => onBehaviorChange("stay")}
+        />
+        <MovementItem
+          active={behavior === "roam"}
+          icon={MoveHorizontalIcon}
+          label="Roam left and right"
+          onSelect={() => onBehaviorChange("roam")}
+        />
+        <DropdownMenuLabel className="px-3 pt-2 text-xs text-muted-foreground">
+          Honey position
+        </DropdownMenuLabel>
+        <MovementItem
+          active={positionPinned}
+          icon={MapPinIcon}
+          label="Use current at startup"
+          onSelect={onPinPosition}
+        />
+        <DropdownMenuItem className="h-10 rounded-xl px-3" onSelect={onResetPosition}>
+          <RotateCcwIcon />
+          <span>Use page default</span>
+        </DropdownMenuItem>
+        {chatHref ? (
+          <>
+            <DropdownMenuLabel className="px-3 pt-2 text-xs text-muted-foreground">
+              Honey assistant
+            </DropdownMenuLabel>
+            <DropdownMenuItem className="h-10 rounded-xl px-3" onSelect={() => onChatOpen?.()}>
+              <MessageCircleIcon />
+              <span>Quick chat</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="h-10 rounded-xl px-3">
+              <a href={chatHref}>
+                <MessageCircleIcon />
+                <span>Open Honey Chat</span>
+              </a>
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

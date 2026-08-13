@@ -32,5 +32,6 @@ export const mascotAtlas = {
 export const mascotStorage = {
   behavior: "devkit.screen-companion.behavior",
   introduction: "devkit.screen-companion.honey-introduced",
-  position: "devkit.screen-companion.position"
+  position: "devkit.screen-companion.position",
+  positionPinned: "devkit.screen-companion.position-pinned"
 } as const;

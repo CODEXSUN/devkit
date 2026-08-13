@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 
 process.loadEnvFile(".env");
 
-test("Honey remains visible through idle, moves naturally, and supports placement", async ({ page }) => {
+test("Honey remains visible through idle, moves naturally, and supports placement", async ({
+  page
+}) => {
   await page.addInitScript(() => {
     class MockSpeechRecognition {
       continuous = false;
@@ -14,7 +16,10 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
 
       start() {
         window.setTimeout(() => {
-          this.onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "Open my tasks" }, isFinal: true }] });
+          this.onresult?.({
+            resultIndex: 0,
+            results: [{ 0: { transcript: "Open my tasks" }, isFinal: true }]
+          });
           this.onend?.();
         }, 50);
       }
@@ -26,7 +31,12 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
     window.SpeechRecognition = MockSpeechRecognition;
     window.localStorage.setItem("devkit.screen-companion.visible", "true");
     window.sessionStorage.setItem("devkit.screen-companion.honey-introduced", "true");
-    window.localStorage.setItem("devkit.screen-companion.position", JSON.stringify({ x: 64, y: 420 }));
+    if (!window.localStorage.getItem("devkit.screen-companion.position")) {
+      window.localStorage.setItem(
+        "devkit.screen-companion.position",
+        JSON.stringify({ x: 64, y: 420 })
+      );
+    }
     window.localStorage.setItem("devkit.screen-companion.behavior", "stay");
   });
   await page.route("**/api/devkit/honey/**", async (route) => {
@@ -35,10 +45,22 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
     await new Promise((resolve) => setTimeout(resolve, 300));
     return route.fulfill({
       contentType: "application/json",
-      json: { data: { id: "mascot-voice-thread", messages: [
-        { body: "Open my tasks", createdAt: now, id: "voice-user", role: "user" },
-        { body: "Here are your current tasks.", createdAt: now, id: "voice-honey", role: "assistant" }
-      ], title: "Open my tasks" }, success: true }
+      json: {
+        data: {
+          id: "mascot-voice-thread",
+          messages: [
+            { body: "Open my tasks", createdAt: now, id: "voice-user", role: "user" },
+            {
+              body: "Here are your current tasks.",
+              createdAt: now,
+              id: "voice-honey",
+              role: "assistant"
+            }
+          ],
+          title: "Open my tasks"
+        },
+        success: true
+      }
     });
   });
 
@@ -58,13 +80,18 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
     const frame = Number(await sprite.getAttribute("data-mascot-frame"));
     expect(frame).toBeGreaterThanOrEqual(0);
     expect(frame).toBeLessThan(7);
-    expect(await sprite.evaluate((element) => getComputedStyle(element).backgroundImage)).not.toBe("none");
+    expect(await sprite.evaluate((element) => getComputedStyle(element).backgroundImage)).not.toBe(
+      "none"
+    );
     await page.waitForTimeout(450);
   }
 
   const initialBox = await mascot.boundingBox();
   expect(initialBox).not.toBeNull();
-  const grabPoint = { x: initialBox.x + initialBox.width / 2, y: initialBox.y + initialBox.height / 2 };
+  const grabPoint = {
+    x: initialBox.x + initialBox.width / 2,
+    y: initialBox.y + initialBox.height / 2
+  };
   const releasePoint = { x: grabPoint.x + 260, y: grabPoint.y - 140 };
   await page.mouse.move(grabPoint.x, grabPoint.y);
   await page.mouse.down();
@@ -81,6 +108,16 @@ test("Honey remains visible through idle, moves naturally, and supports placemen
   expect(placedBox).not.toBeNull();
   expect(placedBox.x).toBeCloseTo(initialBox.x + 260, -1);
   expect(placedBox.y).toBeCloseTo(initialBox.y - 140, -1);
+
+  await mascot.hover();
+  await page.getByRole("button", { name: "Honey movement options" }).click();
+  await page.getByRole("menuitem", { name: "Use current at startup" }).click();
+  await expect(mascot).toHaveAttribute("data-mascot-behavior", "stay");
+  await page.reload();
+  await expect(mascot).toBeVisible();
+  const restoredBox = await mascot.boundingBox();
+  expect(restoredBox.x).toBeCloseTo(placedBox.x, 0);
+  expect(restoredBox.y).toBeCloseTo(placedBox.y, 0);
 
   await expect(page.getByText("Hi, I'm Honey")).toBeAttached();
   await expect(page.getByText("Waiting to help you")).toBeAttached();
@@ -116,7 +153,10 @@ test("Honey submits a completed voice turn and reacts without roaming", async ({
 
       start() {
         window.setTimeout(() => {
-          this.onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "Show my next task" }, isFinal: true }] });
+          this.onresult?.({
+            resultIndex: 0,
+            results: [{ 0: { transcript: "Show my next task" }, isFinal: true }]
+          });
           this.onend?.();
         }, 100);
       }
@@ -128,18 +168,35 @@ test("Honey submits a completed voice turn and reacts without roaming", async ({
     window.SpeechRecognition = MockSpeechRecognition;
     window.localStorage.setItem("devkit.screen-companion.visible", "true");
     window.sessionStorage.setItem("devkit.screen-companion.honey-introduced", "true");
-    window.localStorage.setItem("devkit.screen-companion.position", JSON.stringify({ x: 900, y: 500 }));
+    window.localStorage.setItem(
+      "devkit.screen-companion.position",
+      JSON.stringify({ x: 900, y: 500 })
+    );
     window.localStorage.setItem("devkit.screen-companion.behavior", "roam");
   });
   const now = new Date().toISOString();
-  const voiceConversation = { id: "voice-thread", messages: [
-    { body: "Show my next task", createdAt: now, id: "user-voice", role: "user" },
-    { actions: [
-      { id: "explain-error", label: "Explain an error", prompt: "Help me understand this error and suggest the safest next step: " },
-      { href: "/app/devkit/agent-ide", id: "start-agent", label: "Start Project Agent" },
-      { href: "/app/devkit/projects", id: "open-project", label: "Open project" }
-    ], body: "Your next task is ready.", createdAt: now, id: "assistant-voice", role: "assistant" }
-  ], title: "Show my next task" };
+  const voiceConversation = {
+    id: "voice-thread",
+    messages: [
+      { body: "Show my next task", createdAt: now, id: "user-voice", role: "user" },
+      {
+        actions: [
+          {
+            id: "explain-error",
+            label: "Explain an error",
+            prompt: "Help me understand this error and suggest the safest next step: "
+          },
+          { href: "/app/devkit/agent-ide", id: "start-agent", label: "Start Project Agent" },
+          { href: "/app/devkit/projects", id: "open-project", label: "Open project" }
+        ],
+        body: "Your next task is ready.",
+        createdAt: now,
+        id: "assistant-voice",
+        role: "assistant"
+      }
+    ],
+    title: "Show my next task"
+  };
   await page.route("**/api/devkit/honey/**", async (route) => {
     if (route.request().method() === "POST") {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -167,10 +224,18 @@ test("Honey submits a completed voice turn and reacts without roaming", async ({
   await expect(page.getByText("Show my next task", { exact: true })).toBeVisible();
   await expect(page.getByText("Your next task is ready.")).toBeVisible();
   await expect(mascot).toHaveAttribute("data-mascot-conversation-state", "answered");
-  await expect(page.getByRole("link", { name: /Start Project Agent/u })).toHaveAttribute("href", "/app/devkit/agent-ide");
-  await expect(page.getByRole("link", { name: /Open project/u })).toHaveAttribute("href", "/app/devkit/projects");
+  await expect(page.getByRole("link", { name: /Start Project Agent/u })).toHaveAttribute(
+    "href",
+    "/app/devkit/agent-ide"
+  );
+  await expect(page.getByRole("link", { name: /Open project/u })).toHaveAttribute(
+    "href",
+    "/app/devkit/projects"
+  );
   await page.getByRole("button", { name: /Explain an error/u }).click();
-  await expect(page.getByLabel("Message Honey")).toHaveValue("Help me understand this error and suggest the safest next step: ");
+  await expect(page.getByLabel("Message Honey")).toHaveValue(
+    "Help me understand this error and suggest the safest next step: "
+  );
   const answeredPosition = await mascot.boundingBox();
   expect(answeredPosition.x).toBeCloseTo(stablePosition.x, 0);
   expect(answeredPosition.y).toBeCloseTo(stablePosition.y, 0);

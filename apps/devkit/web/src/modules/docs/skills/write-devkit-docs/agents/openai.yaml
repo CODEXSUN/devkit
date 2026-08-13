@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write DevKit Docs"
+  short_description: "Apply DevKit documentation naming and structure rules"
+  default_prompt: "Use $write-devkit-docs to create or update a DevKit documentation page."

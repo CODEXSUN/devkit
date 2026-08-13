@@ -38,7 +38,9 @@ const permissionKeys = [
   "devkit.orchestration.view",
   "devkit.orchestration.manage",
   "devkit.sync.view",
-  "devkit.sync.manage"
+  "devkit.sync.manage",
+  "devkit.notification.view",
+  "devkit.notification.manage"
 ] as const;
 
 export async function seedPermissionModule(database: Kysely<PlatformDatabase>) {

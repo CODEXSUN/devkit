@@ -33,7 +33,8 @@ export async function seedRolePermissionModule(database: Kysely<PlatformDatabase
       "devkit.registry.view",
       "devkit.github-dashboard.view",
       "devkit.orchestration.view",
-      "devkit.sync.view"
+      "devkit.sync.view",
+      "devkit.notification.view"
     ],
     manager: devkitPermissions(),
     staff: devkitPermissions().filter((key) => key !== "devkit.sync.manage"),
@@ -45,7 +46,8 @@ export async function seedRolePermissionModule(database: Kysely<PlatformDatabase
       "devkit.planning.manage",
       "devkit.registry.view",
       "devkit.orchestration.view",
-      "devkit.github-dashboard.view"
+      "devkit.github-dashboard.view",
+      "devkit.notification.view"
     ]
   };
   for (const [roleKey, permissionKeys] of Object.entries(devkitDefaults)) {
@@ -71,9 +73,15 @@ export async function seedRolePermissionModule(database: Kysely<PlatformDatabase
 
 function devkitPermissions() {
   return [
-    ...["project-manager", "task-manager", "planning", "registry", "orchestration", "sync"].flatMap(
-      (module) => ["view", "manage"].map((action) => `devkit.${module}.${action}`)
-    ),
+    ...[
+      "project-manager",
+      "task-manager",
+      "planning",
+      "registry",
+      "orchestration",
+      "sync",
+      "notification"
+    ].flatMap((module) => ["view", "manage"].map((action) => `devkit.${module}.${action}`)),
     "devkit.github-dashboard.view"
   ];
 }

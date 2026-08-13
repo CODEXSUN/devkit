@@ -24,14 +24,14 @@ import {
   type SidebarUserMenuItem
 } from "../blocks/menu/sidemenu/app-sidebar";
 import { TopMenu, type TopMenuWorkspaceItem } from "../blocks/menu/sidemenu/top-menu";
-import { TechmediaTopMenu } from "../blocks/menu/sidemenu/techmedia-top-menu";
+import {
+  TechmediaTopMenu,
+  type TopMenuNotification
+} from "../blocks/menu/sidemenu/techmedia-top-menu";
 import type { GlobalSearchItem } from "../blocks/menu/sidemenu/global-search";
 import type { SidemenuItem } from "../blocks/menu/sidemenu/sub/sidemenu-section";
 import { SidebarInset, SidebarProvider } from "../components/sidebar";
-import {
-  ScreenCompanion,
-  type ScreenCompanionConfig
-} from "../blocks/companion/screen-companion";
+import { ScreenCompanion, type ScreenCompanionConfig } from "../blocks/companion/screen-companion";
 import { useMascotVisibility } from "../modules/mascot";
 
 type AppLayoutProps = {
@@ -45,6 +45,8 @@ type AppLayoutProps = {
   logoutHref?: string;
   menuItems?: SidemenuItem[];
   onLogout?: () => void | Promise<void>;
+  notifications?: TopMenuNotification[];
+  onNotificationRead?: (id: string) => void;
   profileHref?: string;
   showHomeAction?: boolean;
   showThemeAction?: boolean;
@@ -192,6 +194,8 @@ export function AppLayout({
   logoutHref = "/login",
   menuItems = defaultAppMenuItems,
   onLogout,
+  notifications,
+  onNotificationRead,
   profileHref,
   showHomeAction = true,
   showThemeAction = true,
@@ -216,6 +220,8 @@ export function AppLayout({
           homeHref={homeHref}
           logoutHref={logoutHref}
           {...(onLogout ? { onLogout } : {})}
+          {...(notifications ? { notifications } : {})}
+          {...(onNotificationRead ? { onNotificationRead } : {})}
           onCompanionVisibleChange={setCompanionVisible}
           pageTitle={String(headerTitle)}
           {...(profileHref ? { profileHref } : {})}

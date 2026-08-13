@@ -2,14 +2,22 @@ import { createApiApp, registerHealthRoute, registerRequestLogging } from "@code
 import { AppError } from "@codexsun/framework/errors";
 import type { HealthCheck } from "@codexsun/framework/health";
 import { registerModules } from "@codexsun/framework/modules";
-import { devkitApiModuleKeys, registerDevkitApiForHost } from "@codexsun/devkit-api";
+import {
+  bootstrapDevkitDatabase,
+  configureNotificationRuntime,
+  devkitApiModuleKeys,
+  registerDevkitApiForHost,
+  subscribeNotificationEvents
+} from "@codexsun/devkit-api";
 import type { DevkitDatabase } from "@codexsun/devkit-api";
 import type { Kysely } from "kysely";
+import { Server as SocketServer } from "socket.io";
 import { registerAuthRoutes } from "./auth/auth.routes.js";
 import { bootstrapPlatformDatabase, closePlatformDatabase } from "./database/platform-database.js";
 import { getPlatformDatabase } from "./database/platform-database.js";
 import { identityContext } from "./auth/identity-context.js";
 import { env } from "./env.js";
+import { verifyAuthToken } from "./auth/jwt.js";
 import { permissionModule } from "./modules/permission/index.js";
 import { rolePermissionModule } from "./modules/role-permission/index.js";
 import { roleModule } from "./modules/role/index.js";
@@ -21,15 +29,31 @@ const modules = [userModule, roleModule, permissionModule, userRoleModule, roleP
 export async function createApp() {
   console.info("[devkit.boot] bootstrap started");
   await bootstrapPlatformDatabase();
+  const database = getPlatformDatabase() as unknown as Kysely<DevkitDatabase>;
+  await bootstrapDevkitDatabase(database);
+  const closeNotifications = await configureNotificationRuntime({
+    database,
+    email: {
+      fromEmail: env.MAIL_FROM_EMAIL,
+      fromName: env.MAIL_FROM_NAME,
+      host: env.MAIL_SMTP_HOST,
+      password: env.MAIL_SMTP_PASSWORD,
+      port: env.MAIL_SMTP_PORT,
+      secure: env.MAIL_SMTP_SECURE === "1",
+      username: env.MAIL_SMTP_USERNAME
+    },
+    redisUrl: env.REDIS_URL
+  });
 
   const app = await createApiApp({
     appName: "DevKit API",
     cookieSecret: env.JWT_SECRET,
     corsOrigins: platformWebOrigins(),
     environment: env.NODE_ENV,
-    shutdownHooks: [closePlatformDatabase],
+    shutdownHooks: [closeNotifications, closePlatformDatabase],
     tenantContext: false
   });
+  registerNotificationSocket(app);
   const healthChecks: HealthCheck[] = [
     {
       name: "devkit-api",
@@ -59,7 +83,8 @@ export async function createApp() {
     async (devkitApp) =>
       registerDevkitApiForHost(devkitApp, {
         async authorize({ request }) {
-          if (request.url.includes("/sync/cloud/") || request.url.includes("/telegram/webhook")) return;
+          if (request.url.includes("/sync/cloud/") || request.url.includes("/telegram/webhook"))
+            return;
           await identityContext(request).authorize(devkitPermission(request));
         },
         async resolve(request) {
@@ -100,6 +125,31 @@ export async function createApp() {
   return app;
 }
 
+function registerNotificationSocket(app: Awaited<ReturnType<typeof createApiApp>>) {
+  const io = new SocketServer(app.server, {
+    cors: { credentials: true, origin: platformWebOrigins() },
+    path: "/api/devkit/notifications/socket.io"
+  });
+  io.use((socket, next) => {
+    const authorization = String(
+      socket.handshake.auth.token ?? socket.handshake.headers.authorization ?? ""
+    );
+    const token = authorization.replace(/^Bearer\s+/iu, "");
+    const actor = verifyAuthToken(token);
+    if (!actor) return next(new Error("Notification socket authentication failed."));
+    socket.data.actorId = actor.userId;
+    socket.join(`actor:${actor.userId}`);
+    next();
+  });
+  const unsubscribe = subscribeNotificationEvents((event) => {
+    io.to(`actor:${event.actorId}`).emit("notification.created", event);
+  });
+  app.addHook("onClose", async () => {
+    unsubscribe();
+    await io.close();
+  });
+}
+
 function platformWebOrigins() {
   const configuredOrigins = [env.PLATFORM_WEB_ORIGIN, ...env.PLATFORM_WEB_ORIGINS.split(",")];
   if (env.NODE_ENV !== "production") {
@@ -127,6 +177,7 @@ function devkitPermission(request: { method: string; url: string }) {
   if (request.url.includes("/github-dashboard/")) return "devkit.github-dashboard.view";
   if (request.url.includes("/orchestration/")) return `devkit.orchestration.${action}`;
   if (request.url.includes("/sync/")) return `devkit.sync.${action}`;
+  if (request.url.includes("/notifications")) return `devkit.notification.${action}`;
   if (request.url.includes("/project-manager/registry/")) return `devkit.registry.${action}`;
   return `devkit.project-manager.${action}`;
 }
