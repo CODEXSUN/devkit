@@ -60,6 +60,7 @@ requireTokens(".container/update-watcher/install.sh", watcherInstaller, [
 requireTokens(".container/update-watcher/devkit-update-watcher.service", watcherService, [
   "Type=oneshot",
   "Requires=docker.service",
+  "/root/.docker",
   "TimeoutStartSec=1h"
 ]);
 requireTokens(".container/update-watcher/devkit-update-watcher.timer", watcherTimer, [
