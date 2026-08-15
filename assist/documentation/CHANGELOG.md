@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.58
-Release tag: v-1.0.58
-Changelog label: v 1.0.58
+Current version: 1.0.59
+Release tag: v-1.0.59
+Changelog label: v 1.0.59
 
 ### [Session] 2026-08-15 - CodeLogix internal coding beta
 
@@ -461,6 +461,28 @@ Changelog label: v 1.0.58
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.59
+
+### [v 1.0.59] 2026-08-15 10:13 pm - Direct-download desktop updates
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.59.
+- Published the root-generated updater manifest with a direct versioned GitHub installer URL.
+- Kept the signed MSI and signature creation in the official Tauri release action.
+- Added an explicit release-manifest upload step after root deployment outputs are collected.
+
+#### Verification
+
+- Verified the published 1.0.58 updater endpoint returned HTTP 200 and exposed the signed installer metadata.
+- Confirmed the Tauri-generated GitHub API asset URL required a binary request header that the current client does not send.
+- Kept the public 1.0.58 release as an immutable audit record and moved the compatibility repair to 1.0.59.
+- Passed version synchronization, desktop type checks, lint, 14 Vitest tests, the production build, and all 11 native Rust tests.
 
 ## v-1.0.58
 

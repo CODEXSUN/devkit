@@ -48,7 +48,8 @@ jobs:
         working-directory: apps/devkit/desktop/src-tauri
         run: cargo test
 
-      - name: Build draft release and updater manifest
+      - name: Build draft release
+        id: tauri-release
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,11 +63,29 @@ jobs:
           releaseBody: Review the checks and publish this draft to make the signed update available.
           releaseDraft: true
           prerelease: false
-          uploadUpdaterJson: true
+          uploadUpdaterJson: false
           updaterJsonPreferNsis: false
 
       - name: Collect root deploy outputs
         run: npm run desktop:release:publish
+
+      - name: Upload direct-download updater manifest
+        uses: actions/github-script@v8
+        env:
+          MANIFEST_PATH: dist/deploy/desktop/${{ steps.tauri-release.outputs.appVersion }}/windows-x64/updater/latest.json
+          RELEASE_ID: ${{ steps.tauri-release.outputs.releaseId }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const manifest = fs.readFileSync(process.env.MANIFEST_PATH);
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: Number(process.env.RELEASE_ID),
+              name: "latest.json",
+              data: manifest
+            });
 
       - name: Upload root deploy outputs
         uses: actions/upload-artifact@v4
