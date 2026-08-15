@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   build: { emptyOutDir: true, outDir: "../../../dist/devkit/desktop", sourcemap: true },
+  cacheDir: "../../../node_modules/.vite/devkit-desktop",
   clearScreen: false,
   plugins: [react()],
   server: {

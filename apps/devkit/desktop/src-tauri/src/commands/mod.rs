@@ -1,9 +1,17 @@
+pub mod agent;
+pub mod agent_history;
 pub mod files;
 pub mod git;
+pub mod integrations;
+pub mod learning;
 pub mod process;
+pub mod python;
+pub mod search;
+pub mod skills;
 pub mod sync;
 pub mod system;
 pub mod tasks;
+pub mod terminal;
 
 use std::path::{Path, PathBuf};
 

@@ -9,6 +9,10 @@ pub struct SystemStatus {
     git: bool,
     platform: String,
     rust_version: String,
+    node: bool,
+    python: bool,
+    ripgrep: bool,
+    wsl: bool,
 }
 
 #[tauri::command]
@@ -20,6 +24,10 @@ pub fn system_status() -> SystemStatus {
         rust_version: option_env!("RUSTC_VERSION")
             .unwrap_or("compiled")
             .to_owned(),
+        node: available("node"),
+        python: available("python"),
+        ripgrep: available("rg"),
+        wsl: available("wsl"),
     }
 }
 

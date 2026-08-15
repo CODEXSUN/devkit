@@ -1,13 +1,27 @@
-import { Blocks, FolderOpen, GitBranch, HardDrive, ShieldCheck } from "lucide-react";
+import {
+  Blocks,
+  Bot,
+  FolderOpen,
+  GitBranch,
+  HardDrive,
+  LoaderCircle,
+  ShieldCheck,
+  type LucideIcon
+} from "lucide-react";
 import type { SystemStatus } from "../contracts/desktop";
+import type { AgentRuntimeState } from "../shell/use-desktop-session";
 
 export function SetupWorkspace({
+  agentRuntimeState,
   error,
   onOpen,
+  opening,
   system
 }: {
+  agentRuntimeState: AgentRuntimeState;
   error: string | undefined;
   onOpen: (path?: string) => Promise<void>;
+  opening: boolean;
   system: SystemStatus | undefined;
 }) {
   return (
@@ -16,19 +30,25 @@ export function SetupWorkspace({
         <div className="setup-mark">
           <Blocks size={25} />
         </div>
-        <p className="eyebrow">CodeLogicX Desktop</p>
+        <p className="eyebrow">CodeLogix</p>
         <h1>Your engineering workspace, on this machine.</h1>
         <p>
-          Open a repository to use files, Git, terminals, Docker, Assist, tasks, and local execution
+          Open a repository to use the coding agent, files, Git, terminals, Docker, and local execution
           from one IDE.
         </p>
-        <button onClick={() => void onOpen()} type="button">
-          <FolderOpen size={17} /> Open workspace
+        <button disabled={opening} onClick={() => void onOpen()} type="button">
+          {opening ? <LoaderCircle className="setup-spinner" size={17} /> : <FolderOpen size={17} />}
+          {opening ? "Opening workspace" : "Open workspace"}
         </button>
         {error ? <div className="setup-error">{error}</div> : null}
       </section>
       <aside className="setup-status">
-        <h2>Desktop runtime</h2>
+        <h2>Local runtime</h2>
+        <Status
+          icon={Bot}
+          label="Coding agent"
+          value={runtimeLabel(agentRuntimeState)}
+        />
         <Status icon={GitBranch} label="Git" value={system?.git ? "Ready" : "Checking"} />
         <Status icon={HardDrive} label="Local SQLite" value="Ready" />
         <Status icon={ShieldCheck} label="Execution policy" value="Workspace scoped" />
@@ -42,7 +62,7 @@ function Status({
   label,
   value
 }: {
-  icon: typeof GitBranch;
+  icon: LucideIcon;
   label: string;
   value: string;
 }) {
@@ -55,4 +75,10 @@ function Status({
       </span>
     </div>
   );
+}
+
+function runtimeLabel(state: AgentRuntimeState) {
+  if (state === "ready") return "Ready";
+  if (state === "unavailable") return "Needs attention";
+  return "Starting";
 }

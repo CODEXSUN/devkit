@@ -15,11 +15,54 @@ export type GitChange = {
   status: string;
 };
 
+export type ExternalEditor = {
+  id: string;
+  label: string;
+};
+
 export type SystemStatus = {
   docker: boolean;
   git: boolean;
+  node: boolean;
   platform: string;
+  python: boolean;
+  ripgrep: boolean;
   rustVersion: string;
+  wsl: boolean;
+};
+
+export type SearchMatch = { path: string; line: number; preview: string };
+export type GitWorktree = { path: string; branch: string; head: string };
+export type ProjectSkill = { id: string; path: string; source: string };
+export type ProjectLearningSettings = { enabled: boolean; autoScan: boolean };
+export type ProjectLearning = {
+  id: number;
+  category: string;
+  title: string;
+  content: string;
+  evidencePath: string | null;
+  source: "detected" | "user" | "agent";
+  status: "candidate" | "approved" | "rejected" | "stale";
+  confidence: number;
+  isCurrent: boolean;
+  updatedAt: string;
+};
+export type ProjectLearningSummary = {
+  settings: ProjectLearningSettings;
+  items: ProjectLearning[];
+  approvedCount: number;
+  candidateCount: number;
+  staleCount: number;
+};
+export type TerminalOutput = { sessionId: string; data: string };
+export type PythonEnvironment = {
+  available: boolean;
+  configured: boolean;
+  gpuTools: boolean;
+  interpreter: string | null;
+  projectFiles: string[];
+  version: string | null;
+  virtualEnvironment: string | null;
 };
 
 export type LocalTask = {
@@ -37,4 +80,32 @@ export type TerminalResult = {
 export type SyncResult = {
   accepted: number;
   cursor: string | null;
+};
+
+export type AgentAccess = "readOnly" | "workspaceWrite";
+export type AgentTask = {
+  id: number;
+  threadId: string;
+  title: string;
+  access: AgentAccess;
+  updatedAt: string;
+};
+export type AgentMessage = {
+  id: string;
+  taskId: number;
+  role: "agent" | "user";
+  content: string;
+  createdAt: string;
+};
+export type AgentRuntimeStatus = {
+  connected: boolean;
+  executable: string;
+};
+
+export type AgentProtocolMessage = {
+  id?: number;
+  method?: string;
+  params?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: { message?: string };
 };

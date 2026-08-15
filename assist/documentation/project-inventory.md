@@ -17,6 +17,10 @@
 - `assist/skills/library`: Repository-owned physical skill folders used for Agent prompting and
   review workflows. DevKit generates the hidden `SKILL.md` manifest and links each user-managed
   reference file from it so agents can load the relevant knowledge progressively.
+- `apps/devkit/desktop`: Tauri and React local IDE with a bundled Codex runtime, Monaco, Zustand
+  shell state, Zod protocol validation, ripgrep-first search, Git, terminal, SQLite, and signed
+  Windows updates. The desktop also owns reviewed project learning from repository evidence.
+  Only approved and current facts enter the agent context.
 - Orchestration owns MariaDB-backed Project Agent chat threads, messages, edited-file evidence,
   elapsed time, and feedback. Every chat-history query is partitioned by the authenticated local
   actor ID; this is scoped record isolation, not a claim of platform-wide multi-tenant isolation.
@@ -48,4 +52,4 @@
 
 The Platform module roots contain identity owners only. Proprietary business application sources
 remain in their own repositories. Only repository-root `node_modules` and `dist` directories are
-permitted.
+permitted. Desktop releases publish under `dist/deploy/desktop/<version>/windows-x64`.

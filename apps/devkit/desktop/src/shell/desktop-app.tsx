@@ -1,105 +1,195 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   Blocks,
   Bot,
+  BrainCircuit,
   Box,
-  Bug,
-  ChevronRight,
   CircleDot,
   Files,
   GitBranch,
   ListTodo,
+  Menu,
   PanelBottom,
-  Play,
   Search,
-  Settings,
-  SlidersHorizontal,
-  TerminalSquare
+  Settings
 } from "lucide-react";
-import type { FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
-import { desktopClient } from "../services/desktop-client";
-import { EditorWorkspace } from "../workspaces/editor-workspace";
+import { AgentWorkspace } from "../workspaces/agent-workspace";
 import { SetupWorkspace } from "../workspaces/setup-workspace";
-import { TweakPanel } from "./tweak-panel";
+import { AppDrawer } from "./app-drawer";
+import { OpenInMenu } from "./open-in-menu";
+import { CommandPalette, type PaletteCommand } from "./command-palette";
+import { UpdateButton, UpdateCenter } from "../updates/update-center";
+import { useDesktopUpdater } from "../updates/use-desktop-updater";
+import { DesktopSidePanel } from "./desktop-side-panel";
+import { useDesktopSession } from "./use-desktop-session";
+import { useDesktopUiStore } from "./use-desktop-ui-store";
 
-type Activity = "assist" | "docker" | "files" | "git" | "tasks";
-type Density = "compact" | "relaxed";
+type Theme = "dark" | "light" | "system";
+
+const EditorWorkspace = lazy(() =>
+  import("../workspaces/editor-workspace").then((module) => ({ default: module.EditorWorkspace }))
+);
+const TerminalPanel = lazy(() =>
+  import("../workspaces/terminal-panel").then((module) => ({ default: module.TerminalPanel }))
+);
 
 const activities = [
+  { icon: Bot, id: "assist", label: "Agent" },
   { icon: Files, id: "files", label: "Explorer" },
   { icon: Search, id: "search", label: "Search" },
   { icon: GitBranch, id: "git", label: "Source control" },
   { icon: ListTodo, id: "tasks", label: "Tasks" },
-  { icon: Bot, id: "assist", label: "Assist" },
+  { icon: BrainCircuit, id: "learning", label: "Project learning" },
   { icon: Box, id: "docker", label: "Docker" }
 ] as const;
 
 export function DesktopApp() {
-  const [activity, setActivity] = useState<Activity>("files");
-  const [density, setDensity] = useState<Density>("compact");
-  const [workspace, setWorkspace] = useState<Workspace>();
-  const [files, setFiles] = useState<FileEntry[]>([]);
-  const [changes, setChanges] = useState<GitChange[]>([]);
-  const [system, setSystem] = useState<SystemStatus>();
+  const ui = useDesktopUiStore();
+  const { togglePalette, toggleTerminal } = ui;
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem("devkit-theme");
+    return saved === "dark" || saved === "light" ? saved : "system";
+  });
+  const [systemDark, setSystemDark] = useState(
+    () => matchMedia("(prefers-color-scheme: dark)").matches
+  );
   const [selectedPath, setSelectedPath] = useState<string>();
-  const [terminalOpen, setTerminalOpen] = useState(true);
-  const [error, setError] = useState<string>();
+  const updater = useDesktopUpdater();
+  const session = useDesktopSession();
+  const { changes, files, system, workspace } = session;
 
   useEffect(() => {
-    void desktopClient
-      .systemStatus()
-      .then(setSystem)
-      .catch(() => undefined);
+    const media = matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemDark(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
 
-  async function openWorkspace(path?: string) {
-    try {
-      const next = await desktopClient.openWorkspace(path);
-      const [nextFiles, nextChanges] = await Promise.all([
-        desktopClient.listFiles(),
-        desktopClient.gitStatus()
-      ]);
-      setWorkspace(next);
-      setFiles(nextFiles);
-      setChanges(nextChanges);
-      setSelectedPath(nextFiles.find((entry) => entry.kind === "file")?.path);
-      setError(undefined);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+  const resolvedTheme = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    localStorage.setItem("devkit-theme", theme);
+  }, [resolvedTheme, theme]);
+
+  useEffect(() => {
+    function keyboard(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        togglePalette();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === "`") {
+        event.preventDefault();
+        toggleTerminal();
+      }
     }
-  }
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  }, [togglePalette, toggleTerminal]);
 
   const panelTitle = useMemo(
-    () => activities.find((item) => item.id === activity)?.label ?? "Explorer",
-    [activity]
+    () => activities.find((item) => item.id === ui.activity)?.label ?? "Explorer",
+    [ui.activity]
   );
 
-  if (!workspace) return <SetupWorkspace error={error} onOpen={openWorkspace} system={system} />;
+  const paletteCommands = useMemo<PaletteCommand[]>(
+    () => [
+      {
+        id: "open-workspace",
+        label: "Open workspace",
+        detail: "Choose a local repository",
+        run: () => void session.openWorkspace()
+      },
+      ...activities.map((item) => ({
+        id: `activity-${item.id}`,
+        label: `Show ${item.label}`,
+        detail: "Workspace view",
+        run: () => ui.setActivity(item.id)
+      })),
+      {
+        id: "toggle-terminal",
+        label: ui.terminalOpen ? "Hide terminal" : "Show terminal",
+        detail: "Ctrl + `",
+        run: ui.toggleTerminal
+      },
+      {
+        id: "desktop-updates",
+        label: "Check for updates",
+        detail: "Download signed releases",
+        run: () => ui.setUpdateOpen(true)
+      },
+      ...(["system", "light", "dark"] as const).map((option) => ({
+        id: `theme-${option}`,
+        label: `Use ${option} theme`,
+        detail: "Appearance",
+        run: () => setTheme(option)
+      })),
+      ...files
+        .filter((file) => file.kind === "file")
+        .map((file) => ({
+          id: `file-${file.path}`,
+          label: file.name,
+          detail: file.path,
+          run: () => setSelectedPath(file.path)
+        }))
+    ],
+    [files, ui.setActivity, ui.setUpdateOpen, ui.terminalOpen, ui.toggleTerminal]
+  );
+
+  if (!workspace)
+    return (
+      <>
+        <SetupWorkspace
+          agentRuntimeState={session.agentRuntimeState}
+          error={session.error}
+          onOpen={session.openWorkspace}
+          opening={session.opening}
+          system={system}
+        />
+        <div className="setup-update">
+          <UpdateButton onOpen={() => ui.setUpdateOpen(true)} update={updater} />
+        </div>
+        {ui.paletteOpen ? (
+          <CommandPalette commands={paletteCommands} onClose={() => ui.setPaletteOpen(false)} />
+        ) : null}
+        {ui.updateOpen ? (
+          <UpdateCenter onClose={() => ui.setUpdateOpen(false)} update={updater} />
+        ) : null}
+      </>
+    );
 
   return (
-    <div className="ide" data-density={density}>
+    <div className="ide">
       <header className="titlebar">
         <div className="window-mark">
-          <Blocks size={17} /> CodeLogicX
+          <button
+            aria-label="Open application menu"
+            className="menu-trigger"
+            onClick={() => ui.setDrawerOpen(true)}
+            type="button"
+          >
+            <Menu size={18} />
+          </button>
+          <Blocks size={17} /> CodeLogix
         </div>
-        <div className="command-center">
-          <Search size={14} /> {workspace.name}
-        </div>
+        <button className="command-center" onClick={() => ui.setPaletteOpen(true)} type="button">
+          <Search size={14} /> Search commands and files <kbd>Ctrl K</kbd>
+        </button>
         <div className="title-actions">
-          <Play size={15} />
-          <Bug size={15} />
-          <Settings size={15} />
+          <span className="environment-pill">Local / {workspace.branch}</span>
+          <OpenInMenu path={selectedPath} />
+          <UpdateButton onOpen={() => ui.setUpdateOpen(true)} update={updater} />
         </div>
       </header>
-      <div className="ide-body">
+      <div className={ui.activity === "assist" ? "ide-body agent-active" : "ide-body"}>
         <nav className="activity-bar" aria-label="IDE activities">
           <div>
             {activities.map((item) => (
               <button
                 aria-label={item.label}
-                className={activity === item.id ? "active" : ""}
+                className={ui.activity === item.id ? "active" : ""}
                 key={item.id}
-                onClick={() => setActivity(item.id as Activity)}
+                onClick={() => ui.setActivity(item.id)}
                 title={item.label}
                 type="button"
               >
@@ -107,24 +197,62 @@ export function DesktopApp() {
               </button>
             ))}
           </div>
-          <button aria-label="Settings" type="button">
+          <button
+            aria-label="Open settings"
+            onClick={() => ui.setDrawerOpen(true)}
+            type="button"
+          >
             <Settings size={21} />
           </button>
         </nav>
-        <aside className="side-panel">
-          <div className="panel-heading">{panelTitle}</div>
-          <SidePanel
-            activity={activity}
-            changes={changes}
-            files={files}
-            onSelectFile={setSelectedPath}
-            selectedPath={selectedPath}
-            workspace={workspace}
-          />
-        </aside>
-        <main className="workbench">
-          <EditorWorkspace path={selectedPath} />
-          {terminalOpen ? <TerminalPanel workspace={workspace} /> : null}
+        {ui.activity !== "assist" ? (
+          <aside className="side-panel">
+            <div className="panel-heading">{panelTitle}</div>
+            <DesktopSidePanel
+              activity={ui.activity}
+              changes={changes}
+              changesState={session.changesState}
+              files={files}
+              filesState={session.filesState}
+              onSelectFile={setSelectedPath}
+              selectedPath={selectedPath}
+              workspace={workspace}
+              system={system}
+              onRefreshChanges={session.refreshChanges}
+            />
+          </aside>
+        ) : null}
+        <main
+          className={`workbench${ui.activity === "assist" ? " agent-workbench" : ""}${ui.terminalOpen ? " terminal-visible" : ""}`}
+        >
+          {ui.activity === "assist" ? (
+            <AgentWorkspace
+              changes={changes}
+              changesState={session.changesState}
+              files={files}
+              filesState={session.filesState}
+              key={workspace.path}
+              onOpenFile={(path) => {
+                setSelectedPath(path);
+                ui.setActivity("files");
+              }}
+              onRefreshChanges={session.refreshChanges}
+              workspace={workspace}
+            />
+          ) : (
+            <Suspense fallback={<div className="workspace-loading">Loading editor...</div>}>
+              <EditorWorkspace
+                onSelectPath={setSelectedPath}
+                path={selectedPath}
+                theme={resolvedTheme}
+              />
+            </Suspense>
+          )}
+          {ui.terminalOpen ? (
+            <Suspense fallback={<div className="terminal-loading">Starting terminal...</div>}>
+              <TerminalPanel theme={resolvedTheme} workspace={workspace} />
+            </Suspense>
+          ) : null}
         </main>
       </div>
       <footer className="statusbar">
@@ -132,94 +260,32 @@ export function DesktopApp() {
           <GitBranch size={13} /> {workspace.branch}
         </span>
         <span>
-          <CircleDot size={13} /> {changes.length} changes
+          <CircleDot size={13} />
+          {session.changesState === "loading" ? "Refreshing Git" : `${changes.length} changes`}
         </span>
         <span className="status-spacer" />
         <span>{system?.platform ?? "desktop"}</span>
-        <button onClick={() => setTerminalOpen((value) => !value)} type="button">
+        <button onClick={ui.toggleTerminal} type="button">
           <PanelBottom size={13} /> Terminal
         </button>
       </footer>
-      <TweakPanel density={density} onDensityChange={setDensity} />
+      <AppDrawer
+        onClose={() => ui.setDrawerOpen(false)}
+        onOpenCommands={() => ui.setPaletteOpen(true)}
+        onOpenUpdates={() => ui.setUpdateOpen(true)}
+        onOpenWorkspace={() => void session.openWorkspace()}
+        onThemeChange={setTheme}
+        onToggleTerminal={ui.toggleTerminal}
+        open={ui.drawerOpen}
+        terminalOpen={ui.terminalOpen}
+        theme={theme}
+      />
+      {ui.paletteOpen ? (
+        <CommandPalette commands={paletteCommands} onClose={() => ui.setPaletteOpen(false)} />
+      ) : null}
+      {ui.updateOpen ? (
+        <UpdateCenter onClose={() => ui.setUpdateOpen(false)} update={updater} />
+      ) : null}
     </div>
-  );
-}
-
-function SidePanel({
-  activity,
-  changes,
-  files,
-  onSelectFile,
-  selectedPath,
-  workspace
-}: {
-  activity: Activity;
-  changes: GitChange[];
-  files: FileEntry[];
-  onSelectFile: (path: string) => void;
-  selectedPath: string | undefined;
-  workspace: Workspace;
-}) {
-  if (activity === "git") {
-    return (
-      <div className="tree">
-        <div className="tree-section">Changes {changes.length}</div>
-        {changes.map((change) => (
-          <div className="tree-row" key={change.path}>
-            <span>{change.path}</span>
-            <b>{change.status}</b>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  if (activity !== "files") return <EmptyPanel activity={activity} />;
-  return (
-    <div className="tree">
-      <div className="tree-section">
-        <ChevronRight size={14} /> {workspace.name}
-      </div>
-      {files.map((file) => (
-        <button
-          className={selectedPath === file.path ? "tree-row selected" : "tree-row"}
-          disabled={file.kind === "directory"}
-          key={file.path}
-          onClick={() => onSelectFile(file.path)}
-          type="button"
-        >
-          <span>{file.name}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function EmptyPanel({ activity }: { activity: Activity }) {
-  const descriptions: Record<Activity, string> = {
-    assist: "Connect Assist to plan, edit, review, and verify this workspace.",
-    docker: "Inspect services and run approved Docker operations.",
-    files: "Open a workspace to browse files.",
-    git: "Open a Git repository to review changes.",
-    tasks: "Local tasks remain available offline and sync to DevKit."
-  };
-  return (
-    <div className="empty-panel">
-      <SlidersHorizontal size={20} />
-      <p>{descriptions[activity]}</p>
-    </div>
-  );
-}
-
-function TerminalPanel({ workspace }: { workspace: Workspace }) {
-  return (
-    <section className="terminal">
-      <div className="terminal-tabs">
-        <span>
-          <TerminalSquare size={14} /> PowerShell
-        </span>
-        <span className="terminal-path">{workspace.path}</span>
-      </div>
-      <pre>CodeLogicX desktop runtime ready.{"\n"}Open a command from the command palette.</pre>
-    </section>
   );
 }

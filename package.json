@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.35",
+  "version": "1.0.49",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -13,6 +13,8 @@
   "scripts": {
     "desktop:dev": "npm run tauri:dev --workspace @devkit/desktop",
     "desktop:build": "npm run tauri:build --workspace @devkit/desktop",
+    "desktop:release:build": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-desktop-release.ps1",
+    "desktop:release:publish": "node tools/publish-desktop-release.mjs",
     "desktop:check": "npm run check --workspace @devkit/desktop",
     "dev:api": "node tools/preflight.mjs platform-api",
     "dev:web": "node tools/preflight.mjs platform-web",

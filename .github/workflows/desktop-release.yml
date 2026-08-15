@@ -1,0 +1,73 @@
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.5.0
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME -replace '^desktop-v', ''
+          $packageVersion = node -p "require('./package.json').version"
+          if ($tagVersion -ne $packageVersion) {
+            throw "Tag version $tagVersion does not match package version $packageVersion."
+          }
+
+      - name: Check desktop
+        run: npm run desktop:check
+
+      - name: Test desktop runtime
+        working-directory: apps/devkit/desktop/src-tauri
+        run: cargo test
+
+      - name: Build draft release and updater manifest
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/devkit/desktop
+          tauriScript: npm run tauri
+          tagName: desktop-v__VERSION__
+          releaseName: CodeLogix __VERSION__
+          releaseBody: Review the checks and publish this draft to make the signed update available.
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: false
+
+      - name: Collect root deploy outputs
+        run: npm run desktop:release:publish
+
+      - name: Upload root deploy outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: codelogix-${{ github.ref_name }}-windows-x64
+          path: dist/deploy/desktop/*/windows-x64
+          if-no-files-found: error

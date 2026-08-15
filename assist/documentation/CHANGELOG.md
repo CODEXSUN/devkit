@@ -1,8 +1,211 @@
 # Changelog
 
-Current version: 1.0.35
-Release tag: v-1.0.35
-Changelog label: v 1.0.35
+Current version: 1.0.49
+Release tag: v-1.0.49
+Changelog label: v 1.0.49
+
+### [Session] 2026-08-14 - Navigation drawer and local editor runtime
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Removed the floating view-options toggle and spacing selector.
+- Added a top-left application menu with an extensible side drawer.
+- Added workspace, command, terminal, update, and Settings actions to the drawer.
+- Moved the System, Light, and Dark theme selector into Settings.
+- Bundled Monaco and its language workers with the application instead of loading them remotely.
+- Preloaded Monaco while the workspace picker is open to reduce the first-file delay.
+- Fixed the editor grid so Monaco always receives the available workbench height.
+- Added explicit file-read and editor-start states.
+- Prevented duplicate and stale file loads during rapid tab changes.
+- Added smooth editor scrolling and caret movement.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, and production build checks.
+- Confirmed the production build includes local Monaco editor and language workers.
+- Passed Rust formatting, tests, and compilation checks.
+- Verified file opening, drawer actions, and theme changes in the native application.
+- Built the signed CodeLogix 1.0.43 Windows MSI and updater signature.
+
+### [Session] 2026-08-14 - CodeLogix package identity
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Changed the package display name from CodeLogicX Desktop to CodeLogix.
+- Changed the native window, landing screen, workspace, update center, and release labels to CodeLogix.
+- Replaced the remaining visible Desktop labels with Local runtime and Updates.
+- Kept the application identifier and updater signing keys unchanged for upgrade compatibility.
+- Removed the gray border from the generated application logo.
+- Regenerated the Windows, macOS, Android, iOS, and Store icon assets.
+
+#### Verification
+
+- Visually verified the borderless 512-pixel and 32-pixel icons.
+- Passed the desktop TypeScript, ESLint, production build, Rust formatting, tests, and compilation checks.
+- Built the signed CodeLogix 1.0.42 Windows MSI and updater signature.
+- Verified the native release window uses the CodeLogix title and borderless logo.
+
+### [Session] 2026-08-14 - CodeLogicX desktop application icon
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Replaced the default Tauri desktop icon with the blue four-panel mark used by the desktop landing screen.
+- Added a desktop-owned SVG source with a high-contrast rounded tile.
+- Generated Windows ICO and Store tiles, macOS ICNS, PNG, Android, and iOS icon assets from one source.
+- Kept the web logo unchanged.
+
+#### Verification
+
+- Visually verified the generated 512-pixel and 32-pixel desktop icons.
+- Built the signed version 1.0.41 Windows MSI and updater signature.
+- Passed the desktop TypeScript, ESLint, production build, Rust formatting, test, and compilation checks.
+
+### [Session] 2026-08-14 - Signed desktop updater and MSI lifecycle
+
+#### Database Changes
+
+- Database update: No.
+- Preserved the desktop SQLite database during MSI updates and uninstall.
+
+#### App Codebase Changes
+
+- Added signed desktop update checks against the public GitHub release feed.
+- Added background update downloads with progress status.
+- Added an update center that waits for user approval before installation.
+- Added passive MSI installation and app restart after a successful update.
+- Standardized Windows distribution on one MSI installer lineage.
+- Added minimum updater and process permissions to the main desktop window.
+- Added a draft GitHub release workflow with MSI signatures and `latest.json`.
+- Stored the updater private key outside the repository with a Windows-encrypted password.
+- Added a local signed-release build command.
+- Documented installer ownership, uninstall, recovery, signing, and release steps.
+
+#### Verification
+
+- Passed the desktop TypeScript check, ESLint check, and production build.
+- Passed Rust formatting, tests, and compilation checks.
+- Verified the update center in a clean live browser session.
+- Verified the browser fallback keeps installation disabled and logs no errors.
+- Built the version 1.0.40 MSI and updater signature.
+- Verified the embedded public key matches the updater signature key identifier.
+- Confirmed the public update feed remains unavailable until the first draft release is published.
+
+### [Session] 2026-08-14 - Single desktop instance and embedded terminal
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Changed the Windows release executable to the GUI subsystem.
+- Removed the extra console or Windows Terminal window during desktop startup.
+- Added a single-instance guard for the desktop application.
+- Focused and restored the existing window when the application starts again.
+- Kept PowerShell inside the IDE terminal after a workspace opens.
+- Kept the embedded terminal hidden on the workspace selection screen.
+
+#### Verification
+
+- Passed Rust formatting and compilation checks.
+- Built the version 1.0.39 release executable.
+- Verified two launches keep only one DevKit desktop process.
+- Verified no Windows Terminal process starts with the release executable.
+- Built the version 1.0.39 MSI and NSIS installers.
+
+### [Session] 2026-08-14 - System theme and command workflow
+
+#### Database Changes
+
+- Database update: No.
+- Saved the theme preference in local desktop storage.
+
+#### App Codebase Changes
+
+- Added Windows system, light, and dark theme options.
+- Updated Monaco and terminal colors when the theme changes.
+- Added a Ctrl+K command palette.
+- Added commands for workspace selection, navigation, files, terminal, and themes.
+- Added a local environment and branch summary to the title bar.
+- Kept the editor and terminal engines outside the startup bundle.
+
+#### Verification
+
+- Verified system theme resolution in the live desktop web surface.
+- Verified Ctrl+K command-palette opening and command rendering.
+- Verified a theme command changes the active theme and closes the palette.
+- Verified no browser console errors or horizontal overflow.
+- Passed the desktop TypeScript check, ESLint check, and production build.
+- Passed Rust formatting, tests, and compilation checks.
+- Passed the repository text encoding and version checks.
+- Built the version 1.0.38 MSI and NSIS installers.
+
+### [Session] 2026-08-14 - Local Python and ML environment
+
+#### Database Changes
+
+- Database update: No.
+- Kept Python environment state in the workspace and local runtime.
+
+#### App Codebase Changes
+
+- Detected Python project files and the available interpreter.
+- Detected a workspace-local `.venv` and its Python version.
+- Detected NVIDIA command-line tools without starting a GPU workload.
+- Added guarded `.venv` creation inside the open workspace.
+- Kept package and ML dependency installation explicit.
+- Added Python environment status and creation controls to the runtime panel.
+- Added guarded Git worktree creation and clean-worktree removal.
+
+#### Verification
+
+- Added native path and worktree-name policy tests.
+- Passed the desktop TypeScript check, ESLint check, and production build.
+- Passed Rust formatting, test, and compilation checks.
+- Passed the repository text encoding and version checks.
+- Built the version 1.0.37 MSI and NSIS installers.
+
+### [Session] 2026-08-14 - Local DevKit IDE MVP
+
+#### Database Changes
+
+- Database update: No.
+- Kept desktop tasks and sync records in the existing local SQLite database.
+
+#### App Codebase Changes
+
+- Added a lazy workspace file tree and a multi-tab Monaco editor.
+- Added dirty-file protection and Ctrl+S saves.
+- Added bounded workspace text search.
+- Added a native PowerShell terminal with Windows pseudoconsole support.
+- Added Git status, diff, stage, unstage, commit, and worktree inventory.
+- Added guarded worktree creation and clean-worktree removal.
+- Added local task, runtime, Python, and project skill panels.
+- Added external editor, File Explorer, and Windows Terminal launch actions.
+- Added a desktop content security policy.
+- Split the editor and terminal engines from the startup bundle.
+- Aligned the desktop and repository versions at 1.0.36.
+
+#### Verification
+
+- Passed the desktop TypeScript check, ESLint check, and production build.
+- Passed Rust formatting and compilation checks.
+- Passed the repository text encoding and version checks.
+- Verified the startup layout at 1280 by 720 with no browser console errors.
+- Built and started the Windows release executable.
+- Built the MSI and NSIS installers.
 
 ### [Session] 2026-08-11 - CODEXSUN application workspace layout
 
@@ -167,6 +370,298 @@ Changelog label: v 1.0.35
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.49
+
+### [v 1.0.49] 2026-08-15 6:53 pm - Root deploy output collection
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.49.
+- Added one root desktop deployment folder under `dist/deploy/desktop/<version>/windows-x64`.
+- Collected the runnable CodeLogix executable and bundled Codex sidecar under the `app` folder.
+- Collected the MSI and updater signature under the `installer` folder.
+- Generated a local Tauri `latest.json` updater manifest under the `updater` folder.
+- Generated SHA-256 checksums and a machine-readable release manifest for every deployable file.
+- Added a standalone publish command for an existing native release build.
+- Made the signed release command check the root-only dependency and build-output boundary first.
+- Added the root deploy folder to the GitHub Actions artifact output.
+- Kept compiler caches under Tauri `target` while exposing deployable files only from root `dist`.
+- Removed workspace-local `node_modules` folders and restored the repository root-only layout.
+
+#### Verification
+
+- Passed the repository root dependency and build-output boundary check.
+- Published and inspected the complete desktop release folder from an existing build.
+- Verified the release manifest, updater manifest, file sizes, and SHA-256 checksums.
+
+## v-1.0.48
+
+### [v 1.0.48] 2026-08-15 6:42 pm - Reviewed project learning loop
+
+#### Database Changes
+
+- MariaDB update: No.
+- Added desktop SQLite migration `0003_project_learning.sql`.
+- Added workspace learning settings and reviewed project facts with evidence and status.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.48.
+- Added a Project learning activity beside the Agent and Explorer activities.
+- Detected facts from repository instructions, manifests, project paths, and skill roots.
+- Required approval before a detected fact can enter the coding-agent context.
+- Added rejection, approval reversal, automatic evidence rechecks, and stale-fact status.
+- Returned changed approved facts to review before the agent can use them again.
+- Kept the original user message in task history while sending approved facts in a separate context block.
+- Added settings to disable context use or automatic rechecks for each workspace.
+- Kept project learning local to the desktop SQLite database.
+- Prevented the learning loop from editing project files, skills, instructions, or CodeLogix code.
+
+#### Verification
+
+- Passed desktop TypeScript, ESLint, Vitest, and production build checks.
+- Passed 5 frontend tests across 2 test files.
+- Passed 8 native tests, including approval, context, evidence detection, and stale-fact behavior.
+- Verified the Project learning activity, detected evidence, settings, counts, and review controls in the native application.
+- Built the CodeLogix 1.0.48 Windows MSI and its 420-byte Tauri updater signature.
+- Recorded MSI SHA-256 `7FDF0831AFE4D5DB5C65B99257DA45D66EFBC94C4E94D5413C8CD03992492CC2`.
+- Confirmed that the updater is signed while the MSI itself remains without an Authenticode certificate.
+
+## v-1.0.47
+
+### [v 1.0.47] 2026-08-15 6:26 pm - Agent IDE toolchain foundation
+
+#### Database Changes
+
+- Database update: No.
+- MariaDB schema update: No.
+- Desktop SQLite schema update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.47.
+- Audited the proposed agent IDE toolset against the existing DevKit owners and runtime boundaries.
+- Added direct Zustand state management for desktop shell navigation, drawers, terminal visibility, command palette, and update center state.
+- Added Zod validation at the Codex event boundary so malformed native payloads do not enter the React agent session.
+- Added Vitest coverage for valid messages, malformed events, thread extraction, and tool activity normalization.
+- Changed repository text search to prefer ripgrep JSON output with bounded results and a native recursive fallback when ripgrep is unavailable.
+- Added ripgrep capability reporting to the local runtime panel.
+- Documented the current, next, and deferred owners for MCP, LSP, Tree-sitter, vector search, LangGraph, model adapters, Docker, GitHub, jobs, realtime events, and observability.
+- Kept BullMQ and Redis in the API delivery layer instead of adding them to the local desktop process.
+- Deferred unused LangChain, LangGraph, language server, Tree-sitter, vector database, OpenTelemetry, and extra provider SDK dependencies until their owning services and acceptance tests are implemented.
+
+#### Verification
+
+- Installed the desktop dependencies with zero reported npm vulnerabilities.
+- Passed desktop TypeScript, ESLint, Vitest, and production build checks.
+- Passed 3 desktop protocol tests.
+- Passed Rust formatting, compilation, and 5 native library tests.
+- Detected ripgrep 15.1.0 in the local runtime.
+- Passed repository version consistency and whitespace checks.
+- Built the CodeLogix 1.0.47 Windows MSI and its 420-byte Tauri updater signature.
+- Recorded MSI SHA-256 `84BAAEA8A6DA5A857CACAA91902B9D88B71856D31773DC2306F98C5121251BF7`.
+- Confirmed that the updater is signed while the MSI itself remains without an Authenticode certificate.
+
+## v-1.0.46
+
+### [v 1.0.46] 2026-08-15 6:14 pm - Durable CodeLogix agent tasks
+
+#### Database Changes
+
+- MariaDB update: No.
+- Added the additive desktop SQLite migration `0002_agent_history.sql` for workspace-scoped
+  agent tasks and message transcripts.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.46.
+- Added native task and message persistence commands owned by the desktop runtime.
+- Persisted task titles, Codex thread identifiers, access modes, timestamps, and full user/agent
+  messages in the local desktop database.
+- Added Recent tasks with an accessible empty state, active state, relative time, and guarded task
+  switching while an agent is running.
+- Reconnected saved tasks through the Codex App Server `thread/resume` contract.
+- Restored the most recent workspace task and transcript when CodeLogix opens.
+- Kept agent protocol parsing, session orchestration, and presentation in focused owner files.
+
+#### Verification
+
+- Passed desktop TypeScript and ESLint checks.
+- Passed 4 Rust tests, including workspace-scoped task and message persistence.
+- Verified the native CodeLogix window renders Recent tasks and keeps Codex connected.
+- Verified the implementation against the generated schema from the bundled Codex App Server.
+- Did not send an external Codex test prompt during UI verification.
+- Built the CodeLogix 1.0.46 Windows MSI and updater signature without installing it.
+
+## v-1.0.45
+
+### [v 1.0.45] 2026-08-15 5:59 pm - Fast local-first CodeLogix startup
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.45.
+- Replaced the sequential desktop startup waterfall with an immediate local-first workspace shell.
+- Warmed one shared Codex runtime in the background and reused its startup promise across callers.
+- Restored the recent workspace before Git status and file indexing finish.
+- Loaded Git changes and workspace files concurrently with stale-result protection.
+- Deferred Monaco and its language workers until the user opens Explorer.
+- Added compact, non-blocking readiness states for agent startup, source control, file indexing, and
+  workspace opening.
+- Extracted desktop session orchestration and side-panel composition from the main shell.
+
+#### Verification
+
+- Passed the desktop TypeScript and ESLint checks after the startup refactor.
+- Passed the desktop production build, Rust formatting, 3 Rust tests, and Rust compilation.
+- Passed repository version consistency and whitespace validation.
+- Verified the native CodeLogix window restores the DevKit workspace and connects to Codex.
+- Verified Explorer remains the second activity and triggers the deferred editor load.
+- Verified `package.json` opens and renders in the embedded Monaco editor.
+- Built the CodeLogix 1.0.45 Windows MSI and updater signature without installing it.
+
+## v-1.0.44
+
+### [v 1.0.44] 2026-08-14 10:35 am - Agent-first CodeLogix workspace
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.44.
+- Made Agent the first and default desktop activity and moved Explorer to the second position.
+- Added a Codex-style task history rail, focused conversation surface, and environment inspector.
+- Added a native Codex App Server process bridge using the stable JSON-RPC thread and turn flow.
+- Bundled the platform Codex engine as a Tauri sidecar so the installed app does not depend on a
+  separately executable Windows Store binary.
+- Added streamed Agent replies, command and file activity, unified diff evidence, and run status.
+- Added workspace-write and read-only modes with network access disabled by default.
+- Added command and file approval cards with allow-once, allow-for-task, and decline decisions.
+- Added turn interruption, new-task creation, starter prompts, Git context, and direct file opening.
+- Kept the integrated terminal, editor, Git worktrees, search, tasks, skills, Docker, and updater.
+- Reopen the most recent valid workspace automatically and support `CODELOGIX_WORKSPACE` for a
+  deterministic local launch.
+
+#### Verification
+
+- Passed desktop TypeScript and ESLint checks.
+- Passed the desktop Vite production build with locally bundled Monaco workers.
+- Passed Rust compilation for the Tauri App Server bridge.
+- Passed three Rust library tests for Git worktree names and workspace-local Python environments.
+- Launched the native CodeLogix window and verified workspace loading, the agent-first layout, and
+  Explorer in the second activity position.
+- Verified a live Codex App Server turn returned `This workspace is DevKit.` without changing files.
+- Built the `CodeLogix_1.0.44_x64_en-US.msi` installer and its Tauri updater signature with the
+  bundled Codex engine.
+
+## v-1.0.43
+
+### [v 1.0.43] 2026-08-14 10:10 am - CodeLogix navigation drawer and local editor
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.43.
+- Replaced the floating view toggle with the application drawer and repaired local file editing.
+
+## v-1.0.42
+
+### [v 1.0.42] 2026-08-14 9:53 am - CodeLogix package identity
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.42.
+- Changed the package display name to CodeLogix and removed the application logo border.
+
+## v-1.0.41
+
+### [v 1.0.41] 2026-08-14 9:43 am - CodeLogicX desktop application icon
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.41.
+- Replaced all generated Tauri platform icons with the blue CodeLogicX Desktop application mark.
+
+## v-1.0.40
+
+### [v 1.0.40] 2026-08-14 8:54 am - Signed desktop updater and MSI lifecycle
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.40.
+
+## v-1.0.39
+
+### [v 1.0.39] 2026-08-14 8:36 am - Version update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.39.
+
+## v-1.0.38
+
+### [v 1.0.38] 2026-08-14 8:30 am - Version update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.38.
+
+## v-1.0.37
+
+### [v 1.0.37] 2026-08-14 8:17 am - Version update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.37.
+
+## v-1.0.36
+
+### [v 1.0.36] 2026-08-14 8:07 am - Version update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.36.
 
 ## v-1.0.35
 

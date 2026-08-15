@@ -1,25 +1,32 @@
 {
   "name": "@devkit/desktop",
-  "version": "1.0.35",
+  "version": "1.0.49",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build",
-    "check": "npm run typecheck && npm run lint && npm run build",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "dev": "vite --host 127.0.0.1 --port 1420",
     "lint": "eslint src --ext .ts,.tsx",
     "tauri": "tauri",
-    "tauri:build": "tauri build",
-    "tauri:dev": "tauri dev",
+    "tauri:build": "node ../../../tools/prepare-codex-sidecar.mjs && tauri build",
+    "tauri:dev": "node ../../../tools/prepare-codex-sidecar.mjs && tauri dev",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@openai/codex": "0.147.0",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "@xterm/xterm": "^6.0.0",
     "lucide-react": "^1.28.0",
     "monaco-editor": "^0.52.2",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
@@ -28,6 +35,7 @@
     "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^10.8.0",
     "typescript": "^7.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
   }
 }

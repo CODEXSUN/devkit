@@ -30,6 +30,7 @@ pub fn open_workspace(
 ) -> DesktopResult<Workspace> {
     let selected = path
         .map(Into::into)
+        .or_else(|| std::env::var_os("CODELOGIX_WORKSPACE").map(Into::into))
         .or_else(|| rfd::FileDialog::new().pick_folder())
         .ok_or_else(|| DesktopError::Policy("Workspace selection was canceled.".into()))?;
     let root = selected.canonicalize()?;

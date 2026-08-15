@@ -45,14 +45,8 @@ import {
   useProjectManagerMutations,
   useProjectManagerRecordsQuery
 } from "../project-manager/project-manager.hooks";
-import { ProjectManagerAttachments } from "../project-manager/project-manager.attachments";
 import { formFromRecord, payloadFromForm } from "../project-manager/project-manager.schema";
-import {
-  deleteProjectManagerAttachment,
-  uploadProjectManagerAttachment
-} from "../project-manager/project-manager.services";
 import type {
-  ProjectManagerAttachment,
   ProjectManagerForm,
   ProjectManagerRecord
 } from "../project-manager/project-manager.types";
@@ -65,6 +59,7 @@ import {
 } from "./work-automation.workflow";
 import { ProjectCardList } from "./work-automation.project-cards";
 import { ProjectDashboard } from "./work-automation.project-dashboard";
+import { useWorkAssigneeUsers, userLookupOptions } from "./work-automation.users";
 
 const issueStatusOptions = ["open", "in-progress", "needs-review", "blocked", "completed"];
 const projectStatusOptions = [
@@ -113,6 +108,7 @@ export function WorkAutomationWorkspace({
   const taskQuery = useProjectManagerRecordsQuery("task");
   const activityQuery = useProjectManagerRecordsQuery("activity");
   const reviewQuery = useProjectManagerRecordsQuery("review");
+  const assigneeUsersQuery = useWorkAssigneeUsers();
   const projectMutations = useProjectManagerMutations("project");
   const issueMutations = useProjectManagerMutations("issue");
   const taskMutations = useProjectManagerMutations("task");
@@ -123,7 +119,6 @@ export function WorkAutomationWorkspace({
   const [forcedKind, setForcedKind] = useState<FlowKind | null>(null);
   const [editing, setEditing] = useState<ProjectManagerForm | null>(null);
   const [editingKind, setEditingKind] = useState<FlowKind | null>(null);
-  const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -210,8 +205,7 @@ export function WorkAutomationWorkspace({
             (record.id === editing.referenceId || record.key === editing.referenceId)
         ) ?? null)
       : parent;
-  const busy =
-    attachmentUploading || editorMutations.create.isPending || editorMutations.update.isPending;
+  const busy = editorMutations.create.isPending || editorMutations.update.isPending;
   const workflowSearchOptions = useMemo(
     () =>
       workflowRecords
@@ -421,14 +415,13 @@ export function WorkAutomationWorkspace({
     window.location.assign(`/app/devkit/agent-ide?${search.toString()}`);
   }
 
-  function save(form: ProjectManagerForm, pendingFiles: File[]) {
+  function save(form: ProjectManagerForm) {
     const missing = requiredFields(form, editorKind);
     if (missing.length) {
       setSaveError(`Complete the required fields: ${missing.join(", ")}.`);
       return;
     }
     setSaveError("");
-    setAttachmentUploading(true);
     const action = form.id
       ? editorMutations.update.mutateAsync({
           id: form.id,
@@ -436,42 +429,20 @@ export function WorkAutomationWorkspace({
         })
       : editorMutations.create.mutateAsync(payloadFromForm(form));
     void action
-      .then(async (record) => {
-        const uploaded: ProjectManagerAttachment[] = [];
-        try {
-          for (const file of pendingFiles) {
-            uploaded.push(await uploadProjectManagerAttachment(editorKind, record.id, file));
-          }
-        } catch (uploadError) {
-          await Promise.allSettled(
-            uploaded.map((attachment) =>
-              deleteProjectManagerAttachment(editorKind, record.id, attachment.id)
-            )
-          );
-          if (!form.id) {
-            await mutationSets[editorKind].delete.mutateAsync(record.id).catch(() => undefined);
-          }
-          throw uploadError;
-        }
+      .then((record) => {
         toast.success(form.id ? `${label(editorKind)} updated` : `${label(editorKind)} created`, {
-          description: pendingFiles.length
-            ? `${record.title} · ${pendingFiles.length} attachment${
-                pendingFiles.length === 1 ? "" : "s"
-              }`
-            : record.title
+          description: record.title
         });
         setEditing(null);
         setEditingKind(null);
       })
       .catch((error) =>
-        setSaveError(
-          error instanceof Error ? error.message : "Record and attachments could not be saved."
-        )
-      )
-      .finally(() => setAttachmentUploading(false));
+        setSaveError(error instanceof Error ? error.message : "Record could not be saved.")
+      );
   }
 
   function lookupOptions(lookupKind: LookupKind) {
+    if (lookupKind === "assignee") return userLookupOptions(assigneeUsersQuery.data ?? []);
     const defaults =
       lookupKind === "status"
         ? statusesFor(editorKind)
@@ -486,6 +457,7 @@ export function WorkAutomationWorkspace({
   }
 
   async function createLookup(kind: LookupKind, name: string) {
+    if (kind === "assignee") throw new Error("Assignees must be selected from Identity users.");
     const option = toOption(name);
     setCreatedOptions((current) => ({
       ...current,
@@ -1160,10 +1132,9 @@ function IssueDialog({
   options: (kind: LookupKind) => WorkspaceLookupOption[];
   onCancel: () => void;
   onCreate: (kind: LookupKind, name: string) => Promise<WorkspaceLookupOption>;
-  onSave: (form: ProjectManagerForm, pendingFiles: File[]) => void;
+  onSave: (form: ProjectManagerForm) => void;
 }) {
   const [form, setForm] = useState(initial);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const invalid = error
     ? new Set(requiredFields(form, kind).map((field) => field.toLowerCase()))
     : new Set<string>();
@@ -1191,7 +1162,7 @@ function IssueDialog({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          onSave(form, pendingFiles);
+          onSave(form);
         }}
       >
         {error ? (
@@ -1291,7 +1262,7 @@ function IssueDialog({
             <IssueLookup
               kind="assignee"
               label={actorLabel(kind)}
-              required={kind === "project" || kind === "task" || kind === "review"}
+              required
               form={form}
               options={options}
               onCreate={onCreate}
@@ -1313,14 +1284,6 @@ function IssueDialog({
             </WorkspaceFormField>
           </div>
         </WorkspaceFormGrid>
-        {kind !== "project" && kind !== "issue" ? (
-          <ProjectManagerAttachments
-            kind={kind}
-            pendingFiles={pendingFiles}
-            {...(form.id ? { recordId: form.id } : {})}
-            onPendingFilesChange={setPendingFiles}
-          />
-        ) : null}
         <WorkspaceFormFooter
           className="mt-6 border-t pt-4"
           onCancel={onCancel}
@@ -1353,16 +1316,22 @@ function IssueLookup({
     <WorkspaceFormField label={fieldLabel} required={required}>
       <WorkspaceLookup
         allowTextValue={false}
-        createLabel={`Add ${fieldLabel}`}
-        createMode="inline"
-        emptyLabel={`No ${fieldLabel.toLowerCase()} found. Type a name to add it.`}
+        {...(kind === "assignee"
+          ? {
+              createMode: "none" as const,
+              emptyLabel: "No active users are available in Identity.",
+              placeholder: `Select ${fieldLabel.toLowerCase()}`
+            }
+          : {
+              createLabel: `Add ${fieldLabel}`,
+              createMode: "inline" as const,
+              emptyLabel: `No ${fieldLabel.toLowerCase()} found. Type a name to add it.`,
+              placeholder: `Search or add ${fieldLabel.toLowerCase()}`
+            })}
         options={options(kind)}
-        placeholder={`Search or add ${fieldLabel.toLowerCase()}`}
         value={form[kind]}
-        onCreate={(name) => onCreate(kind, name)}
-        onValueChange={(value, option) =>
-          onChange(kind, kind === "assignee" ? (option?.label ?? value) : value)
-        }
+        {...(kind === "assignee" ? {} : { onCreate: (name: string) => onCreate(kind, name) })}
+        onValueChange={(value) => onChange(kind, value)}
       />
     </WorkspaceFormField>
   );
@@ -1376,8 +1345,7 @@ function requiredFields(form: ProjectManagerForm, kind: FlowKind): string[] {
   ];
   if (kind !== "project" && kind !== "issue") fields.push(["Status", form.status]);
   if (usesPriority(kind)) fields.push(["Priority", form.priority]);
-  if (kind === "project" || kind === "task" || kind === "review")
-    fields.push([actorLabel(kind), form.assignee]);
+  fields.push([actorLabel(kind), form.assignee]);
   if (kind === "project") {
     fields.push(["Planned start", form.startDate]);
     fields.push(["Card logo", form.logoText]);

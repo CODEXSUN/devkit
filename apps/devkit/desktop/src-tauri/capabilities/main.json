@@ -3,5 +3,5 @@
   "identifier": "main-window",
   "description": "Minimum capability set for the local IDE window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "process:allow-restart", "updater:default"]
 }

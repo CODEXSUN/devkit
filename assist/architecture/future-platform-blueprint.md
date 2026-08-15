@@ -89,6 +89,9 @@ Use the existing TypeScript ecosystem unless evidence justifies a change:
 | Infrastructure        | Ubuntu, Docker, Cloudflare, Cloudflare Tunnel                   |
 | AI                    | Provider-neutral gateway supporting local and remote model APIs |
 
+The approved tool choices and delivery gates are in `agent-ide-toolchain.md`. That document keeps
+current tools separate from planned tools and prevents unused runtime dependencies.
+
 Rust may support Tauri or proven low-level needs. The orchestration system must not be rewritten in
 Rust without a demonstrated requirement.
 
