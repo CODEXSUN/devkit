@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.57
-Release tag: v-1.0.57
-Changelog label: v 1.0.57
+Current version: 1.0.58
+Release tag: v-1.0.58
+Changelog label: v 1.0.58
 
 ### [Session] 2026-08-15 - CodeLogix internal coding beta
 
@@ -461,6 +461,27 @@ Changelog label: v 1.0.57
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.58
+
+### [v 1.0.58] 2026-08-15 9:50 pm - Reliable signed desktop release
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.58.
+- Prepared the bundled Codex sidecar before native desktop tests in the Windows release workflow.
+- Kept release tags immutable by issuing this fix as a new desktop version after the failed 1.0.57 CI run.
+
+#### Verification
+
+- Confirmed the 1.0.57 GitHub release run failed only because the native build could not find the prepared Windows Codex sidecar.
+- Verified repository-owned package, Tauri, and Rust versions are synchronized at 1.0.58.
+- Passed desktop type checks, lint, 14 Vitest tests, the production build, and all 11 native Rust tests.
+- Built the 1.0.58 MSI and its 420-byte Tauri updater signature in the root deployment output.
 
 ## v-1.0.57
 

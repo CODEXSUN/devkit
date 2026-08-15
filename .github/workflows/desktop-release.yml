@@ -41,6 +41,9 @@ jobs:
       - name: Check desktop
         run: npm run desktop:check
 
+      - name: Prepare desktop sidecars
+        run: node tools/prepare-codex-sidecar.mjs
+
       - name: Test desktop runtime
         working-directory: apps/devkit/desktop/src-tauri
         run: cargo test
