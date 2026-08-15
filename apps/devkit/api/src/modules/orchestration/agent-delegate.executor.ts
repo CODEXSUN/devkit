@@ -6,6 +6,7 @@ import { agentWorktreeService } from "./agent-worktree.service.js";
 
 export class AgentDelegateExecutor {
   private readonly active = new Set<string>();
+  private recovery: Promise<number> | null = null;
 
   async call(taskUuid: string, actorId: string) {
     const graph = await agentTaskGraphRepository.start(taskUuid, actorId);
@@ -22,6 +23,16 @@ export class AgentDelegateExecutor {
       recovered += 1;
     }
     return recovered;
+  }
+
+  recoverOnce() {
+    if (!this.recovery) {
+      this.recovery = this.recover().catch((error: unknown) => {
+        this.recovery = null;
+        throw error;
+      });
+    }
+    return this.recovery;
   }
 
   private dispatch(taskUuid: string, actorId: string, recovering: boolean) {

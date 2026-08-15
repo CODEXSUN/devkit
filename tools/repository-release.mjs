@@ -8,6 +8,9 @@ import { createInterface } from "node:readline";
 
 const root = resolve(import.meta.dirname, "..");
 const changelogPath = join(root, "assist", "documentation", "CHANGELOG.md");
+const tauriConfigPath = join(root, "apps", "devkit", "desktop", "src-tauri", "tauri.conf.json");
+const cargoManifestPath = join(root, "apps", "devkit", "desktop", "src-tauri", "Cargo.toml");
+const cargoLockPath = join(root, "apps", "devkit", "desktop", "src-tauri", "Cargo.lock");
 const command = process.argv[2];
 const args = process.argv.slice(3);
 
@@ -93,6 +96,26 @@ function checkVersions() {
     if (actual !== expected) {
       failures.push(`${relative(root, file)} is ${actual}; expected ${expected}.`);
     }
+  }
+
+  if (existsSync(tauriConfigPath)) {
+    checkOwnedVersion(failures, tauriConfigPath, readJson(tauriConfigPath).version, expected);
+  }
+  if (existsSync(cargoManifestPath)) {
+    checkOwnedVersion(
+      failures,
+      cargoManifestPath,
+      rustPackageVersion(readFileSync(cargoManifestPath, "utf8"), "devkit-desktop"),
+      expected
+    );
+  }
+  if (existsSync(cargoLockPath)) {
+    checkOwnedVersion(
+      failures,
+      cargoLockPath,
+      rustPackageVersion(readFileSync(cargoLockPath, "utf8"), "devkit-desktop"),
+      expected
+    );
   }
 
   const lockPath = join(root, "package-lock.json");
@@ -218,7 +241,47 @@ async function githubNow() {
 function applyVersionBump(currentVersion, nextVersion, title, databaseUpdate) {
   for (const file of packageFiles()) updatePackage(file, currentVersion, nextVersion);
   updateLockfile(currentVersion, nextVersion);
+  updateDesktopVersions(currentVersion, nextVersion);
   updateChangelog(nextVersion, title, databaseUpdate);
+}
+
+function checkOwnedVersion(failures, file, actual, expected) {
+  if (String(actual ?? "") !== expected) {
+    failures.push(`${relative(root, file)} is ${actual ?? "missing"}; expected ${expected}.`);
+  }
+}
+
+function updateDesktopVersions(currentVersion, nextVersion) {
+  if (existsSync(tauriConfigPath)) {
+    const config = readJson(tauriConfigPath);
+    if (config.version !== currentVersion) {
+      throw new Error(`Tauri version is ${config.version}; expected ${currentVersion}.`);
+    }
+    config.version = nextVersion;
+    writeJson(tauriConfigPath, config);
+  }
+  updateRustPackageVersion(cargoManifestPath, "devkit-desktop", currentVersion, nextVersion);
+  updateRustPackageVersion(cargoLockPath, "devkit-desktop", currentVersion, nextVersion);
+}
+
+function rustPackageVersion(content, packageName) {
+  const escapedName = packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return content.match(
+    new RegExp(`(?:^|\\n)(?:\\[\\[?package\\]?\\]\\r?\\n)name = "${escapedName}"\\r?\\nversion = "([^"]+)"`, "u")
+  )?.[1];
+}
+
+function updateRustPackageVersion(file, packageName, currentVersion, nextVersion) {
+  if (!existsSync(file)) return;
+  const content = readFileSync(file, "utf8");
+  const escapedName = packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const pattern = new RegExp(
+    `((?:^|\\n)(?:\\[\\[?package\\]?\\]\\r?\\n)name = "${escapedName}"\\r?\\nversion = ")${currentVersion.replaceAll(".", "\\.")}(")`,
+    "u"
+  );
+  const match = content.match(pattern);
+  if (!match) throw new Error(`${relative(root, file)} does not contain ${packageName} ${currentVersion}.`);
+  writeFileSync(file, content.replace(pattern, `$1${nextVersion}$2`), "utf8");
 }
 
 function changedFiles() {

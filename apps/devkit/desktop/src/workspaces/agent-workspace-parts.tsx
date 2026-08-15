@@ -112,7 +112,7 @@ export function EnvironmentPanel({
         <h2><GitBranch size={15} /> Local</h2>
         <div className="environment-row"><span>Branch</span><strong>{workspace.branch}</strong></div>
         <div className="environment-row">
-          <span>Files indexed</span>
+          <span>Root entries</span>
           <strong>{filesState === "loading" ? "Indexing" : files.length}</strong>
         </div>
       </section>

@@ -1,8 +1,99 @@
 # Changelog
 
-Current version: 1.0.51
-Release tag: v-1.0.51
-Changelog label: v 1.0.51
+Current version: 1.0.57
+Release tag: v-1.0.57
+Changelog label: v 1.0.57
+
+### [Session] 2026-08-15 - CodeLogix internal coding beta
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Combined the completed CodeLogix Agent, editor, Git review, and workspace safety changes.
+- Kept Agent tasks connected while developers inspect files and other workspace views.
+- Added bounded file context with a 1,000-line limit for each attached file.
+- Added exact change fingerprints before stage and commit actions.
+- Added stalled-turn recovery and safe prompt submission rollback.
+- Hid untracked generated workspace roots from Explorer, search, and source control.
+- Synchronized all repository and desktop version owners through the release tool.
+- Kept the release scope at internal coding beta. A signed installer remains a separate release step.
+
+#### Verification
+
+- Passed the full repository policy, typecheck, lint, and framework test suite.
+- Passed the DevKit API, Platform API, DevKit web, and CodeLogix production builds.
+- Passed 14 desktop Vitest tests and 11 native Rust tests.
+- Passed the repository version, formatting, and diff checks.
+- Verified persistent Agent and editor state in the native CodeLogix app.
+- Did not build or publish a signed installer in this release step.
+
+### [Session] 2026-08-15 - Safe Agent prompt handoff
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Prepared project learning and attached files before creating a durable user message.
+- Blocked duplicate sends while CodeLogix prepares or submits a prompt.
+- Added visible Preparing context and Sending states to the Agent composer.
+- Restored the prompt when context preparation or Codex submission fails.
+- Removed an unaccepted user message from local history after a failed Codex submission.
+- Reported a separate error when local history cleanup fails.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, 14 Vitest tests, and production build.
+- Passed all 11 native Rust tests, including the local message rollback assertion.
+- Passed native Rust compilation for version 1.0.56.
+- Passed the repository version and diff checks.
+- Did not send a live model request.
+
+### [Session] 2026-08-15 - Persistent desktop Agent session
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Kept the Agent session mounted while developers use Explorer and other workspace views.
+- Preserved live Agent events, task state, and the connection across view changes.
+- Started Monaco only after the developer first leaves the Agent view.
+- Kept Monaco mounted after its first start to preserve open files and unsaved edits.
+- Opened command-palette file results in Explorer.
+- Reset the editor model when the selected workspace changes.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, 14 Vitest tests, and production build.
+- Verified Agent to Explorer to Agent switching in the native CodeLogix app.
+- Confirmed the task transcript and Codex connection remained active after each switch.
+- Confirmed the second Explorer switch reused the loaded editor without a loading state.
+- Passed the native Rust compilation and repository version checks.
+- Did not send a model request or change the sample workspace.
+
+### [Session] 2026-08-15 - One-thousand-line file context limit
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Replaced the per-file character limit with a strict 1,000-line limit.
+- Kept the three-file limit and the 24,000-character total prompt limit.
+- Added a test that removes all content after line 1,000.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, test, and production build checks.
+- Passed the native Rust compilation check.
+- Passed the repository version consistency and diff checks.
 
 ### [Session] 2026-08-14 - Navigation drawer and local editor runtime
 
@@ -371,6 +462,169 @@ Changelog label: v 1.0.51
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
 
+## v-1.0.57
+
+### [v 1.0.57] 2026-08-15 9:25 pm - CodeLogix internal coding beta
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.57.
+- Combined the completed CodeLogix Agent, editor, Git review, and workspace safety changes.
+- Added bounded file context, persistent Agent sessions, and safe prompt rollback.
+- Added exact change fingerprints before stage and commit actions.
+- Added stalled-turn recovery and generated-workspace filtering.
+- Synchronized all repository and desktop version owners through the release tool.
+- Kept the release scope at internal coding beta. A signed installer remains a separate release step.
+
+#### Verification
+
+- Passed the full repository policy, typecheck, lint, and framework test suite.
+- Passed the DevKit API, Platform API, DevKit web, and CodeLogix production builds.
+- Passed 14 desktop Vitest tests and 11 native Rust tests.
+- Passed the repository version, formatting, and diff checks.
+- Did not build or publish a signed installer in this release step.
+
+## v-1.0.56
+
+### [v 1.0.56] 2026-08-15 9:22 pm - Safe Agent prompt handoff
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.56.
+- Prepared project learning and attached files before creating a durable user message.
+- Blocked duplicate sends while CodeLogix prepares or submits a prompt.
+- Added visible Preparing context and Sending states to the Agent composer.
+- Restored the prompt when context preparation or Codex submission fails.
+- Removed an unaccepted user message from local history after a failed Codex submission.
+- Reported a separate error when local history cleanup fails.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, and 14 Vitest tests.
+- Passed all 11 native Rust tests, including the local message rollback assertion.
+- Passed the production build and native Rust compilation for version 1.0.56.
+- Passed the repository version and diff checks.
+- Did not send a live model request.
+
+## v-1.0.55
+
+### [v 1.0.55] 2026-08-15 9:15 pm - Persistent desktop Agent session
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.55.
+- Kept the Agent session mounted while developers use Explorer and other workspace views.
+- Preserved live Agent events, task state, and the connection across view changes.
+- Started Monaco only after the developer first leaves the Agent view.
+- Kept Monaco mounted after its first start to preserve open files and unsaved edits.
+- Opened command-palette file results in Explorer.
+- Reset the editor model when the selected workspace changes.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, 14 Vitest tests, and production build.
+- Verified persistent Agent and editor state in the native CodeLogix app.
+- Passed the native Rust compilation and repository version checks.
+- Did not send a model request or change the sample workspace.
+
+## v-1.0.54
+
+### [v 1.0.54] 2026-08-15 9:11 pm - One-thousand-line file context limit
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.54.
+- Replaced the per-file character limit with a strict 1,000-line limit.
+- Kept the three-file limit and the 24,000-character total prompt limit.
+- Added a test that removes all content after line 1,000.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, 14 Vitest tests, and the production build.
+- Passed the native Rust compilation check.
+- Passed the repository version consistency and diff checks.
+
+## v-1.0.53
+
+### [v 1.0.53] 2026-08-15 9:05 pm - Bounded IDE file context
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.53.
+- Added explicit active-file attachments to the CodeLogix agent composer.
+- Kept attached context while developers move between Explorer and Agent views.
+- Limited each task to three attached saved files, 12,000 characters per file, and 24,000
+  characters in total.
+- Re-read attached files when a prompt is sent so the agent receives the current saved content.
+- Marked truncated context and separated it from both approved project learning and the original
+  user request.
+- Told the agent to treat attached file content as untrusted reference data.
+- Kept the original user message unchanged in durable task history.
+- Added accessible context chips with individual removal and automatic clearing for a new task or
+  workspace.
+
+#### Verification
+
+- Passed desktop TypeScript, ESLint, 14 Vitest tests, and the production build.
+- Passed Rust formatting, 11 Rust tests, and Rust compilation checks.
+- Passed the repository version and diff checks for version 1.0.53.
+- Verified the native CodeLogix app with the live sample workspace.
+- Selected `README.md` in Explorer, attached it in Agent, confirmed the chip persisted after moving
+  between views, and removed it successfully.
+- Did not send the attached sample to a model, stage files, or create a commit.
+
+## v-1.0.52
+
+### [v 1.0.52] 2026-08-15 8:48 pm - Desktop live workflow hardening
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.52.
+- Synchronized the npm workspace, Tauri configuration, Rust manifest, and Rust lockfile versions.
+- Extended the release tool to check and update every desktop version owner.
+- Added one shared policy that hides generated workspace roots from Explorer, fallback search, and
+  untracked Source Control results.
+- Kept tracked generated files visible so existing repository content cannot be hidden accidentally.
+- Added a content fingerprint and explicit review approval before staging or committing changes.
+- Invalidated change approval when the reviewed workspace content changes.
+- Added a one-minute stalled-turn warning and a bounded three-minute automatic interruption.
+- Renamed the environment file count to `Root entries` so the UI describes the loaded data correctly.
+- Added focused tests for generated-path policy, review matching, and stalled-turn recovery.
+
+#### Verification
+
+- Passed the desktop TypeScript, ESLint, Vitest, and production build checks.
+- Passed Rust formatting, 11 Rust tests, and Rust compilation checks.
+- Passed the repository version check for version 1.0.52.
+- Verified the native CodeLogix app against the live sample workspace.
+- Confirmed the live Source Control panel hides untracked `dist`, shows the three authored changes,
+  disables staging before review, and unlocks staging after approving the exact content.
+- Did not stage or commit the sample project changes.
+
 ## v-1.0.51
 
 ### [v 1.0.51] 2026-08-15 8:13 pm - Named delegate restart recovery
@@ -382,6 +636,25 @@ Changelog label: v 1.0.51
 #### App Codebase Changes
 
 - Bumped repository version to 1.0.51.
+- Added one-time recovery for running named delegates after an API process restart.
+- Started recovery only inside an authenticated request database and actor context.
+- Reused each task's existing child run, worktree, scope, profile, model, and access ceiling.
+- Started a new Codex thread and turn for each recovered delegate.
+- Closed stale pending approval records before the replacement turn started.
+- Added `run.recovered` child events and `run.task.recovered` parent events.
+- Made executor startup failures finish the durable task instead of leaving it stuck in `running`.
+- Extended the isolated named Agent E2E test to restart the API after parallel task dispatch.
+
+#### Verification
+
+- Passed the DevKit API TypeScript and ESLint checks.
+- Built the DevKit API and Platform API packages.
+- Passed the live named Agent E2E against MariaDB and the real Codex App Server.
+- Replaced the API process while Forge and Canvas were running.
+- Verified both delegates resumed in their existing worktrees and changed only assigned files.
+- Verified both child runs and the parent run stored recovery events.
+- Verified Atlas completed the dependency-final review after recovery.
+- Verified the final human parent approval completed the recovered graph.
 
 ## v-1.0.50
 

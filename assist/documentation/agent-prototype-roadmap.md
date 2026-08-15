@@ -71,8 +71,9 @@ tasks, calls ready delegates through Codex, and keeps each writable task in an i
 The scheduler rejects concurrent scope overlap, enforces the Agent profile permission ceiling,
 records approvals and evidence on child runs, and stops a task when its changed files leave the
 declared scope. A dependency-final review task may call the named supervisor before human parent
-approval. Per-task skill selection, controlled branch integration, and restart recovery for an
-in-flight delegate remain later work.
+approval. Running delegates recover in their existing child worktrees after an API restart. The
+recovery starts on the first authenticated Orchestration request and records parent and child
+events. Per-task skill selection and controlled branch integration remain later work.
 
 ### Phase 4 - Model Gateway
 

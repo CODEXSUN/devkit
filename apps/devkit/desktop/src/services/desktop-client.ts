@@ -61,6 +61,10 @@ export class DesktopClient {
     return invoke<AgentMessage>("save_agent_message", { content, id, role, taskId });
   }
 
+  async deleteAgentMessage(taskId: number, id: string) {
+    return invoke<boolean>("delete_agent_message", { id, taskId });
+  }
+
   async sendAgentTurn(threadId: string, prompt: string, access: AgentAccess) {
     return invoke<number>("send_agent_turn", { access, prompt, threadId });
   }
@@ -93,20 +97,24 @@ export class DesktopClient {
     return invoke<GitChange[]>("git_status");
   }
 
+  async gitChangeFingerprint() {
+    return invoke<string>("git_change_fingerprint");
+  }
+
   async gitDiff(path?: string) {
     return invoke<string>("git_diff", { path: path ?? null });
   }
 
-  async gitStage(paths: string[]) {
-    return invoke<void>("git_stage", { paths });
+  async gitStage(paths: string[], expectedFingerprint: string) {
+    return invoke<void>("git_stage", { expectedFingerprint, paths });
   }
 
   async gitUnstage(paths: string[]) {
     return invoke<void>("git_unstage", { paths });
   }
 
-  async gitCommit(message: string) {
-    return invoke<string>("git_commit", { message });
+  async gitCommit(message: string, expectedFingerprint: string) {
+    return invoke<string>("git_commit", { expectedFingerprint, message });
   }
 
   async gitWorktrees() {

@@ -6,13 +6,13 @@ use serde::Serialize;
 use serde_json::Value;
 use tauri::State;
 
+use crate::commands::workspace_policy::is_hidden_workspace_entry;
 use crate::commands::workspace_root;
 use crate::error::DesktopResult;
 use crate::state::DesktopState;
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_RESULTS: usize = 250;
-const IGNORED_DIRECTORIES: &[&str] = &[".git", "node_modules", "dist", "target", ".venv"];
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +57,10 @@ fn ripgrep_search(root: &Path, query: &str) -> DesktopResult<Option<Vec<SearchMa
             "!target/**",
             "--glob",
             "!.venv/**",
+            "--glob",
+            "!.next/**",
+            "--glob",
+            "!coverage/**",
             "--",
             query,
             ".",
@@ -112,7 +116,7 @@ fn search_directory(
     for entry in fs::read_dir(directory)?.filter_map(Result::ok) {
         let path = entry.path();
         if path.is_dir() {
-            if !IGNORED_DIRECTORIES.contains(&entry.file_name().to_string_lossy().as_ref()) {
+            if !is_hidden_workspace_entry(&entry.file_name().to_string_lossy()) {
                 search_directory(root, &path, query, matches)?;
             }
             continue;

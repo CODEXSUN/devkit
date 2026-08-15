@@ -78,6 +78,20 @@ pub fn save_agent_message(
         .save_agent_message(task_id, id, &role, content)
 }
 
+#[tauri::command]
+pub fn delete_agent_message(
+    task_id: i64,
+    id: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<bool> {
+    let id = required(&id, "Message identifier")?;
+    state
+        .database
+        .lock()
+        .map_err(|_| unavailable())?
+        .delete_agent_message(task_id, id)
+}
+
 fn required<'a>(value: &'a str, label: &str) -> DesktopResult<&'a str> {
     let value = value.trim();
     if value.is_empty() {

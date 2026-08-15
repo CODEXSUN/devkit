@@ -1,7 +1,8 @@
 import { Check, GitCommit, Minus, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { GitChange, GitWorktree } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
+import { reviewIsCurrent } from "./change-review";
 
 export function GitPanel({
   changes,
@@ -17,6 +18,29 @@ export function GitPanel({
   const [diff, setDiff] = useState<string>();
   const [worktreeName, setWorktreeName] = useState("");
   const [error, setError] = useState<string>();
+  const [currentFingerprint, setCurrentFingerprint] = useState<string>();
+  const [approvedFingerprint, setApprovedFingerprint] = useState<string>();
+  const reviewCurrent = reviewIsCurrent(approvedFingerprint, currentFingerprint);
+
+  useEffect(() => {
+    let disposed = false;
+    if (!changes.length) {
+      setCurrentFingerprint(undefined);
+      setApprovedFingerprint(undefined);
+      return;
+    }
+    void desktopClient
+      .gitChangeFingerprint()
+      .then((fingerprint) => {
+        if (!disposed) setCurrentFingerprint(fingerprint);
+      })
+      .catch((reason) => {
+        if (!disposed) setError(String(reason));
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [changes]);
 
   async function action(run: () => Promise<unknown>) {
     try {
@@ -27,8 +51,47 @@ export function GitPanel({
       setError(String(reason));
     }
   }
+
+  async function reviewedAction(run: (fingerprint: string) => Promise<unknown>) {
+    await action(async () => {
+      const fingerprint = await desktopClient.gitChangeFingerprint();
+      setCurrentFingerprint(fingerprint);
+      if (!reviewIsCurrent(approvedFingerprint, fingerprint)) {
+        throw new Error("The change set changed after review. Review and approve it again.");
+      }
+      await run(fingerprint);
+    });
+  }
+
+  async function approveChanges() {
+    try {
+      const fingerprint = await desktopClient.gitChangeFingerprint();
+      setCurrentFingerprint(fingerprint);
+      setApprovedFingerprint(fingerprint);
+      setError(undefined);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
   return (
     <div className="git-panel">
+      <div className={`change-review${reviewCurrent ? " approved" : ""}`}>
+        <span>
+          <strong>{reviewCurrent ? "Change set approved" : "Review required"}</strong>
+          <small>
+            {reviewCurrent
+              ? "Staging and commit are unlocked for the reviewed content."
+              : "Inspect the diffs, then approve this exact content before staging."}
+          </small>
+        </span>
+        <button
+          disabled={!changes.length || !currentFingerprint || reviewCurrent}
+          onClick={() => void approveChanges()}
+          type="button"
+        >
+          <Check size={13} /> {reviewCurrent ? "Approved" : "Approve changes"}
+        </button>
+      </div>
       <div className="commit-box">
         <textarea
           aria-label="Commit message"
@@ -37,10 +100,10 @@ export function GitPanel({
           value={message}
         />
         <button
-          disabled={!message.trim()}
+          disabled={!message.trim() || !reviewCurrent}
           onClick={() =>
-            void action(async () => {
-              await desktopClient.gitCommit(message);
+            void reviewedAction(async (fingerprint) => {
+              await desktopClient.gitCommit(message, fingerprint);
               setMessage("");
             })
           }
@@ -64,7 +127,12 @@ export function GitPanel({
           <span>{change.status}</span>
           <button
             aria-label={`Stage ${change.path}`}
-            onClick={() => void action(() => desktopClient.gitStage([change.path]))}
+            disabled={!reviewCurrent}
+            onClick={() =>
+              void reviewedAction((fingerprint) =>
+                desktopClient.gitStage([change.path], fingerprint)
+              )
+            }
             type="button"
           >
             <Plus size={13} />

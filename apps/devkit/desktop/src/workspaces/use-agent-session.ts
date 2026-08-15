@@ -15,13 +15,18 @@ import {
   textAt,
   threadIdFrom
 } from "./agent-protocol";
+import { AgentTurnWatchdog } from "./agent-turn-watchdog";
+import { buildAgentPrompt, loadBoundedFileContext } from "./agent-context";
 
 export type ChatMessage = { id: string; role: "agent" | "user"; text: string };
+export type SubmissionPhase = "idle" | "preparing" | "sending";
 
 export function useAgentSession({
+  contextPaths,
   onRefreshChanges,
   workspace
 }: {
+  contextPaths: string[];
   onRefreshChanges: () => Promise<void>;
   workspace: Workspace;
 }) {
@@ -34,6 +39,8 @@ export function useAgentSession({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [runItems, setRunItems] = useState<RunItem[]>([]);
   const [running, setRunning] = useState(false);
+  const [stalled, setStalled] = useState(false);
+  const [submissionPhase, setSubmissionPhase] = useState<SubmissionPhase>("idle");
   const [runtime, setRuntime] = useState<"connecting" | "ready" | "unavailable">(
     "connecting"
   );
@@ -41,7 +48,28 @@ export function useAgentSession({
   const [threadId, setThreadId] = useState<string>();
   const [turnId, setTurnId] = useState<string>();
   const activeTaskIdRef = useRef<number | undefined>(undefined);
+  const threadIdRef = useRef<string | undefined>(undefined);
+  const turnIdRef = useRef<string | undefined>(undefined);
   const transcript = useRef<HTMLDivElement>(null);
+  const watchdogRef = useRef<AgentTurnWatchdog | undefined>(undefined);
+  const busy = running || submissionPhase !== "idle";
+  watchdogRef.current ??= new AgentTurnWatchdog({
+    onRecovered: () => setStalled(false),
+    onStalled: () => setStalled(true),
+    onTimeout: () => {
+      setStalled(false);
+      setError(
+        "The agent produced no activity for three minutes, so CodeLogix stopped the turn. Send a follow-up to continue."
+      );
+      const currentThreadId = threadIdRef.current;
+      const currentTurnId = turnIdRef.current;
+      if (currentThreadId && currentTurnId) {
+        void desktopClient.interruptAgentTurn(currentThreadId, currentTurnId).catch((reason) => {
+          setError(`The stalled turn could not be stopped. ${String(reason)}`);
+        });
+      }
+    }
+  });
 
   useEffect(() => {
     let disposed = false;
@@ -77,6 +105,7 @@ export function useAgentSession({
     });
     return () => {
       disposed = true;
+      watchdogRef.current?.stop();
       stopEvents?.();
       stopErrors?.();
     };
@@ -87,11 +116,18 @@ export function useAgentSession({
   }, [messages, runItems]);
 
   function handleAgentEvent(message: AgentProtocolMessage) {
+    watchdogRef.current?.touch();
     const nextThread = threadIdFrom(message);
-    if (nextThread) setThreadId(nextThread);
+    if (nextThread) {
+      threadIdRef.current = nextThread;
+      setThreadId(nextThread);
+    }
     if (message.method === "turn/started") {
-      setTurnId(textAt(message, "params", "turn", "id"));
+      const nextTurnId = textAt(message, "params", "turn", "id");
+      turnIdRef.current = nextTurnId;
+      setTurnId(nextTurnId);
       setRunning(true);
+      watchdogRef.current?.start();
     }
     if (message.method === "item/agentMessage/delta") {
       appendAgentText(textAt(message, "params", "delta") ?? "");
@@ -124,7 +160,9 @@ export function useAgentSession({
       });
     }
     if (message.method === "turn/completed") {
+      watchdogRef.current?.stop();
       setRunning(false);
+      turnIdRef.current = undefined;
       setTurnId(undefined);
       void onRefreshChanges();
       void recheckProjectLearning();
@@ -134,31 +172,48 @@ export function useAgentSession({
 
   async function send() {
     const prompt = composer.trim();
-    if (!prompt || !threadId || running) return;
+    if (!prompt || !threadId || busy) return;
     setComposer("");
     setError(undefined);
     setRunItems([]);
     setDiff("");
     const message = { id: crypto.randomUUID(), role: "user" as const, text: prompt };
+    let savedMessage: { id: string; taskId: number } | undefined;
     try {
+      setSubmissionPhase("preparing");
+      const [learningContext, fileContext] = await Promise.all([
+        desktopClient.projectLearningContext(),
+        loadBoundedFileContext(contextPaths, (path) => desktopClient.readFile(path))
+      ]);
       const task = await ensureTask(threadId, prompt);
       await desktopClient.saveAgentMessage(task.id, message.id, message.role, message.text);
+      savedMessage = { id: message.id, taskId: task.id };
       setMessages((current) => [...current, message]);
       setRunning(true);
-      const learningContext = await desktopClient.projectLearningContext();
+      setSubmissionPhase("sending");
       await desktopClient.sendAgentTurn(
         threadId,
-        promptWithLearning(prompt, learningContext),
+        buildAgentPrompt(prompt, learningContext, fileContext),
         access
       );
     } catch (reason) {
       setRunning(false);
-      setError(String(reason));
+      const rollbackError = savedMessage
+        ? await rollbackMessage(savedMessage.taskId, savedMessage.id)
+        : undefined;
+      setComposer((current) => current || prompt);
+      setError(
+        rollbackError
+          ? `The prompt was not sent, and its saved draft could not be removed. ${rollbackError}`
+          : `The prompt was not sent. ${String(reason)}`
+      );
+    } finally {
+      setSubmissionPhase("idle");
     }
   }
 
   async function newChat() {
-    if (running) return;
+    if (busy) return;
     setActiveTask(undefined);
     resetConversation();
     try {
@@ -169,9 +224,10 @@ export function useAgentSession({
   }
 
   async function openTask(task: AgentTask) {
-    if (running || task.id === activeTaskIdRef.current) return;
+    if (busy || task.id === activeTaskIdRef.current) return;
     setError(undefined);
     setThreadId(undefined);
+    threadIdRef.current = undefined;
     setRunItems([]);
     setDiff("");
     setAccess(task.access);
@@ -239,6 +295,16 @@ export function useAgentSession({
     }
   }
 
+  async function rollbackMessage(taskId: number, id: string) {
+    try {
+      await desktopClient.deleteAgentMessage(taskId, id);
+      setMessages((current) => current.filter((message) => message.id !== id));
+      return undefined;
+    } catch (reason) {
+      return String(reason);
+    }
+  }
+
   function setActiveTask(id: number | undefined) {
     activeTaskIdRef.current = id;
     setActiveTaskId(id);
@@ -285,6 +351,7 @@ export function useAgentSession({
     access,
     activeTaskId,
     approval,
+    busy,
     composer,
     decide,
     diff,
@@ -299,6 +366,8 @@ export function useAgentSession({
     send,
     setAccess,
     setComposer,
+    stalled,
+    submissionPhase,
     tasks,
     threadId,
     transcript,
@@ -313,9 +382,4 @@ function toChatMessage(message: AgentMessage): ChatMessage {
 
 function taskTitle(prompt: string) {
   return prompt.length <= 80 ? prompt : `${prompt.slice(0, 77).trimEnd()}...`;
-}
-
-export function promptWithLearning(prompt: string, learningContext: string) {
-  if (!learningContext) return prompt;
-  return `${learningContext}\n\n<user_request>\n${prompt}\n</user_request>`;
 }

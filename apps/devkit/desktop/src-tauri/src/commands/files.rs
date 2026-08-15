@@ -3,6 +3,7 @@ use std::fs;
 use serde::Serialize;
 use tauri::State;
 
+use crate::commands::workspace_policy::is_hidden_workspace_entry;
 use crate::commands::{display_name, workspace_path, workspace_root};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
@@ -58,7 +59,7 @@ pub fn list_files(path: String, state: State<'_, DesktopState>) -> DesktopResult
     let directory = workspace_path(&state, &path)?;
     let mut entries = fs::read_dir(directory)?
         .filter_map(Result::ok)
-        .filter(|entry| entry.file_name() != ".git")
+        .filter(|entry| !is_hidden_workspace_entry(&entry.file_name().to_string_lossy()))
         .map(|entry| {
             let absolute = entry.path();
             let relative = absolute

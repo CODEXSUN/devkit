@@ -291,6 +291,15 @@ button.tree-row:hover,
 .workbench.terminal-visible {
   grid-template-rows: minmax(0, 1fr) 180px;
 }
+.workspace-surface {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-surface[hidden] {
+  display: none;
+}
 .ide-body.agent-active {
   grid-template-columns: 48px minmax(0, 1fr);
 }
@@ -566,6 +575,40 @@ button.tree-row:hover,
   display: grid;
   gap: 6px;
   padding-bottom: 8px;
+}
+
+.change-review {
+  background: #fffaf0;
+  border: 1px solid #d8c79e;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.change-review.approved {
+  background: #eefaf5;
+  border-color: #a9d9c4;
+}
+
+.change-review span {
+  display: grid;
+  gap: 3px;
+}
+
+.change-review small {
+  color: #73787e;
+  line-height: 1.35;
+}
+
+.change-review button {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
 }
 .commit-box textarea {
   min-height: 58px;
@@ -1321,6 +1364,17 @@ button.tree-row:hover,
   border-color: #41464d;
   background: #292d32;
   color: #e4e7eb;
+}
+:root[data-theme="dark"] .change-review {
+  border-color: #665a3c;
+  background: #302b21;
+}
+:root[data-theme="dark"] .change-review.approved {
+  border-color: #315e4c;
+  background: #20332c;
+}
+:root[data-theme="dark"] .change-review small {
+  color: #aeb4bc;
 }
 :root[data-theme="dark"] .learning-panel {
   border-color: #34383e;

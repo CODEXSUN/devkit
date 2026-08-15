@@ -47,10 +47,13 @@ const hostingerSshTargetSchema = z.object({
 }).strict();
 
 export async function registerOrchestrationRoutes(app: FastifyInstance) {
-  const recoveredDelegates = await agentDelegateExecutor.recover();
-  if (recoveredDelegates) {
+  let recoveryReported = false;
+  app.addHook("preHandler", async () => {
+    const recoveredDelegates = await agentDelegateExecutor.recoverOnce();
+    if (!recoveredDelegates || recoveryReported) return;
+    recoveryReported = true;
     app.log.info({ recoveredDelegates }, "Recovered named Agent delegates after API restart.");
-  }
+  });
   app.get("/orchestration/catalog", async (request) =>
     ok(service.catalog(), { requestId: request.id })
   );

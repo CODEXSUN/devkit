@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   Blocks,
   Bot,
@@ -14,6 +14,7 @@ import {
   Settings
 } from "lucide-react";
 import { AgentWorkspace } from "../workspaces/agent-workspace";
+import { MAX_AGENT_CONTEXT_FILES } from "../workspaces/agent-context";
 import { SetupWorkspace } from "../workspaces/setup-workspace";
 import { AppDrawer } from "./app-drawer";
 import { OpenInMenu } from "./open-in-menu";
@@ -54,6 +55,8 @@ export function DesktopApp() {
     () => matchMedia("(prefers-color-scheme: dark)").matches
   );
   const [selectedPath, setSelectedPath] = useState<string>();
+  const [agentContextPaths, setAgentContextPaths] = useState<string[]>([]);
+  const [editorStarted, setEditorStarted] = useState(false);
   const updater = useDesktopUpdater();
   const session = useDesktopSession();
   const { changes, files, system, workspace } = session;
@@ -71,6 +74,15 @@ export function DesktopApp() {
     document.documentElement.dataset.theme = resolvedTheme;
     localStorage.setItem("devkit-theme", theme);
   }, [resolvedTheme, theme]);
+
+  useEffect(() => {
+    setAgentContextPaths([]);
+    setSelectedPath(undefined);
+  }, [workspace?.path]);
+
+  useLayoutEffect(() => {
+    if (ui.activity !== "assist") setEditorStarted(true);
+  }, [ui.activity]);
 
   useEffect(() => {
     function keyboard(event: KeyboardEvent) {
@@ -130,7 +142,10 @@ export function DesktopApp() {
           id: `file-${file.path}`,
           label: file.name,
           detail: file.path,
-          run: () => setSelectedPath(file.path)
+          run: () => {
+            setSelectedPath(file.path);
+            ui.setActivity("files");
+          }
         }))
     ],
     [files, ui.setActivity, ui.setUpdateOpen, ui.terminalOpen, ui.toggleTerminal]
@@ -225,29 +240,46 @@ export function DesktopApp() {
         <main
           className={`workbench${ui.activity === "assist" ? " agent-workbench" : ""}${ui.terminalOpen ? " terminal-visible" : ""}`}
         >
-          {ui.activity === "assist" ? (
+          <div className="workspace-surface" hidden={ui.activity !== "assist"}>
             <AgentWorkspace
               changes={changes}
               changesState={session.changesState}
+              contextPaths={agentContextPaths}
               files={files}
               filesState={session.filesState}
               key={workspace.path}
+              onAddContext={(path) =>
+                setAgentContextPaths((current) =>
+                  current.includes(path) || current.length >= MAX_AGENT_CONTEXT_FILES
+                    ? current
+                    : [...current, path]
+                )
+              }
+              onClearContext={() => setAgentContextPaths([])}
               onOpenFile={(path) => {
                 setSelectedPath(path);
                 ui.setActivity("files");
               }}
               onRefreshChanges={session.refreshChanges}
+              onRemoveContext={(path) =>
+                setAgentContextPaths((current) => current.filter((entry) => entry !== path))
+              }
+              selectedPath={selectedPath}
               workspace={workspace}
             />
-          ) : (
-            <Suspense fallback={<div className="workspace-loading">Loading editor...</div>}>
-              <EditorWorkspace
-                onSelectPath={setSelectedPath}
-                path={selectedPath}
-                theme={resolvedTheme}
-              />
-            </Suspense>
-          )}
+          </div>
+          {editorStarted ? (
+            <div className="workspace-surface" hidden={ui.activity === "assist"}>
+              <Suspense fallback={<div className="workspace-loading">Loading editor...</div>}>
+                <EditorWorkspace
+                  key={workspace.path}
+                  onSelectPath={setSelectedPath}
+                  path={selectedPath}
+                  theme={resolvedTheme}
+                />
+              </Suspense>
+            </div>
+          ) : null}
           {ui.terminalOpen ? (
             <Suspense fallback={<div className="terminal-loading">Starting terminal...</div>}>
               <TerminalPanel theme={resolvedTheme} workspace={workspace} />

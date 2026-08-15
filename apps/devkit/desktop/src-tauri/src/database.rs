@@ -170,6 +170,14 @@ impl DesktopDatabase {
         Ok(message)
     }
 
+    pub fn delete_agent_message(&self, task_id: i64, id: &str) -> DesktopResult<bool> {
+        let deleted = self.connection.execute(
+            "DELETE FROM desktop_agent_messages WHERE task_id = ?1 AND id = ?2",
+            params![task_id, id],
+        )?;
+        Ok(deleted > 0)
+    }
+
     pub fn pending_sync_count(&self) -> DesktopResult<usize> {
         let count = self.connection.query_row(
             "SELECT COUNT(*) FROM desktop_sync_outbox WHERE status='pending'",
@@ -238,6 +246,12 @@ mod tests {
         let messages = database.list_agent_messages(task.id).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[1].content, "Startup is now deferred.");
+        assert!(database
+            .delete_agent_message(task.id, "message-1")
+            .expect("delete unaccepted message"));
+        let messages = database.list_agent_messages(task.id).unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].id, "message-2");
 
         drop(database);
         std::fs::remove_file(path).expect("remove test database");

@@ -20,7 +20,12 @@
 - `apps/devkit/desktop`: Tauri and React local IDE with a bundled Codex runtime, Monaco, Zustand
   shell state, Zod protocol validation, ripgrep-first search, Git, terminal, SQLite, and signed
   Windows updates. The desktop also owns reviewed project learning from repository evidence.
-  Only approved and current facts enter the agent context.
+  Only approved and current facts enter the agent context. Developers may explicitly attach up to
+  three saved workspace files to a task. Each file supplies no more than 1,000 lines, and all files
+  share a 24,000-character prompt limit. Attachments remain separate from the durable user message
+  and are re-read only when the prompt is sent. The Agent session stays mounted across workspace
+  views. Monaco starts on its first use and then stays mounted for the selected workspace. Prompt
+  preparation blocks duplicate sends and removes local user messages that Codex does not accept.
 - Orchestration owns MariaDB-backed Project Agent chat threads, messages, edited-file evidence,
   elapsed time, and feedback. Every chat-history query is partitioned by the authenticated local
   actor ID; this is scoped record isolation, not a claim of platform-wide multi-tenant isolation.

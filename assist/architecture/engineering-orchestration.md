@@ -52,7 +52,8 @@ The current orchestration slice provides these implemented controls:
 - delegate completion is automatic only after the worktree remains inside its declared file scope;
 - a named supervisor can execute the dependency-final review task, while a human still owns the
   parent approval gate;
-- durable recovery of an in-flight delegate after an API process restart remains planned.
+- the first authenticated Orchestration request after an API restart recovers running delegates in
+  their existing child runs and worktrees with new Codex turns and durable recovery events;
 - DevKit can register the Hostinger VPS MCP server in its private Codex runtime. The server-side
   environment supplies the API token, while Codex applies MCP tool approval policy. DevKit never
   returns the token to the browser or stores it in the generated Codex configuration.

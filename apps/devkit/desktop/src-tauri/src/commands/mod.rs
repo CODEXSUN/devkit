@@ -12,6 +12,7 @@ pub mod sync;
 pub mod system;
 pub mod tasks;
 pub mod terminal;
+mod workspace_policy;
 
 use std::path::{Path, PathBuf};
 

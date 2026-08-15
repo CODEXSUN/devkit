@@ -1,10 +1,12 @@
 use std::fs;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
 use std::process::Command;
 
 use serde::Serialize;
 use tauri::State;
 
+use crate::commands::workspace_policy::is_generated_untracked_path;
 use crate::commands::workspace_root;
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
@@ -27,8 +29,12 @@ pub struct GitWorktree {
 #[tauri::command]
 pub fn git_status(state: State<'_, DesktopState>) -> DesktopResult<Vec<GitChange>> {
     let root = workspace_root(&state)?;
+    git_status_for(&root)
+}
+
+fn git_status_for(root: &Path) -> DesktopResult<Vec<GitChange>> {
     let output = Command::new("git")
-        .args(["status", "--short", "--untracked-files=all"])
+        .args(["status", "--short", "-z", "--untracked-files=all"])
         .current_dir(root)
         .output()?;
     if !output.status.success() {
@@ -36,21 +42,98 @@ pub fn git_status(state: State<'_, DesktopState>) -> DesktopResult<Vec<GitChange
             String::from_utf8_lossy(&output.stderr).trim().into(),
         ));
     }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter(|line| line.len() >= 3)
-        .map(|line| GitChange {
-            status: line[..2].trim().to_owned(),
-            path: line[3..].to_owned(),
+    Ok(parse_status(&output.stdout)
+        .into_iter()
+        .filter_map(|change| {
+            let GitChange { path, status } = change;
+            if status == "??" && is_generated_untracked_path(&path) {
+                return None;
+            }
+            Some(GitChange { status, path })
         })
         .collect())
+}
+
+fn parse_status(output: &[u8]) -> Vec<GitChange> {
+    let mut records = output
+        .split(|byte| *byte == 0)
+        .filter(|value| !value.is_empty());
+    let mut changes = Vec::new();
+    while let Some(record) = records.next() {
+        if record.len() < 4 {
+            continue;
+        }
+        let status = String::from_utf8_lossy(&record[..2]).trim().to_owned();
+        let path = String::from_utf8_lossy(&record[3..]).into_owned();
+        if status.contains('R') || status.contains('C') {
+            let _previous_path = records.next();
+        }
+        changes.push(GitChange { path, status });
+    }
+    changes
+}
+
+#[tauri::command]
+pub fn git_change_fingerprint(state: State<'_, DesktopState>) -> DesktopResult<String> {
+    let root = workspace_root(&state)?;
+    change_fingerprint_for(&root)
+}
+
+fn change_fingerprint_for(root: &Path) -> DesktopResult<String> {
+    let changes = git_status_for(&root)?;
+    let mut hasher = DefaultHasher::new();
+    let mut tracked_diff = Command::new("git");
+    tracked_diff.args(["diff", "--binary", "HEAD", "--"]);
+    let output = tracked_diff.current_dir(&root).output()?;
+    if output.status.success() {
+        output.stdout.hash(&mut hasher);
+    } else {
+        hash_diff_without_head(&root, &mut hasher)?;
+    }
+
+    let mut untracked = changes
+        .iter()
+        .filter(|change| change.status == "??")
+        .map(|change| change.path.as_str())
+        .collect::<Vec<_>>();
+    untracked.sort_unstable();
+    for path in untracked {
+        path.hash(&mut hasher);
+        fs::read(root.join(path))?.hash(&mut hasher);
+    }
+    Ok(format!("{:016x}", hasher.finish()))
+}
+
+fn hash_diff_without_head(root: &Path, hasher: &mut DefaultHasher) -> DesktopResult<()> {
+    for args in [
+        ["diff", "--binary", "--"].as_slice(),
+        ["diff", "--cached", "--binary", "--"].as_slice(),
+    ] {
+        let output = Command::new("git").args(args).current_dir(root).output()?;
+        if !output.status.success() {
+            return Err(DesktopError::Policy("Git diff failed.".into()));
+        }
+        output.stdout.hash(hasher);
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub fn git_diff(path: Option<String>, state: State<'_, DesktopState>) -> DesktopResult<String> {
     let root = workspace_root(&state)?;
+    if let Some(path) = path.as_deref() {
+        let untracked = git_status_for(&root)?
+            .iter()
+            .any(|change| change.status == "??" && change.path == path);
+        if untracked {
+            return Ok(format!(
+                "Untracked file: {path}\n\n{}",
+                fs::read_to_string(root.join(path))?
+            ));
+        }
+    }
     let mut command = Command::new("git");
-    command.args(["diff", "--"]);
+    command.args(["diff", "HEAD", "--"]);
     if let Some(path) = path {
         command.arg(path);
     }
@@ -58,11 +141,16 @@ pub fn git_diff(path: Option<String>, state: State<'_, DesktopState>) -> Desktop
 }
 
 #[tauri::command]
-pub fn git_stage(paths: Vec<String>, state: State<'_, DesktopState>) -> DesktopResult<()> {
+pub fn git_stage(
+    paths: Vec<String>,
+    expected_fingerprint: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<()> {
     if paths.is_empty() {
         return Err(DesktopError::Policy("Select at least one file.".into()));
     }
     let root = workspace_root(&state)?;
+    require_reviewed_fingerprint(&root, &expected_fingerprint)?;
     let mut command = Command::new("git");
     command.args(["add", "--"]).args(paths);
     checked_output(command.current_dir(root), "Git stage failed.").map(|_| ())
@@ -80,14 +168,28 @@ pub fn git_unstage(paths: Vec<String>, state: State<'_, DesktopState>) -> Deskto
 }
 
 #[tauri::command]
-pub fn git_commit(message: String, state: State<'_, DesktopState>) -> DesktopResult<String> {
+pub fn git_commit(
+    message: String,
+    expected_fingerprint: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<String> {
     if message.trim().is_empty() {
         return Err(DesktopError::Policy("Commit message is required.".into()));
     }
     let root = workspace_root(&state)?;
+    require_reviewed_fingerprint(&root, &expected_fingerprint)?;
     let mut command = Command::new("git");
     command.args(["commit", "-m", message.trim()]);
     checked_output(command.current_dir(root), "Git commit failed.")
+}
+
+fn require_reviewed_fingerprint(root: &Path, expected: &str) -> DesktopResult<()> {
+    if expected.is_empty() || change_fingerprint_for(root)? != expected {
+        return Err(DesktopError::Policy(
+            "The change set changed after review. Review and approve it again.".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -236,7 +338,7 @@ fn registered_worktree_paths(root: &Path) -> DesktopResult<Vec<std::path::PathBu
 
 #[cfg(test)]
 mod tests {
-    use super::worktree_slug;
+    use super::{parse_status, worktree_slug};
 
     #[test]
     fn accepts_a_bounded_worktree_name() {
@@ -250,5 +352,14 @@ mod tests {
     fn rejects_paths_and_spaces() {
         assert!(worktree_slug("../outside").is_err());
         assert!(worktree_slug("two words").is_err());
+    }
+
+    #[test]
+    fn parses_unquoted_paths_and_rename_records() {
+        let changes = parse_status(b"?? file with spaces.txt\0R  new name.txt\0old name.txt\0");
+
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0].path, "file with spaces.txt");
+        assert_eq!(changes[1].path, "new name.txt");
     }
 }
