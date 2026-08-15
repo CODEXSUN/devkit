@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.49
-Release tag: v-1.0.49
-Changelog label: v 1.0.49
+Current version: 1.0.51
+Release tag: v-1.0.51
+Changelog label: v 1.0.51
 
 ### [Session] 2026-08-14 - Navigation drawer and local editor runtime
 
@@ -371,6 +371,68 @@ Changelog label: v 1.0.49
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
 
+## v-1.0.51
+
+### [v 1.0.51] 2026-08-15 8:13 pm - Named delegate restart recovery
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.51.
+
+## v-1.0.50
+
+### [v 1.0.50] 2026-08-15 7:37 pm - Named supervisor and delegate execution
+
+#### Database Changes
+
+- Database update: Yes.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.50.
+- Added actor-owned named Agent personas with supervisor and delegate roles.
+- Added an explicit starter team that users can create and rename from Project Agent.
+- Persisted supervisor selection on parent runs and delegate assignment on graph tasks.
+- Changed task start into real Codex delegate execution inside the task-owned worktree.
+- Added profile-based permission ceilings for planning, review, and security delegates.
+- Enforced task file scopes after execution and failed delegates that changed unrelated paths.
+- Added durable child activity, file, approval, result, and failure evidence.
+- Added dependency evidence and child-worktree locations to the final supervisor review task.
+- Added inline delegate approval controls while keeping human parent approval as the final gate.
+- Fixed auto-approve sessions so Codex file and command approval requests are accepted only for
+  that explicit access mode.
+- Made the assigned child task authoritative instead of inheriting one-turn parent chat commands.
+- Failed write-oriented delegates that report completion without producing a scoped file change.
+- Persisted inspected worktree files as durable artifacts even when a streaming diff event is missed.
+- Restored the selected Project Agent project after a browser reload.
+- Added a repeatable named Agent team E2E test with an isolated temporary Git repository.
+
+#### Verification
+
+- Passed DevKit API and web TypeScript checks.
+- Passed DevKit API and web ESLint checks.
+- Passed database lifecycle and module boundary checks.
+- Applied `devkit.agent-personas.sql.v1` to the live local MariaDB database.
+- Verified the named team and assignment controls in the live Project Agent browser workspace.
+- Created Atlas, Scout, Forge, Canvas, and Sentinel through the user action and persisted a
+  supervised four-task graph.
+- Called Scout from the graph and verified its durable child run advanced through planning,
+  running, and completed before unlocking the dependent Forge and Canvas tasks.
+- Passed the isolated named Agent team E2E against the built API, live MariaDB, and real Codex App
+  Server: Forge and Canvas ran in parallel worktrees, changed only their assigned files, persisted
+  artifacts, unlocked Atlas, completed the read-only supervisor review, and accepted final human
+  approval.
+- Verified an incompatible supervisor-to-coding-task assignment returns a conflict without changing
+  the valid delegate.
+- Created the supervised four-task graph from the live browser UI and confirmed the selected project,
+  Atlas team, graph, and run control survive a full reload with no browser console errors.
+- Did not run write-capable delegates against the dirty development checkout; all write E2E work used
+  the temporary Git fixture.
+
 ## v-1.0.49
 
 ### [v 1.0.49] 2026-08-15 6:53 pm - Root deploy output collection
@@ -383,7 +445,11 @@ Changelog label: v 1.0.49
 
 - Bumped repository version to 1.0.49.
 - Added one root desktop deployment folder under `dist/deploy/desktop/<version>/windows-x64`.
-- Collected the runnable CodeLogix executable and bundled Codex sidecar under the `app` folder.
+- Collected the runnable CodeLogix executable and the complete Codex runtime under the `app` folder.
+- Bundled the Codex code-mode host, Windows sandbox setup, sandbox command runner, and ripgrep beside `codex.exe`.
+- Added the bundled runtime directory to the Codex process path so tool and sandbox helpers resolve in development and installed builds.
+- Made `CODELOGIX_WORKSPACE` take precedence over the remembered workspace for deterministic development and automated live tests.
+- Removed the unsupported `excludeTurns` field when resuming persisted Codex App Server threads.
 - Collected the MSI and updater signature under the `installer` folder.
 - Generated a local Tauri `latest.json` updater manifest under the `updater` folder.
 - Generated SHA-256 checksums and a machine-readable release manifest for every deployable file.
@@ -398,6 +464,11 @@ Changelog label: v 1.0.49
 - Passed the repository root dependency and build-output boundary check.
 - Published and inspected the complete desktop release folder from an existing build.
 - Verified the release manifest, updater manifest, file sizes, and SHA-256 checksums.
+- Ran CodeLogix against an isolated Git repository with a known failing test.
+- Verified the live agent read `AGENTS.md`, reproduced the failure, edited only `src/cart.js`, passed the test, refreshed Git status, displayed the diff, persisted the task, and resumed it after restart.
+- Reproduced missing Codex tool and sandbox helpers in the live application, bundled the required executables, and repeated the coding task through the Windows workspace-write sandbox without fallback approvals.
+- Rebuilt the 1.0.49 MSI and Tauri updater signature after the runtime repair; the MSI SHA-256 is `3504bd00d797d89ca6d7134d112afb926959b86d8510618b7763ba53712c6794`.
+- Verified every release-manifest byte count and SHA-256 digest. The MSI has a valid Tauri updater signature but is not yet Authenticode-signed by a Windows publisher certificate.
 
 ## v-1.0.48
 

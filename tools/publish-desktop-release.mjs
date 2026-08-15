@@ -29,6 +29,22 @@ async function publishDesktopRelease() {
   const files = [
     copyArtifact(join(targetRoot, "devkit-desktop.exe"), join("app", "CodeLogix.exe"), "app"),
     copyArtifact(join(targetRoot, "codex.exe"), join("app", "codex.exe"), "agent-runtime"),
+    copyArtifact(
+      join(targetRoot, "codex-code-mode-host.exe"),
+      join("app", "codex-code-mode-host.exe"),
+      "agent-tool-runtime",
+    ),
+    copyArtifact(
+      join(targetRoot, "codex-command-runner.exe"),
+      join("app", "codex-command-runner.exe"),
+      "agent-sandbox-runner",
+    ),
+    copyArtifact(
+      join(targetRoot, "codex-windows-sandbox-setup.exe"),
+      join("app", "codex-windows-sandbox-setup.exe"),
+      "agent-sandbox-setup",
+    ),
+    copyArtifact(join(targetRoot, "rg.exe"), join("app", "rg.exe"), "agent-search-runtime"),
     copyArtifact(join(bundleRoot, installerName), join("installer", installerName), "installer"),
     copyArtifact(
       join(bundleRoot, `${installerName}.sig`),

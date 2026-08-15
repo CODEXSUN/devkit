@@ -6,6 +6,7 @@ import type { DevkitDatabase } from "../../database/schema.js";
 import type { AgentDecompositionInput } from "./orchestration.schemas.js";
 import { agentRunRepository } from "./agent-run.repository.js";
 import { agentWorktreeService } from "./agent-worktree.service.js";
+import { agentPersonaRepository } from "./agent-persona.repository.js";
 
 type TaskStatus = "blocked" | "ready" | "running" | "completed" | "failed";
 
@@ -15,6 +16,22 @@ export class AgentTaskGraphRepository {
   async replace(parentRunUuid: string, actorId: string, input: AgentDecompositionInput) {
     await this.requireParent(parentRunUuid, actorId);
     validateGraph(input.tasks);
+    if (input.supervisorPersonaUuid) {
+      const supervisor = await agentPersonaRepository.require(input.supervisorPersonaUuid, actorId);
+      if (supervisor.role !== "supervisor") {
+        conflict("AGENT_SUPERVISOR_REQUIRED", "Select a supervisor persona for the parent run.");
+      }
+    }
+    for (const task of input.tasks) {
+      if (!task.delegatePersonaUuid) continue;
+      const persona = await agentPersonaRepository.require(task.delegatePersonaUuid, actorId);
+      if (persona.role !== "delegate" && task.agentProfile !== "review") {
+        conflict("AGENT_DELEGATE_REQUIRED", "Only review tasks may call the supervisor directly.");
+      }
+      if (persona.agentProfile !== task.agentProfile) {
+        conflict("AGENT_PROFILE_MISMATCH", `${persona.name} is a ${persona.agentProfile} Agent, not ${task.agentProfile}.`);
+      }
+    }
     await this.database.transaction().execute(async (transaction) => {
       await transaction.deleteFrom("devkit_agent_tasks")
         .where("parent_run_uuid", "=", parentRunUuid).execute();
@@ -22,6 +39,7 @@ export class AgentTaskGraphRepository {
       await transaction.insertInto("devkit_agent_tasks").values(input.tasks.map((task, index) => ({
         actor_id: actorId,
         agent_profile: task.agentProfile,
+        delegate_persona_uuid: task.delegatePersonaUuid,
         child_run_uuid: null,
         completed_at: null,
         objective: task.objective,
@@ -52,12 +70,14 @@ export class AgentTaskGraphRepository {
         uuid: id()
       }).execute();
     });
+    await agentRunRepository.assignSupervisor(parentRunUuid, actorId, input.supervisorPersonaUuid);
     return this.find(parentRunUuid, actorId);
   }
 
   async start(taskUuid: string, actorId: string) {
     const task = await this.requireTask(taskUuid, actorId);
     if (task.status !== "ready") conflict("AGENT_TASK_NOT_READY", "The task dependencies are not complete.");
+    if (!task.delegate_persona_uuid) conflict("AGENT_TASK_DELEGATE_REQUIRED", "Assign a named delegate before calling this task.");
     const running = await this.database.selectFrom("devkit_agent_tasks").select(["scope_json", "title"])
       .where("parent_run_uuid", "=", task.parent_run_uuid).where("status", "=", "running").execute();
     const scope = parseScope(task.scope_json);
@@ -76,7 +96,6 @@ export class AgentTaskGraphRepository {
         access: child.access, runId: child.uuid, sourceRoot: child.sourceRoot
       });
       await agentRunRepository.setWorkspace(child.uuid, actorId, workspace);
-      await agentRunRepository.markDispatched(child.uuid, actorId, task.parent_run_uuid);
     } catch (error) {
       await agentRunRepository.fail(child.uuid, actorId, error instanceof Error ? error.message : "Child worktree preparation failed.");
       throw error;
@@ -87,6 +106,69 @@ export class AgentTaskGraphRepository {
       .where("uuid", "=", taskUuid).where("actor_id", "=", actorId).execute();
     await this.recordEvent(task.parent_run_uuid, actorId, "run.task.started", { childRunUuid: child.uuid, taskUuid });
     return this.find(task.parent_run_uuid, actorId);
+  }
+
+  async executionContext(taskUuid: string, actorId: string) {
+    const task = await this.requireTask(taskUuid, actorId);
+    if (task.status !== "running" || !task.child_run_uuid || !task.delegate_persona_uuid) {
+      conflict("AGENT_TASK_NOT_DISPATCHED", "The named delegate task has not been dispatched.");
+    }
+    const [child, parent, persona, dependencies] = await Promise.all([
+      this.database.selectFrom("devkit_agent_runs").selectAll()
+        .where("uuid", "=", task.child_run_uuid).where("actor_id", "=", actorId).executeTakeFirstOrThrow(),
+      this.database.selectFrom("devkit_agent_runs").select(["objective", "project_key", "project_title"])
+        .where("uuid", "=", task.parent_run_uuid).where("actor_id", "=", actorId).executeTakeFirstOrThrow(),
+      agentPersonaRepository.require(task.delegate_persona_uuid, actorId),
+      this.database.selectFrom("devkit_agent_task_dependencies as dependency")
+        .innerJoin("devkit_agent_tasks as required", "required.uuid", "dependency.depends_on_task_uuid")
+        .leftJoin("devkit_agent_runs as child", "child.uuid", "required.child_run_uuid")
+        .select(["required.result_summary", "required.title", "child.workspace_path"])
+        .where("dependency.task_uuid", "=", taskUuid).execute()
+    ]);
+    if (!child.workspace_path || !child.source_root) {
+      conflict("AGENT_CHILD_WORKSPACE_REQUIRED", "The delegate worktree is not prepared.");
+    }
+    return {
+      access: child.access_mode as import("./agent-run.policy.js").AgentAccessMode,
+      childRunUuid: child.uuid,
+      dependencies: dependencies.map((dependency) => ({
+        resultSummary: dependency.result_summary,
+        title: dependency.title,
+        workspacePath: dependency.workspace_path
+      })),
+      model: child.model,
+      objective: task.objective,
+      parentObjective: parent.objective,
+      parentRunUuid: task.parent_run_uuid,
+      persona,
+      projectKey: parent.project_key,
+      projectTitle: parent.project_title,
+      scopePaths: parseScope(task.scope_json),
+      taskTitle: task.title,
+      taskUuid,
+      workspace: {
+        mode: child.workspace_mode as "source" | "worktree",
+        path: child.workspace_path,
+        sourceRoot: child.source_root
+      }
+    };
+  }
+
+  async recoverable() {
+    const tasks = await this.database.selectFrom("devkit_agent_tasks")
+      .select(["actor_id", "uuid"])
+      .where("status", "=", "running")
+      .where("child_run_uuid", "is not", null)
+      .execute();
+    return tasks.map((task) => ({ actorId: task.actor_id, taskUuid: task.uuid }));
+  }
+
+  async recordRecovery(taskUuid: string, actorId: string) {
+    const task = await this.requireTask(taskUuid, actorId);
+    await this.recordEvent(task.parent_run_uuid, actorId, "run.task.recovered", {
+      childRunUuid: task.child_run_uuid,
+      taskUuid
+    });
   }
 
   async finish(taskUuid: string, actorId: string, status: "completed" | "failed", resultSummary: string) {
@@ -109,6 +191,37 @@ export class AgentTaskGraphRepository {
       else await agentRunRepository.fail(task.child_run_uuid, actorId, resultSummary || "Scoped task failed.");
     }
     return this.find(task.parent_run_uuid, actorId);
+  }
+
+  async assignDelegate(taskUuid: string, actorId: string, personaUuid: string) {
+    const task = await this.requireTask(taskUuid, actorId);
+    if (task.status !== "blocked" && task.status !== "ready") {
+      conflict("AGENT_TASK_ASSIGNMENT_LOCKED", "A running or completed task cannot change delegates.");
+    }
+    const persona = await agentPersonaRepository.require(personaUuid, actorId);
+    if (persona.role !== "delegate" && task.agent_profile !== "review") {
+      conflict("AGENT_DELEGATE_REQUIRED", "Only review tasks may call the supervisor directly.");
+    }
+    if (persona.agentProfile !== task.agent_profile) {
+      conflict("AGENT_PROFILE_MISMATCH", `${persona.name} is a ${persona.agentProfile} Agent, not ${task.agent_profile}.`);
+    }
+    await this.database.updateTable("devkit_agent_tasks").set({ delegate_persona_uuid: personaUuid })
+      .where("uuid", "=", taskUuid).where("actor_id", "=", actorId).executeTakeFirst();
+    await this.recordEvent(task.parent_run_uuid, actorId, "run.task.delegate-assigned", {
+      personaUuid,
+      taskUuid
+    });
+    return this.find(task.parent_run_uuid, actorId);
+  }
+
+  async assignSupervisor(parentRunUuid: string, actorId: string, personaUuid: string) {
+    await this.requireParent(parentRunUuid, actorId);
+    const persona = await agentPersonaRepository.require(personaUuid, actorId);
+    if (persona.role !== "supervisor") {
+      conflict("AGENT_SUPERVISOR_REQUIRED", "Select a supervisor persona for the parent run.");
+    }
+    await agentRunRepository.assignSupervisor(parentRunUuid, actorId, personaUuid);
+    return this.find(parentRunUuid, actorId);
   }
 
   async review(parentRunUuid: string, actorId: string, decision: "approved" | "rework", note: string) {
@@ -136,7 +249,9 @@ export class AgentTaskGraphRepository {
 
   async find(parentRunUuid: string, actorId: string) {
     await this.requireParent(parentRunUuid, actorId);
-    const [tasks, dependencies, reviews] = await Promise.all([
+    const [parent, tasks, dependencies, reviews, personas, approvals] = await Promise.all([
+      this.database.selectFrom("devkit_agent_runs").select("supervisor_persona_uuid")
+        .where("uuid", "=", parentRunUuid).where("actor_id", "=", actorId).executeTakeFirstOrThrow(),
       this.database.selectFrom("devkit_agent_tasks").selectAll()
         .where("parent_run_uuid", "=", parentRunUuid).orderBy("sequence_no").execute(),
       this.database.selectFrom("devkit_agent_task_dependencies as dependency")
@@ -144,21 +259,43 @@ export class AgentTaskGraphRepository {
         .select(["dependency.task_uuid", "dependency.depends_on_task_uuid"])
         .where("task.parent_run_uuid", "=", parentRunUuid).execute(),
       this.database.selectFrom("devkit_agent_parent_reviews").selectAll()
-        .where("parent_run_uuid", "=", parentRunUuid).orderBy("created_at", "desc").execute()
+        .where("parent_run_uuid", "=", parentRunUuid).orderBy("created_at", "desc").execute(),
+      this.database.selectFrom("devkit_agent_personas").selectAll()
+        .where("actor_id", "=", actorId).where("status", "=", "active").execute(),
+      this.database.selectFrom("devkit_agent_approvals as approval")
+        .innerJoin("devkit_agent_tasks as task", "task.child_run_uuid", "approval.run_uuid")
+        .select(["approval.reason", "approval.request_id", "approval.status", "approval.thread_id", "task.uuid as task_uuid"])
+        .where("task.parent_run_uuid", "=", parentRunUuid).where("approval.status", "=", "pending").execute()
     ]);
+    const personaMap = new Map(personas.map((persona) => [persona.uuid, {
+      agentProfile: persona.agent_profile,
+      description: persona.description,
+      instructions: persona.instructions,
+      key: persona.persona_key,
+      name: persona.name,
+      role: persona.role as "delegate" | "supervisor",
+      uuid: persona.uuid
+    }]));
     return {
       parentRunUuid,
+      supervisor: parent.supervisor_persona_uuid
+        ? personaMap.get(parent.supervisor_persona_uuid) ?? null
+        : null,
       reviews: reviews.map((review) => ({
         createdAt: iso(review.created_at), decision: review.decision, note: review.note, uuid: review.uuid
       })),
       tasks: tasks.map((task) => ({
         agentProfile: task.agent_profile,
+        delegate: task.delegate_persona_uuid
+          ? personaMap.get(task.delegate_persona_uuid) ?? null
+          : null,
         childRunUuid: task.child_run_uuid,
         completedAt: iso(task.completed_at),
         dependsOn: dependencies.filter((item) => item.task_uuid === task.uuid)
           .map((item) => item.depends_on_task_uuid),
         key: task.task_key,
         objective: task.objective,
+        pendingApproval: mapApproval(approvals.find((approval) => approval.task_uuid === task.uuid)),
         resultSummary: task.result_summary,
         scopePaths: parseScope(task.scope_json),
         sequence: task.sequence_no,
@@ -236,6 +373,18 @@ function scopesOverlap(left: string[], right: string[]) {
 
 function parseScope(value: string) {
   try { return JSON.parse(value) as string[]; } catch { return []; }
+}
+
+function mapApproval(approval: {
+  reason: string; request_id: number; status: string; task_uuid: string; thread_id: string;
+} | undefined) {
+  return approval ? {
+    reason: approval.reason,
+    requestId: approval.request_id,
+    status: approval.status,
+    taskUuid: approval.task_uuid,
+    threadId: approval.thread_id
+  } : null;
 }
 
 function conflict(code: string, message: string): never {

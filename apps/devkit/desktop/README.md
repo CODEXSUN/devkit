@@ -24,7 +24,7 @@ Run `npm.cmd run desktop:build` to create the signed desktop bundle after signin
 - an instant local-first shell that restores the workspace before background Git, file indexing,
   and agent startup finish;
 - one shared, background-warmed Codex runtime and a Monaco editor loaded only when Explorer opens;
-- a bundled Codex App Server sidecar over JSON-RPC with streamed turns and reusable threads;
+- a complete bundled Codex App Server runtime, including code mode, sandbox helpers, and ripgrep, over JSON-RPC with streamed turns and reusable threads;
 - workspace-scoped agent tasks and messages persisted in desktop SQLite;
 - recent-task switching with saved transcripts and Codex thread resume;
 - read-only and workspace-write agent modes with command and file approval cards;

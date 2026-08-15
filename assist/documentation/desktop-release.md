@@ -74,6 +74,10 @@ The version folder contains:
 ```text
 app/CodeLogix.exe
 app/codex.exe
+app/codex-code-mode-host.exe
+app/codex-command-runner.exe
+app/codex-windows-sandbox-setup.exe
+app/rg.exe
 installer/CodeLogix_<version>_x64_en-US.msi
 installer/CodeLogix_<version>_x64_en-US.msi.sig
 updater/latest.json
@@ -82,7 +86,7 @@ release.json
 ```
 
 Use the MSI for installation. The `app` folder is the unpackaged application pair for controlled
-testing. Keep `CodeLogix.exe` and `codex.exe` together.
+testing. Keep every file in `app` together because the Codex process resolves its code-mode, sandbox, and search helpers beside `codex.exe`.
 
 The release command also checks that only the repository root contains `node_modules` and `dist`.
 Nested dependency or build-output folders stop the release.

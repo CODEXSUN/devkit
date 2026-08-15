@@ -25,6 +25,7 @@ export type DevkitDatabase = {
   devkit_agent_tasks: AgentTasksTable;
   devkit_agent_task_dependencies: AgentTaskDependenciesTable;
   devkit_agent_parent_reviews: AgentParentReviewsTable;
+  devkit_agent_personas: AgentPersonasTable;
   devkit_project_manager_activity: ProjectManagerActivityTable;
   devkit_project_manager_attachments: ProjectManagerAttachmentsTable;
   devkit_project_manager_items: ProjectManagerItemsTable;
@@ -139,6 +140,7 @@ export type RepositoryConnectionsTable = {
 export type AgentTasksTable = {
   actor_id: string;
   agent_profile: string;
+  delegate_persona_uuid: string | null;
   child_run_uuid: string | null;
   completed_at: TimestampColumn | null;
   created_at: TimestampColumn;
@@ -152,6 +154,21 @@ export type AgentTasksTable = {
   status: string;
   task_key: string;
   title: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type AgentPersonasTable = {
+  actor_id: string;
+  agent_profile: string;
+  created_at: TimestampColumn;
+  description: string;
+  id: Generated<number>;
+  instructions: string;
+  name: string;
+  persona_key: string;
+  role: string;
+  status: string;
   updated_at: TimestampColumn;
   uuid: string;
 };
@@ -177,6 +194,7 @@ export type AgentRunsTable = {
   access_mode: string;
   actor_id: string;
   agent_profile: string;
+  supervisor_persona_uuid: string | null;
   assist_mode: string;
   budget_json: string;
   chat_thread_uuid: string;

@@ -33,6 +33,10 @@ import {
   agentRunMigration,
   migrateAgentRuns
 } from "../modules/orchestration/agent-run.migration.js";
+import {
+  agentPersonaMigration,
+  migrateAgentPersonas
+} from "../modules/orchestration/agent-persona.migration.js";
 
 const databaseContext = new AsyncLocalStorage<Kysely<DevkitDatabase>>();
 const bootstrapPromises = new WeakMap<Kysely<DevkitDatabase>, Promise<void>>();
@@ -67,7 +71,8 @@ const migrationSteps = [
   { migrate: migrateHoneyModule, name: honeyMigration.key },
   { migrate: migrateNotificationModule, name: notificationMigration.key },
   { migrate: migrateOrchestrationChat, name: orchestrationChatMigration.key },
-  { migrate: migrateAgentRuns, name: agentRunMigration.key }
+  { migrate: migrateAgentRuns, name: agentRunMigration.key },
+  { migrate: migrateAgentPersonas, name: agentPersonaMigration.key }
 ] as const;
 
 export function getDevkitDatabase() {

@@ -170,9 +170,23 @@ export const agentCommitInputSchema = z
   })
   .strict();
 
+export const agentPersonaInputSchema = z
+  .object({
+    agentProfile: z.enum(["coding", "devops", "planning", "review", "security", "testing"]),
+    description: z.string().trim().min(3).max(500),
+    instructions: z.string().trim().min(3).max(4_000),
+    key: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/u).max(80),
+    name: z.string().trim().min(2).max(80),
+    role: z.enum(["supervisor", "delegate"])
+  })
+  .strict();
+
+export type AgentPersonaInput = z.infer<typeof agentPersonaInputSchema>;
+
 const agentTaskInputSchema = z
   .object({
     agentProfile: z.string().trim().min(1).max(80),
+    delegatePersonaUuid: z.string().length(16).nullable().default(null),
     dependsOn: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
     key: z
       .string()
@@ -187,6 +201,7 @@ const agentTaskInputSchema = z
 
 export const agentDecompositionInputSchema = z
   .object({
+    supervisorPersonaUuid: z.string().length(16).nullable().default(null),
     tasks: z.array(agentTaskInputSchema).min(1).max(20)
   })
   .strict();
@@ -196,6 +211,10 @@ export const agentTaskStatusInputSchema = z
     resultSummary: z.string().trim().max(8_000).default(""),
     status: z.enum(["completed", "failed"])
   })
+  .strict();
+
+export const agentPersonaAssignmentSchema = z
+  .object({ personaUuid: z.string().length(16) })
   .strict();
 
 export const agentParentReviewInputSchema = z

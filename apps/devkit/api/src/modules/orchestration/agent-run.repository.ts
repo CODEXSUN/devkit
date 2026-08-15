@@ -30,6 +30,7 @@ type RunUpdate = {
   started_at?: Date;
   status?: AgentRunStatus;
   source_root?: string;
+  supervisor_persona_uuid?: string | null;
   review_status?: string;
   verification_completed_at?: Date;
   verification_fingerprint?: string | null;
@@ -49,6 +50,7 @@ export class AgentRunRepository {
       access_mode: input.access,
       actor_id: actorId,
       agent_profile: profileFor(input.access),
+      supervisor_persona_uuid: null,
       assist_mode: modeFor(input.access),
       budget_json: JSON.stringify(defaultAgentRunBudget),
       chat_thread_uuid: input.chatThreadUuid,
@@ -86,10 +88,12 @@ export class AgentRunRepository {
   async createChild(parentUuid: string, actorId: string, input: { agentProfile: string; objective: string }) {
     const parent = await this.requireRun(parentUuid, actorId);
     const uuid = id();
+    const access = childAccess(parent.access_mode as AgentAccessMode, input.agentProfile);
     await this.database.insertInto("devkit_agent_runs").values({
-      access_mode: parent.access_mode,
+      access_mode: access,
       actor_id: actorId,
       agent_profile: input.agentProfile,
+      supervisor_persona_uuid: parent.supervisor_persona_uuid,
       assist_mode: "Develop",
       base_revision: null,
       branch_name: null,
@@ -121,7 +125,7 @@ export class AgentRunRepository {
       workspace_status: "source"
     }).executeTakeFirstOrThrow();
     await this.event(uuid, actorId, "run.child.created", { parentUuid });
-    return { access: parent.access_mode as AgentAccessMode, sourceRoot: parent.source_root, uuid };
+    return { access, sourceRoot: parent.source_root, uuid };
   }
 
   async start(uuid: string, actorId: string, threadId: string, turnId: string) {
@@ -134,9 +138,24 @@ export class AgentRunRepository {
     await this.event(uuid, actorId, "run.started", { threadId, turnId });
   }
 
+  async recover(uuid: string, actorId: string, threadId: string, turnId: string) {
+    await this.database.updateTable("devkit_agent_approvals").set({
+      decided_at: new Date(),
+      decision: "decline",
+      status: "cancelled"
+    }).where("run_uuid", "=", uuid).where("status", "=", "pending").execute();
+    await this.start(uuid, actorId, threadId, turnId);
+    await this.event(uuid, actorId, "run.recovered", { threadId, turnId });
+  }
+
   async markDispatched(uuid: string, actorId: string, parentUuid: string) {
     await this.updateOwned(uuid, actorId, { started_at: new Date(), status: "running" });
     await this.event(uuid, actorId, "run.child.dispatched", { parentUuid });
+  }
+
+  async assignSupervisor(uuid: string, actorId: string, personaUuid: string | null) {
+    await this.updateOwned(uuid, actorId, { supervisor_persona_uuid: personaUuid });
+    await this.event(uuid, actorId, "run.supervisor.assigned", { personaUuid });
   }
 
   async setWorkspace(uuid: string, actorId: string, workspace: {
@@ -456,6 +475,7 @@ export class AgentRunRepository {
 function mapRun(run: Selectable<AgentRunsTable>) {
   return {
     access: run.access_mode, agentProfile: run.agent_profile, assistMode: run.assist_mode,
+    supervisorPersonaUuid: run.supervisor_persona_uuid,
     budget: JSON.parse(run.budget_json) as unknown, chatThreadUuid: run.chat_thread_uuid,
     completedAt: iso(run.completed_at), createdAt: iso(run.created_at), errorMessage: run.error_message,
     model: run.model, objective: run.objective, projectKey: run.project_key, projectTitle: run.project_title,
@@ -475,6 +495,11 @@ function parseJson(value: string) { try { return JSON.parse(value) as unknown; }
 function id() { return randomBytes(8).toString("hex"); }
 function modeFor(access: AgentAccessMode) { return access === "plan" ? "plan" : access === "read-only" ? "ask" : "build"; }
 function profileFor(access: AgentAccessMode) { return access === "plan" ? "planning" : access === "read-only" ? "review" : "coding"; }
+function childAccess(parent: AgentAccessMode, profile: string): AgentAccessMode {
+  if (profile === "planning") return "plan";
+  if (profile === "review" || profile === "security") return "read-only";
+  return parent;
+}
 function riskFor(label: string): AgentRisk { return /command|fileChange|mcpTool/iu.test(label) ? "medium" : "low"; }
 
 export const agentRunRepository = new AgentRunRepository();

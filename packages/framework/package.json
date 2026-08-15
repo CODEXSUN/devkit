@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/framework",
-  "version": "1.0.49",
+  "version": "1.0.51",
   "private": true,
   "description": "DevKit-owned framework runtime and stable application contracts",
   "type": "module",

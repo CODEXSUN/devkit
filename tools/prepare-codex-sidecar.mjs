@@ -5,35 +5,49 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const target = process.env.TAURI_ENV_TARGET_TRIPLE ?? detectTargetTriple();
 const packageName = packageForTarget(target);
-const executableName = process.platform === "win32" ? "codex.exe" : "codex";
-const source = resolve(
-  repositoryRoot,
-  "node_modules",
-  "@openai",
-  packageName,
-  "vendor",
-  target,
-  "bin",
-  executableName,
-);
-const destination = resolve(
-  repositoryRoot,
-  "apps/devkit/desktop/src-tauri/binaries",
-  `codex-${target}${process.platform === "win32" ? ".exe" : ""}`,
-);
+const executableSuffix = process.platform === "win32" ? ".exe" : "";
+const binaries = [
+  { name: "codex", sourceDirectory: "bin" },
+  { name: "codex-code-mode-host", sourceDirectory: "bin" },
+  { name: "codex-command-runner", sourceDirectory: "codex-resources" },
+  { name: "codex-windows-sandbox-setup", sourceDirectory: "codex-resources" },
+  { name: "rg", sourceDirectory: "codex-path" },
+];
 
-if (!existsSync(source)) {
-  throw new Error(
-    `Codex sidecar is unavailable for ${target}. Run npm install from the repository root.`,
+for (const binary of binaries) {
+  copyBinary(binary.name, binary.sourceDirectory);
+}
+
+console.log(`Prepared Codex ${target} sidecars.`);
+
+function copyBinary(binary, sourceDirectory) {
+  const source = resolve(
+    repositoryRoot,
+    "node_modules",
+    "@openai",
+    packageName,
+    "vendor",
+    target,
+    sourceDirectory,
+    `${binary}${executableSuffix}`,
   );
-}
+  const destination = resolve(
+    repositoryRoot,
+    "apps/devkit/desktop/src-tauri/binaries",
+    `${binary}-${target}${executableSuffix}`,
+  );
 
-mkdirSync(dirname(destination), { recursive: true });
-if (!existsSync(destination) || statSync(destination).size !== statSync(source).size) {
-  copyFileSync(source, destination);
-}
+  if (!existsSync(source)) {
+    throw new Error(
+      `${binary} is unavailable for ${target}. Run npm install from the repository root.`,
+    );
+  }
 
-console.log(`Prepared Codex ${target} sidecar.`);
+  mkdirSync(dirname(destination), { recursive: true });
+  if (!existsSync(destination) || statSync(destination).size !== statSync(source).size) {
+    copyFileSync(source, destination);
+  }
+}
 
 function detectTargetTriple() {
   const targets = {

@@ -45,7 +45,14 @@ The current orchestration slice provides these implemented controls:
 - the tool catalog defines capability, access, and risk metadata for future executors;
 - agent profiles remain definitions, while Codex supplies the current executable runtime;
 - preview, deployment, provider routing, and Codex command interception remain planned.
-- automatic sub-agent prompt execution remains planned. The current scheduler prepares dispatch-ready child runs and worktrees.
+- named supervisors and delegates are actor-owned personas that can be assigned to a durable task graph;
+- calling a ready task now executes its named delegate through Codex in the prepared child worktree;
+- delegate prompts carry the assigned objective, file scope, persona instructions, dependency evidence,
+  and a permission ceiling derived from the parent run and Agent profile;
+- delegate completion is automatic only after the worktree remains inside its declared file scope;
+- a named supervisor can execute the dependency-final review task, while a human still owns the
+  parent approval gate;
+- durable recovery of an in-flight delegate after an API process restart remains planned.
 - DevKit can register the Hostinger VPS MCP server in its private Codex runtime. The server-side
   environment supplies the API token, while Codex applies MCP tool approval policy. DevKit never
   returns the token to the browser or stores it in the generated Codex configuration.

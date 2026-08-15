@@ -8,7 +8,7 @@ import {
   PanelRightOpenIcon,
   RotateCcwIcon
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useProjectManagerRecordsQuery } from "../project-manager/project-manager.hooks";
 import type { ProjectManagerRecord } from "../project-manager/project-manager.types";
@@ -45,8 +45,12 @@ export function AgentIdeWorkspace() {
     refetchInterval: 30_000
   });
   const [projectId, setProjectId] = useState(
-    () => new URLSearchParams(window.location.search).get("project") ?? ""
+    () => new URLSearchParams(window.location.search).get("project") ?? storedProjectId()
   );
+  useEffect(() => {
+    if (projectId) window.localStorage.setItem("devkit_agent_project", projectId);
+    else window.localStorage.removeItem("devkit_agent_project");
+  }, [projectId]);
   const honeyBrief = useMemo(() => {
     const search = new URLSearchParams(window.location.search);
     if (search.get("source") !== "honey") return undefined;
@@ -394,6 +398,10 @@ export function AgentIdeWorkspace() {
       </div>
     </main>
   );
+}
+
+function storedProjectId() {
+  return window.localStorage.getItem("devkit_agent_project") ?? "";
 }
 
 type AgentWorkItem = {

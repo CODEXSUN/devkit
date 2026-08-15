@@ -12,6 +12,7 @@ import type {
 } from "./agent-ide.types";
 import type { AgentRunDetail, AgentRunSummary } from "./agent-ide.types";
 import type { AgentTaskGraph } from "./agent-ide.types";
+import type { AgentPersona } from "./agent-ide.types";
 
 export const getAgentIdeSettings = () =>
   apiGet<AgentIdeSettings>("/orchestration/agent-ide/settings");
@@ -45,17 +46,44 @@ export const getAgentRun = (uuid: string) =>
 export const getAgentTaskGraph = (uuid: string) =>
   apiGet<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`);
 
+export const listAgentPersonas = () =>
+  apiGet<AgentPersona[]>("/orchestration/agent-ide/personas");
+
+export const createStarterAgentTeam = () =>
+  apiPost<AgentPersona[]>("/orchestration/agent-ide/personas/starter-team");
+
+export const updateAgentPersona = (persona: AgentPersona) =>
+  apiPut<AgentPersona>(`/orchestration/agent-ide/personas/${persona.uuid}`, {
+    agentProfile: persona.agentProfile,
+    description: persona.description,
+    instructions: persona.instructions,
+    key: persona.key,
+    name: persona.name,
+    role: persona.role
+  });
+
 export const saveAgentTaskGraph = (
   uuid: string,
   tasks: Array<{
     agentProfile: string;
+    delegatePersonaUuid: string | null;
     dependsOn: string[];
     key: string;
     objective: string;
     scopePaths: string[];
     title: string;
-  }>
-) => apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, { tasks });
+  }>,
+  supervisorPersonaUuid: string | null
+) => apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, {
+  supervisorPersonaUuid,
+  tasks
+});
+
+export const assignAgentTaskDelegate = (uuid: string, personaUuid: string) =>
+  apiPut<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/delegate`, { personaUuid });
+
+export const assignAgentSupervisor = (uuid: string, personaUuid: string) =>
+  apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/supervisor`, { personaUuid });
 
 export const startAgentTask = (uuid: string) =>
   apiPost<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/start`);

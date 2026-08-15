@@ -282,6 +282,10 @@ export class CodexAppServerClient {
       for (const listener of this.listeners) listener(message);
       return;
     }
+    if (threadId && this.threadAccess.get(threadId) === "auto-approve" && interactiveApproval) {
+      this.process?.stdin.write(`${JSON.stringify({ id: message.id, result: { decision: "acceptForSession" } })}\n`);
+      return;
+    }
     const result = message.method?.includes("requestApproval")
       ? { decision: "decline" }
       : { action: "decline", content: null };

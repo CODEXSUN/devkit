@@ -58,13 +58,21 @@ rework and run again. A passed run exposes a separate local commit approval. Dev
 the commit. Protected branches and remote changes remain outside this phase.
 DevKit fingerprints the verified worktree and rejects stale commit approval after any file change.
 
-### Phase 3 - Task Decomposition
+### Phase 3 - Task Decomposition - Implemented Foundation
 
 1. Convert an approved plan into small durable tasks.
 2. Record task dependencies as a directed graph.
 3. Give each task a file scope, skill set, access ceiling, and budget.
 4. Run parallel tasks only when their file scopes do not overlap.
 5. Return every task result to the parent run for review.
+
+The current slice persists named supervisor and delegate personas, assigns them to parent runs and
+tasks, calls ready delegates through Codex, and keeps each writable task in an isolated worktree.
+The scheduler rejects concurrent scope overlap, enforces the Agent profile permission ceiling,
+records approvals and evidence on child runs, and stops a task when its changed files leave the
+declared scope. A dependency-final review task may call the named supervisor before human parent
+approval. Per-task skill selection, controlled branch integration, and restart recovery for an
+in-flight delegate remain later work.
 
 ### Phase 4 - Model Gateway
 

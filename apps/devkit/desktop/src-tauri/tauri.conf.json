@@ -29,7 +29,13 @@
     "active": true,
     "category": "DeveloperTool",
     "createUpdaterArtifacts": true,
-    "externalBin": ["binaries/codex"],
+    "externalBin": [
+      "binaries/codex",
+      "binaries/codex-code-mode-host",
+      "binaries/codex-command-runner",
+      "binaries/codex-windows-sandbox-setup",
+      "binaries/rg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

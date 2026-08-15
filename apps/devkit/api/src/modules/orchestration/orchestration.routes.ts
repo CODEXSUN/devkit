@@ -6,6 +6,8 @@ import {
   agentIdePlanInputSchema,
   agentCommitInputSchema,
   agentDecompositionInputSchema,
+  agentPersonaInputSchema,
+  agentPersonaAssignmentSchema,
   agentParentReviewInputSchema,
   agentReworkInputSchema,
   agentTaskStatusInputSchema,
@@ -26,6 +28,8 @@ import { agentWorktreeService } from "./agent-worktree.service.js";
 import { agentVerificationService } from "./agent-verification.service.js";
 import { agentIntegrationService } from "./agent-integration.service.js";
 import { agentTaskGraphRepository } from "./agent-task-graph.repository.js";
+import { agentPersonaRepository } from "./agent-persona.repository.js";
+import { agentDelegateExecutor } from "./agent-delegate.executor.js";
 import { hostingerMcpService } from "./hostinger-mcp.service.js";
 import { hostingerDashboardService } from "./hostinger-dashboard.service.js";
 import { hostingerSshService } from "./hostinger-ssh.service.js";
@@ -43,6 +47,10 @@ const hostingerSshTargetSchema = z.object({
 }).strict();
 
 export async function registerOrchestrationRoutes(app: FastifyInstance) {
+  const recoveredDelegates = await agentDelegateExecutor.recover();
+  if (recoveredDelegates) {
+    app.log.info({ recoveredDelegates }, "Recovered named Agent delegates after API restart.");
+  }
   app.get("/orchestration/catalog", async (request) =>
     ok(service.catalog(), { requestId: request.id })
   );
@@ -86,6 +94,34 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
       requestId: request.id
     });
   });
+  app.get("/orchestration/agent-ide/personas", async (request) =>
+    ok(await agentPersonaRepository.list(requireDevkitActor().id), { requestId: request.id })
+  );
+  app.post("/orchestration/agent-ide/personas", async (request) =>
+    ok(
+      await agentPersonaRepository.create(
+        agentPersonaInputSchema.parse(request.body),
+        requireDevkitActor().id
+      ),
+      { requestId: request.id }
+    )
+  );
+  app.put("/orchestration/agent-ide/personas/:uuid", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    return ok(
+      await agentPersonaRepository.update(
+        uuid,
+        agentPersonaInputSchema.parse(request.body),
+        requireDevkitActor().id
+      ),
+      { requestId: request.id }
+    );
+  });
+  app.post("/orchestration/agent-ide/personas/starter-team", async (request) =>
+    ok(await agentPersonaRepository.createStarterTeam(requireDevkitActor().id), {
+      requestId: request.id
+    })
+  );
   app.get("/orchestration/agent-ide/runs/:uuid", async (request) => {
     const { uuid } = z
       .object({ uuid: z.string().length(16) })
@@ -119,9 +155,25 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
       .object({ uuid: z.string().length(16) })
       .strict()
       .parse(request.params);
-    return ok(await agentTaskGraphRepository.start(uuid, requireDevkitActor().id), {
+    return ok(await agentDelegateExecutor.call(uuid, requireDevkitActor().id), {
       requestId: request.id
     });
+  });
+  app.put("/orchestration/agent-ide/tasks/:uuid/delegate", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { personaUuid } = agentPersonaAssignmentSchema.parse(request.body);
+    return ok(
+      await agentTaskGraphRepository.assignDelegate(uuid, requireDevkitActor().id, personaUuid),
+      { requestId: request.id }
+    );
+  });
+  app.put("/orchestration/agent-ide/runs/:uuid/supervisor", async (request) => {
+    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { personaUuid } = agentPersonaAssignmentSchema.parse(request.body);
+    return ok(
+      await agentTaskGraphRepository.assignSupervisor(uuid, requireDevkitActor().id, personaUuid),
+      { requestId: request.id }
+    );
   });
   app.post("/orchestration/agent-ide/tasks/:uuid/finish", async (request) => {
     const { uuid } = z

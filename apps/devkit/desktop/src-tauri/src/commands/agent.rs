@@ -1,5 +1,5 @@
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 
@@ -45,6 +45,7 @@ pub fn start_agent_runtime(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    prepend_runtime_directory_to_path(&mut command, &executable)?;
     hide_child_window(&mut command);
 
     let mut child = command.spawn().map_err(|error| {
@@ -86,6 +87,25 @@ pub fn start_agent_runtime(
         connected: true,
         executable,
     })
+}
+
+fn prepend_runtime_directory_to_path(command: &mut Command, executable: &str) -> DesktopResult<()> {
+    let Some(directory) = Path::new(executable).parent() else {
+        return Ok(());
+    };
+    if directory.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let paths = std::iter::once(directory.to_path_buf()).chain(std::env::split_paths(&path));
+    let path = std::env::join_paths(paths).map_err(|error| {
+        DesktopError::Policy(format!(
+            "CodeLogix could not prepare the Codex runtime path. {error}"
+        ))
+    })?;
+    command.env("PATH", path);
+    Ok(())
 }
 
 fn resolve_codex_executable() -> String {
@@ -168,8 +188,7 @@ pub fn resume_agent_thread(
         json!({
             "threadId": thread_id,
             "cwd": root,
-            "approvalPolicy": "on-request",
-            "excludeTurns": true
+            "approvalPolicy": "on-request"
         }),
     )
 }

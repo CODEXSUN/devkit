@@ -101,6 +101,7 @@ export type AgentIdeAttachment = {
 export type AgentRunSummary = {
   access: AgentIdeAccess;
   agentProfile: string;
+  supervisorPersonaUuid: string | null;
   assistMode: string;
   budget: {
     maxDurationSeconds: number;
@@ -187,6 +188,7 @@ export type AgentRunStatus =
 
 export type AgentTaskGraph = {
   parentRunUuid: string;
+  supervisor: AgentPersona | null;
   reviews: Array<{
     createdAt: string;
     decision: "approved" | "rework";
@@ -195,11 +197,19 @@ export type AgentTaskGraph = {
   }>;
   tasks: Array<{
     agentProfile: string;
+    delegate: AgentPersona | null;
     childRunUuid: string | null;
     completedAt: string | null;
     dependsOn: string[];
     key: string;
     objective: string;
+    pendingApproval: {
+      reason: string;
+      requestId: number;
+      status: string;
+      taskUuid: string;
+      threadId: string;
+    } | null;
     resultSummary: string | null;
     scopePaths: string[];
     sequence: number;
@@ -208,4 +218,16 @@ export type AgentTaskGraph = {
     title: string;
     uuid: string;
   }>;
+};
+
+export type AgentPersona = {
+  agentProfile: "coding" | "devops" | "planning" | "review" | "security" | "testing";
+  createdAt: string;
+  description: string;
+  instructions: string;
+  key: string;
+  name: string;
+  role: "delegate" | "supervisor";
+  updatedAt: string;
+  uuid: string;
 };
