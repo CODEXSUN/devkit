@@ -207,6 +207,18 @@ export function assertReleaseAssets(release, version) {
   if (missing.length) throw new Error(`The public release is missing: ${missing.join(", ")}`);
 }
 
+export function npmInvocation(
+  args,
+  runtimePlatform = platform(),
+  commandShell = process.env.ComSpec
+) {
+  if (runtimePlatform !== "win32") return { command: "npm", args };
+  return {
+    command: commandShell || "cmd.exe",
+    args: ["/d", "/s", "/c", "npm.cmd", ...args]
+  };
+}
+
 function tagCommit(tag) {
   try {
     return runGit(["rev-list", "-n", "1", tag], true);
@@ -277,7 +289,8 @@ function runGit(args, silent = false) {
 }
 
 function runNpm(args) {
-  execFileSync(platform() === "win32" ? "npm.cmd" : "npm", args, { cwd: root, stdio: "inherit" });
+  const invocation = npmInvocation(args);
+  execFileSync(invocation.command, invocation.args, { cwd: root, stdio: "inherit" });
 }
 
 function numberOption(args, name, fallback) {

@@ -480,6 +480,7 @@ Changelog label: v 1.0.63
 - Used slower public API polling when no GitHub token is available.
 - Published the GitHub release only after the signed desktop workflow completes every build, test, output check, and asset upload.
 - Added `github:release:test` for the tag and required release asset contracts.
+- Fixed the Windows Node 26 command boundary so the release tool can run npm checks.
 - Updated the version tool so the root lockfile keeps internal workspace dependency versions synchronized.
 - Added a version check that rejects stale internal workspace dependencies in the root lockfile.
 - Documented the automated release, timeout, and operator approval flow.
