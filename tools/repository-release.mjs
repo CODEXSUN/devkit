@@ -127,6 +127,7 @@ function checkVersions() {
     if (lock.packages?.[""]?.version && String(lock.packages[""].version) !== expected) {
       failures.push(`package-lock root is ${lock.packages[""].version}; expected ${expected}.`);
     }
+    checkWorkspaceLockDependencies(failures, lock);
   }
 
   const changelog = readFileSync(changelogPath, "utf8");
@@ -267,7 +268,10 @@ function updateDesktopVersions(currentVersion, nextVersion) {
 function rustPackageVersion(content, packageName) {
   const escapedName = packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   return content.match(
-    new RegExp(`(?:^|\\n)(?:\\[\\[?package\\]?\\]\\r?\\n)name = "${escapedName}"\\r?\\nversion = "([^"]+)"`, "u")
+    new RegExp(
+      `(?:^|\\n)(?:\\[\\[?package\\]?\\]\\r?\\n)name = "${escapedName}"\\r?\\nversion = "([^"]+)"`,
+      "u"
+    )
   )?.[1];
 }
 
@@ -280,7 +284,8 @@ function updateRustPackageVersion(file, packageName, currentVersion, nextVersion
     "u"
   );
   const match = content.match(pattern);
-  if (!match) throw new Error(`${relative(root, file)} does not contain ${packageName} ${currentVersion}.`);
+  if (!match)
+    throw new Error(`${relative(root, file)} does not contain ${packageName} ${currentVersion}.`);
   writeFileSync(file, content.replace(pattern, `$1${nextVersion}$2`), "utf8");
 }
 
@@ -343,8 +348,46 @@ function updateLockfile(currentVersion, nextVersion) {
     ) {
       pkg.version = nextVersion;
     }
+    for (const field of [
+      "dependencies",
+      "devDependencies",
+      "peerDependencies",
+      "optionalDependencies"
+    ]) {
+      for (const [name, value] of Object.entries(pkg?.[field] ?? {})) {
+        if (
+          (name.startsWith("@codexsun/") || name.startsWith("@devkit/")) &&
+          (value === currentVersion || value === `^${currentVersion}`)
+        ) {
+          pkg[field][name] = value.startsWith("^") ? `^${nextVersion}` : nextVersion;
+        }
+      }
+    }
   }
   writeJson(file, lock);
+}
+
+function checkWorkspaceLockDependencies(failures, lock) {
+  for (const file of packageFiles()) {
+    const lockPath = relative(root, dirname(file)).replaceAll("\\", "/");
+    const manifest = readJson(file);
+    const locked = lock.packages?.[lockPath === "." ? "" : lockPath];
+    for (const field of [
+      "dependencies",
+      "devDependencies",
+      "peerDependencies",
+      "optionalDependencies"
+    ]) {
+      for (const [name, value] of Object.entries(manifest[field] ?? {})) {
+        if (!name.startsWith("@codexsun/") && !name.startsWith("@devkit/")) continue;
+        if (locked?.[field]?.[name] !== value) {
+          failures.push(
+            `package-lock ${lockPath} ${name} is ${locked?.[field]?.[name] ?? "missing"}; expected ${value}.`
+          );
+        }
+      }
+    }
+  }
 }
 
 function updateChangelog(nextVersion, title, databaseUpdate) {

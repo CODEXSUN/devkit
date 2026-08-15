@@ -126,17 +126,32 @@ npm.cmd run desktop:release:check
 
 ## GitHub release
 
-1. Bump the repository version.
-2. Run the repository and desktop checks.
-3. Commit and push the reviewed files.
-4. Create and push the tag `desktop-v<version>`.
-5. Wait for the **Desktop release** workflow.
-6. Download the workflow artifact if you need the complete root deploy folder.
-7. Review the draft release, MSI, signature, and `latest.json` file.
-8. Publish the draft release.
+Preview the release before it changes GitHub:
 
-The workflow keeps the release as a draft. A draft never reaches desktop clients. Publishing the
-draft is the operator approval that exposes `latest.json` to the updater.
+```powershell
+npm.cmd run github:release -- --dry-run
+```
+
+Start the reviewed release:
+
+```powershell
+npm.cmd run github:release
+```
+
+The command checks the clean and pushed `main` branch. It runs the version, dependency, and desktop
+checks. After operator approval, it creates and pushes `desktop-v<version>`.
+
+The **Desktop release** workflow builds and tests the signed MSI. It checks the release outputs and
+uploads the setup EXE, updater signature, and `latest.json`. The workflow publishes the release only
+after every earlier step passes. The command waits for the workflow and verifies the public assets.
+
+Use `--no-wait` only when another operator will monitor the workflow. Use `--yes` only after a
+reviewed dry run. The operator approval before the tag push is the release approval that makes the
+signed update available to desktop clients.
+
+The default wait timeout is 45 minutes. Use `--timeout-minutes <5-120>` for a different bounded
+wait. If the local command stops after the tag push, run it again to resume workflow and release
+verification. Never move an existing release tag to another commit.
 
 ## Recovery
 

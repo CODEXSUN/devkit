@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.62
-Release tag: v-1.0.62
-Changelog label: v 1.0.62
+Current version: 1.0.63
+Release tag: v-1.0.63
+Changelog label: v 1.0.63
 
 ### [Session] 2026-08-15 - CodeLogix internal coding beta
 
@@ -461,6 +461,35 @@ Changelog label: v 1.0.62
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.63
+
+### [v 1.0.63] 2026-08-15 11:24 pm - Automated GitHub desktop release
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.63.
+- Added `github:release` with dry-run, operator approval, and noninteractive reviewed modes.
+- Required a clean, pushed `main` branch before a release tag can be created.
+- Ran version, dependency, and desktop checks before pushing `desktop-v<version>`.
+- Added resumable workflow monitoring and public release asset verification.
+- Used slower public API polling when no GitHub token is available.
+- Published the GitHub release only after the signed desktop workflow completes every build, test, output check, and asset upload.
+- Added `github:release:test` for the tag and required release asset contracts.
+- Updated the version tool so the root lockfile keeps internal workspace dependency versions synchronized.
+- Added a version check that rejects stale internal workspace dependencies in the root lockfile.
+- Documented the automated release, timeout, and operator approval flow.
+
+#### Verification
+
+- Passed the GitHub release contract tests and JavaScript syntax check.
+- Passed the release dry run without creating a tag or GitHub release.
+- Verified that an uncommitted worktree stops before tag creation.
+- Passed the full repository check and the CodeLogix desktop check.
 
 ## v-1.0.62
 

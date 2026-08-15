@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.62",
+  "version": "1.0.63",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -52,6 +52,8 @@
     "version-bump": "node tools/repository-release.mjs version:bump",
     "check:versions": "node tools/repository-release.mjs check:versions",
     "github:now": "node tools/github-helper.mjs",
+    "github:release": "node tools/github-release.mjs",
+    "github:release:test": "node --test tools/github-release.test.mjs",
     "stack:impact": "node tools/stack-impact.mjs",
     "stack:plan": "node tools/stack-release-plan.mjs",
     "format": "prettier . --write",

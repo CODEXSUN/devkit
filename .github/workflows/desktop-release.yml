@@ -60,7 +60,7 @@ jobs:
           tauriScript: npm run tauri
           tagName: desktop-v__VERSION__
           releaseName: CodeLogix __VERSION__
-          releaseBody: Review the checks and publish this draft to make the signed update available.
+          releaseBody: Signed CodeLogix desktop release produced by the verified release workflow.
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: false
@@ -104,3 +104,18 @@ jobs:
           name: codelogix-${{ github.ref_name }}-windows-x64
           path: dist/deploy/desktop/*/windows-x64
           if-no-files-found: error
+
+      - name: Publish verified release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/github-script@v8
+        env:
+          RELEASE_ID: ${{ steps.tauri-release.outputs.releaseId }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: Number(process.env.RELEASE_ID),
+              draft: false
+            });
