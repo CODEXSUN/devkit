@@ -2,6 +2,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
+import desktopPackage from "../../package.json";
 
 export type UpdatePhase =
   "checking" | "current" | "downloading" | "idle" | "installing" | "ready" | "unavailable";
@@ -19,7 +20,7 @@ export type DesktopUpdateState = {
 
 export function useDesktopUpdater(): DesktopUpdateState {
   const updateRef = useRef<Update | undefined>(undefined);
-  const [currentVersion, setCurrentVersion] = useState("");
+  const [currentVersion, setCurrentVersion] = useState(desktopPackage.version);
   const [phase, setPhase] = useState<UpdatePhase>("idle");
   const [progress, setProgress] = useState<number>();
   const [version, setVersion] = useState<string>();

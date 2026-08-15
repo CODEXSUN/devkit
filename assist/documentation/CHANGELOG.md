@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.60
-Release tag: v-1.0.60
-Changelog label: v 1.0.60
+Current version: 1.0.62
+Release tag: v-1.0.62
+Changelog label: v 1.0.62
 
 ### [Session] 2026-08-15 - CodeLogix internal coding beta
 
@@ -461,6 +461,51 @@ Changelog label: v 1.0.60
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.62
+
+### [v 1.0.62] 2026-08-15 11:16 pm - Agent conversation and Markdown experience
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.62.
+- Expanded the Agent transcript and composer to 80 percent of the available conversation workspace.
+- Aligned developer prompts on the right and kept Agent responses on the left.
+- Added a compact execution rail that keeps active work open, collapses completed work, and limits long activity lists with an explicit Show earlier actions control.
+- Added safe GitHub-flavored Markdown for Agent headings, lists, task lists, tables, links, quotes, inline code, and fenced code blocks.
+- Kept raw model-supplied HTML disabled and lazy-loaded Markdown rendering to protect startup performance.
+- Added responsive and dark-theme presentation for messages, activity rails, and Markdown content.
+
+#### Verification
+
+- Passed desktop TypeScript, ESLint, 20 Vitest tests, and the version 1.0.62 production webview build.
+- Passed all 11 native Rust tests for version 1.0.62.
+- Confirmed the native single-instance guard focused the installed app instead of opening a competing development process.
+
+## v-1.0.61
+
+### [v 1.0.61] 2026-08-15 11:07 pm - Footer version update control
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.61.
+- Added the installed CodeLogix version to the left side of the workspace footer.
+- Made the version a keyboard-accessible update control that opens the signed update center and checks for a newer release.
+- Preserved downloaded updates when the version control is clicked so approval remains available without another download.
+- Added a restrained update-ready indicator with light and dark theme states.
+
+#### Verification
+
+- Passed desktop TypeScript, ESLint, 16 Vitest tests, and the production webview build.
+- Passed repository version synchronization and diff checks.
 
 ## v-1.0.60
 

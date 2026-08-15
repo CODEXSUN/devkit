@@ -945,6 +945,31 @@ button.tree-row:hover,
   background: transparent;
   cursor: pointer;
 }
+.statusbar .version-update {
+  position: relative;
+  display: flex;
+  min-width: 54px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 7px;
+  color: inherit;
+  font: inherit;
+}
+.statusbar .version-update:hover,
+.statusbar .version-update:focus-visible {
+  background: #eef3f9;
+  color: #1a5fb4;
+  outline: none;
+}
+.version-update i {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #1a73e8;
+}
 .status-spacer {
   flex: 1;
 }
@@ -1350,6 +1375,11 @@ button.tree-row:hover,
 :root[data-theme="dark"] .update-center > footer button.primary {
   border-color: #4a8fe7;
   background: #1f6fd2;
+}
+:root[data-theme="dark"] .statusbar .version-update:hover,
+:root[data-theme="dark"] .statusbar .version-update:focus-visible {
+  background: #292d32;
+  color: #b9d5f5;
 }
 :root[data-theme="dark"] .command-center,
 :root[data-theme="dark"] .editor-tabs,

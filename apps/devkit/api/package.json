@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit-api",
-  "version": "1.0.60",
+  "version": "1.0.62",
   "private": true,
   "type": "module",
   "exports": {
@@ -15,7 +15,7 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@codexsun/framework": "1.0.60",
+    "@codexsun/framework": "1.0.62",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/agents": "^0.14.3",
     "@openai/codex": "^0.147.0",

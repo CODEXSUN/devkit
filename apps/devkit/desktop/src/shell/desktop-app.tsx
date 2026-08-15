@@ -19,7 +19,11 @@ import { SetupWorkspace } from "../workspaces/setup-workspace";
 import { AppDrawer } from "./app-drawer";
 import { OpenInMenu } from "./open-in-menu";
 import { CommandPalette, type PaletteCommand } from "./command-palette";
-import { UpdateButton, UpdateCenter } from "../updates/update-center";
+import {
+  UpdateButton,
+  UpdateCenter,
+  VersionUpdateButton
+} from "../updates/update-center";
 import { useDesktopUpdater } from "../updates/use-desktop-updater";
 import { DesktopSidePanel } from "./desktop-side-panel";
 import { useDesktopSession } from "./use-desktop-session";
@@ -288,6 +292,7 @@ export function DesktopApp() {
         </main>
       </div>
       <footer className="statusbar">
+        <VersionUpdateButton onOpen={() => ui.setUpdateOpen(true)} update={updater} />
         <span>
           <GitBranch size={13} /> {workspace.branch}
         </span>

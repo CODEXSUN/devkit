@@ -23,6 +23,42 @@ export function UpdateButton({
   );
 }
 
+export function VersionUpdateButton({
+  onOpen,
+  update
+}: {
+  onOpen: () => void;
+  update: DesktopUpdateState;
+}) {
+  const updateReady = update.phase === "ready";
+
+  function openAndCheck() {
+    onOpen();
+    if (shouldCheckWhenOpened(update.phase)) void update.checkForUpdate();
+  }
+
+  return (
+    <button
+      aria-label={`CodeLogix version ${update.currentVersion}. Check for updates`}
+      className={updateReady ? "version-update active" : "version-update"}
+      onClick={openAndCheck}
+      title={
+        updateReady
+          ? `Version ${update.version} is ready to install`
+          : `Version ${update.currentVersion} · Check for updates`
+      }
+      type="button"
+    >
+      <span>v{update.currentVersion}</span>
+      {updateReady ? <i aria-hidden="true" /> : null}
+    </button>
+  );
+}
+
+export function shouldCheckWhenOpened(phase: DesktopUpdateState["phase"]) {
+  return !["checking", "downloading", "installing", "ready"].includes(phase);
+}
+
 export function UpdateCenter({
   onClose,
   update

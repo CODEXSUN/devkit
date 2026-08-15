@@ -1,12 +1,17 @@
 import {
   Bot,
+  CheckCircle2,
+  ChevronDown,
   Code2,
   FileDiff,
   GitBranch,
+  LoaderCircle,
   Play,
+  Search,
   ShieldCheck,
   TerminalSquare
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { FileEntry, GitChange, Workspace } from "../contracts/desktop";
 import type { ResourceState } from "../shell/use-desktop-session";
 
@@ -40,18 +45,80 @@ export function AgentWelcome({
 }
 
 export function RunTimeline({ items }: { items: RunItem[] }) {
+  const activeCount = items.filter(isActiveRunItem).length;
+  const [expanded, setExpanded] = useState(activeCount > 0);
+  const [showAll, setShowAll] = useState(false);
+  const visibleItems = showAll ? items : items.slice(-RUN_ITEM_LIMIT);
+  const hiddenCount = items.length - visibleItems.length;
+
+  useEffect(() => {
+    if (activeCount > 0) {
+      setExpanded(true);
+      setShowAll(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setExpanded(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [activeCount]);
+
   return (
-    <div className="run-timeline">
-      {items.map((item) => (
-        <div key={item.id}>
-          {item.type === "commandExecution" ? <TerminalSquare size={14} /> : <Code2 size={14} />}
-          <span>{item.label}</span>
-          <small>{item.status}</small>
+    <section className={`run-timeline${activeCount ? " active" : ""}`}>
+      <button
+        aria-expanded={expanded}
+        className="run-summary"
+        onClick={() => setExpanded((current) => !current)}
+        type="button"
+      >
+        {activeCount ? <LoaderCircle className="spin" size={15} /> : <CheckCircle2 size={15} />}
+        <span>
+          <strong>{activeCount ? "Agent working" : "Work completed"}</strong>
+          <small>{runSummary(items.length, activeCount)}</small>
+        </span>
+        <ChevronDown className={expanded ? "expanded" : ""} size={14} />
+      </button>
+      {expanded ? (
+        <div className="run-list" role="status">
+          {hiddenCount > 0 ? (
+            <button className="run-show-more" onClick={() => setShowAll(true)} type="button">
+              Show {hiddenCount} earlier {hiddenCount === 1 ? "action" : "actions"}
+            </button>
+          ) : null}
+          {visibleItems.map((item) => (
+            <div className={isActiveRunItem(item) ? "run-item active" : "run-item"} key={item.id}>
+              <RunItemIcon item={item} />
+              <span title={item.label}>{item.label}</span>
+              <small>{statusLabel(item.status)}</small>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      ) : null}
+    </section>
   );
 }
+
+export function isActiveRunItem(item: RunItem) {
+  return !["cancelled", "canceled", "completed", "declined", "failed", "success"].includes(
+    item.status.toLowerCase()
+  );
+}
+
+function RunItemIcon({ item }: { item: RunItem }) {
+  if (item.type === "commandExecution") return <TerminalSquare size={14} />;
+  if (item.type === "webSearch") return <Search size={14} />;
+  return <Code2 size={14} />;
+}
+
+function runSummary(total: number, active: number) {
+  if (active) return `${active} active · ${total} ${total === 1 ? "action" : "actions"}`;
+  return `${total} ${total === 1 ? "action" : "actions"}`;
+}
+
+function statusLabel(status: string) {
+  return status.replace(/([a-z])([A-Z])/gu, "$1 $2").toLowerCase();
+}
+
+const RUN_ITEM_LIMIT = 5;
 
 export function ApprovalCard({
   approval,

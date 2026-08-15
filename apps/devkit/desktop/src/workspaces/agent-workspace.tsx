@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   X
 } from "lucide-react";
+import { lazy, Suspense } from "react";
 import type { FileEntry, GitChange, Workspace } from "../contracts/desktop";
 import type { ResourceState } from "../shell/use-desktop-session";
 import { MAX_AGENT_CONTEXT_FILES } from "./agent-context";
@@ -22,6 +23,10 @@ import {
 } from "./agent-workspace-parts";
 import "./agent-workspace.css";
 import { useAgentSession } from "./use-agent-session";
+
+const AgentMarkdown = lazy(() =>
+  import("./agent-markdown").then((module) => ({ default: module.AgentMarkdown }))
+);
 
 export function AgentWorkspace({
   changes,
@@ -112,7 +117,13 @@ export function AgentWorkspace({
             session.messages.map((message) => (
               <article className={`agent-message ${message.role}`} key={message.id}>
                 <span>{message.role === "agent" ? <Bot size={15} /> : "You"}</span>
-                <p>{message.text}</p>
+                {message.role === "agent" ? (
+                  <Suspense fallback={<p>{message.text}</p>}>
+                    <AgentMarkdown text={message.text} />
+                  </Suspense>
+                ) : (
+                  <p>{message.text}</p>
+                )}
               </article>
             ))
           )}
