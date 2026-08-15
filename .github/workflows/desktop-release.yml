@@ -69,23 +69,34 @@ jobs:
       - name: Collect root deploy outputs
         run: npm run desktop:release:publish
 
-      - name: Upload direct-download updater manifest
+      - name: Check desktop release outputs
+        run: npm run desktop:release:check
+
+      - name: Upload first-install assets
         uses: actions/github-script@v8
         env:
           MANIFEST_PATH: dist/deploy/desktop/${{ steps.tauri-release.outputs.appVersion }}/windows-x64/updater/latest.json
           RELEASE_ID: ${{ steps.tauri-release.outputs.releaseId }}
+          SETUP_PATH: dist/deploy/desktop/${{ steps.tauri-release.outputs.appVersion }}/windows-x64/installer/CodeLogix_Setup_${{ steps.tauri-release.outputs.appVersion }}_x64.exe
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require("fs");
-            const manifest = fs.readFileSync(process.env.MANIFEST_PATH);
-            await github.rest.repos.uploadReleaseAsset({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: Number(process.env.RELEASE_ID),
-              name: "latest.json",
-              data: manifest
-            });
+            const path = require("path");
+            const releaseId = Number(process.env.RELEASE_ID);
+            const assets = [
+              ["latest.json", process.env.MANIFEST_PATH],
+              [path.basename(process.env.SETUP_PATH), process.env.SETUP_PATH]
+            ];
+            for (const [name, assetPath] of assets) {
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: releaseId,
+                name,
+                data: fs.readFileSync(assetPath)
+              });
+            }
 
       - name: Upload root deploy outputs
         uses: actions/upload-artifact@v4

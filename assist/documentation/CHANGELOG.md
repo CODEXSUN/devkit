@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.59
-Release tag: v-1.0.59
-Changelog label: v 1.0.59
+Current version: 1.0.60
+Release tag: v-1.0.60
+Changelog label: v 1.0.60
 
 ### [Session] 2026-08-15 - CodeLogix internal coding beta
 
@@ -461,6 +461,34 @@ Changelog label: v 1.0.59
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.60
+
+### [v 1.0.60] 2026-08-15 10:35 pm - Windows first-install and live update flow
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.60.
+- Added a first-install setup EXE that embeds and starts the owned MSI.
+- Kept MSI as the only Windows Installer product and updater package.
+- Fixed the WiX upgrade code so future product-name changes cannot create duplicate installations.
+- Added CODEXSUN publisher and product homepage metadata to the Windows installer.
+- Published the setup EXE beside the MSI, updater signature, and direct-download manifest.
+- Documented first installation, managed MSI deployment, repair, update, and uninstall ownership.
+
+#### Verification
+
+- Database update: not required.
+- Passed version synchronization, type checks, lint, 14 Vitest tests, and the desktop production build.
+- Passed all 11 native Rust tests and the signed MSI build.
+- Passed the release-output check for the MSI identity, setup metadata, updater, and release manifest.
+- Confirmed the setup EXE contains the MSI and excludes debug-symbol files.
+- Passed repository encoding, deployment, boundary, dependency, database lifecycle, type, lint, and framework test gates.
+- Live first-install and update verification continues after the signed GitHub draft passes its gates.
 
 ## v-1.0.59
 

@@ -11,10 +11,28 @@ The update center shows the version, release notes, and download progress. The u
 The updater uses passive MSI mode. The installer needs no answers after Windows grants approval.
 The app restarts after the installer succeeds.
 
+## First installation
+
+The release provides these first-install files:
+
+```text
+CodeLogix_Setup_<version>_x64.exe
+CodeLogix_<version>_x64_en-US.msi
+```
+
+Use the setup EXE for a normal first installation. It contains the same MSI and shows passive
+Windows Installer progress. Use the MSI for managed deployment, repair, and recovery.
+
+Both files install one Windows Installer product. The setup EXE does not create a second product
+or a separate uninstaller.
+
 ## Installer ownership
 
-CodeLogix uses one Windows MSI installer type. Do not publish an NSIS installer for the
-same product. Mixed installer types can create duplicate installations.
+CodeLogix uses one Windows MSI installer identity. Do not publish an NSIS installer for the same
+product. Mixed installer identities can create duplicate installations.
+
+The fixed WiX upgrade code is `da54f106-f843-506e-8738-3bb49bda90d2`. Never change this code for
+an existing product line.
 
 The MSI upgrade removes only components that the earlier MSI registered. It replaces the program
 files, shortcuts, and uninstall registration. It does not delete workspaces or the desktop SQLite
@@ -80,13 +98,15 @@ app/codex-windows-sandbox-setup.exe
 app/rg.exe
 installer/CodeLogix_<version>_x64_en-US.msi
 installer/CodeLogix_<version>_x64_en-US.msi.sig
+installer/CodeLogix_Setup_<version>_x64.exe
 updater/latest.json
 checksums.sha256
 release.json
 ```
 
-Use the MSI for installation. The `app` folder is the unpackaged application pair for controlled
-testing. Keep every file in `app` together because the Codex process resolves its code-mode, sandbox, and search helpers beside `codex.exe`.
+Use the setup EXE for a normal first installation. Use the MSI for managed deployment and repair.
+The `app` folder is the unpackaged application set for controlled testing. Keep every file in
+`app` together because Codex resolves its helpers beside `codex.exe`.
 
 The release command also checks that only the repository root contains `node_modules` and `dist`.
 Nested dependency or build-output folders stop the release.
@@ -95,6 +115,13 @@ Run this command to collect an existing native build again:
 
 ```powershell
 npm.cmd run desktop:release:publish
+```
+
+Run this command to verify the MSI identity, setup metadata, updater manifest, and root release
+manifest:
+
+```powershell
+npm.cmd run desktop:release:check
 ```
 
 ## GitHub release

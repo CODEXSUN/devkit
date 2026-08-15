@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
   createReadStream,
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync
@@ -21,11 +23,14 @@ const bundleRoot = join(targetRoot, "bundle", "msi");
 const deployBase = join(root, "dist", "deploy", "desktop");
 const deployRoot = join(deployBase, version, "windows-x64");
 const installerName = `CodeLogix_${version}_x64_en-US.msi`;
+const setupName = `CodeLogix_Setup_${version}_x64.exe`;
 
 await publishDesktopRelease();
 
 async function publishDesktopRelease() {
   clearDeployRoot();
+  const installerPath = join("installer", installerName);
+  const setupPath = join("installer", setupName);
   const files = [
     copyArtifact(join(targetRoot, "devkit-desktop.exe"), join("app", "CodeLogix.exe"), "app"),
     copyArtifact(join(targetRoot, "codex.exe"), join("app", "codex.exe"), "agent-runtime"),
@@ -45,19 +50,110 @@ async function publishDesktopRelease() {
       "agent-sandbox-setup",
     ),
     copyArtifact(join(targetRoot, "rg.exe"), join("app", "rg.exe"), "agent-search-runtime"),
-    copyArtifact(join(bundleRoot, installerName), join("installer", installerName), "installer"),
+    copyArtifact(join(bundleRoot, installerName), installerPath, "installer"),
     copyArtifact(
       join(bundleRoot, `${installerName}.sig`),
       join("installer", `${installerName}.sig`),
       "updater-signature"
     )
   ];
+  buildSetupLauncher(join(deployRoot, installerPath), join(deployRoot, setupPath));
+  files.push(describeArtifact(setupPath, "first-install-launcher"));
   writeUpdaterManifest(installerName);
   files.push(describeArtifact(join("updater", "latest.json"), "updater-manifest"));
   const described = await Promise.all(files);
   writeChecksums(described);
   writeReleaseManifest(described);
   console.log(`Published desktop release outputs to ${deployRoot}`);
+}
+
+function buildSetupLauncher(installerPath, outputPath) {
+  const source = join(root, "tools", "desktop-installer-launcher.rs");
+  const resourceSource = join(deployRoot, "setup-launcher.rc");
+  const resourceOutput = join(deployRoot, "setup-launcher.res");
+  writeSetupResource(resourceSource);
+
+  try {
+    execFileSync(findResourceCompiler(), ["/nologo", `/fo${resourceOutput}`, resourceSource], {
+      stdio: "inherit"
+    });
+    execFileSync(
+      "rustc",
+      [
+        "--edition",
+        "2021",
+        "-C",
+        "opt-level=z",
+        "-C",
+        "strip=symbols",
+        "-C",
+        "panic=abort",
+        "-C",
+        `link-arg=${resourceOutput}`,
+        "-o",
+        outputPath,
+        source
+      ],
+      {
+        env: {
+          ...process.env,
+          CODELOGIX_MSI_PATH: installerPath,
+          CODELOGIX_VERSION: version
+        },
+        stdio: "inherit"
+      }
+    );
+  } finally {
+    rmSync(resourceSource, { force: true });
+    rmSync(resourceOutput, { force: true });
+    rmSync(outputPath.replace(/\.exe$/u, ".pdb"), { force: true });
+  }
+}
+
+function writeSetupResource(outputPath) {
+  const [major, minor, patch] = version.split(".");
+  const icon = join(root, "apps", "devkit", "desktop", "src-tauri", "icons", "icon.ico")
+    .replaceAll("\\", "\\\\");
+  const content = `1 ICON "${icon}"
+1 VERSIONINFO
+FILEVERSION ${major},${minor},${patch},0
+PRODUCTVERSION ${major},${minor},${patch},0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904E4"
+    BEGIN
+      VALUE "CompanyName", "CODEXSUN\\0"
+      VALUE "FileDescription", "CodeLogix Setup\\0"
+      VALUE "FileVersion", "${version}\\0"
+      VALUE "InternalName", "CodeLogix Setup\\0"
+      VALUE "OriginalFilename", "${setupName}\\0"
+      VALUE "ProductName", "CodeLogix\\0"
+      VALUE "ProductVersion", "${version}\\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1252
+  END
+END
+`;
+  writeFileSync(outputPath, content);
+}
+
+function findResourceCompiler() {
+  const programFiles = process.env["ProgramFiles(x86)"];
+  if (!programFiles) throw new Error("The Windows Program Files path is unavailable.");
+  const binRoot = join(programFiles, "Windows Kits", "10", "bin");
+  const versions = readdirSync(binRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^\d+\.\d+/u.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+  for (const sdkVersion of versions) {
+    const candidate = join(binRoot, sdkVersion, "x64", "rc.exe");
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error("The Windows x64 resource compiler is unavailable.");
 }
 
 function clearDeployRoot() {
