@@ -26,13 +26,18 @@
   and are re-read only when the prompt is sent. The Agent session stays mounted across workspace
   views. Monaco starts on its first use and then stays mounted for the selected workspace. Prompt
   preparation blocks duplicate sends and removes local user messages that Codex does not accept.
-- Orchestration owns MariaDB-backed Project Agent chat threads, messages, edited-file evidence,
-  elapsed time, and feedback. Every chat-history query is partitioned by the authenticated local
-  actor ID; this is scoped record isolation, not a claim of platform-wide multi-tenant isolation.
+- Orchestration owns MariaDB-backed Project Agent chat threads, messages, action history,
+  edited-file evidence, elapsed time, and feedback. Action history records commands, tools,
+  searches, file changes, delegates, and automatic Codex context compaction. Every chat-history
+  query is partitioned by the authenticated local actor ID. This is scoped record isolation, not
+  platform-wide multi-tenant isolation.
 - Orchestration also owns durable Agent runs, steps, events, approvals, artifacts, and observed tool
   calls. The Project Agent Run Control lane shows this evidence for the selected project.
 - Orchestration owns the local Git worktree executor. Writable runs use isolated branches under the
   managed worktree root. Cleanup rejects dirty worktrees and keeps each branch for review.
+- Orchestration owns two isolated Codex connector slots. Each slot has a separate credential home
+  and App Server process. Chats record their connector, and parallel delegates rotate across
+  connected slots while retaining isolated worktrees.
 - Orchestration owns parent task graphs, task dependencies, agent profiles, file scopes, child runs,
   child worktrees, and parent review evidence. The scheduler starts only dependency-ready tasks and
   rejects concurrent scopes that overlap.

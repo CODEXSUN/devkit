@@ -156,12 +156,70 @@
 .agent-state.connecting svg {
   animation: file-loading-spin 0.8s linear infinite;
 }
+.agent-transcript-shell {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
 .agent-transcript {
-  width: min(80%, 1120px);
-  justify-self: center;
-  padding: 34px 0 24px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 34px 10% 24px;
   overflow-y: auto;
   scrollbar-width: thin;
+}
+.conversation-rail {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  bottom: 18px;
+  left: 12px;
+  width: 36px;
+}
+.conversation-rail-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 5px;
+  background: repeating-linear-gradient(to bottom, #9d9898 0 2px, transparent 2px 8px);
+  opacity: 0.42;
+}
+.conversation-rail button {
+  position: absolute;
+  left: 7px;
+  width: 17px;
+  height: 14px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.72;
+}
+.conversation-rail button::after {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: #3d7df0;
+  content: "";
+}
+.conversation-rail button.user {
+  width: 28px;
+}
+.conversation-rail button.active,
+.conversation-rail button:hover,
+.conversation-rail button:focus-visible {
+  opacity: 1;
+}
+.conversation-rail button.active::after,
+.conversation-rail button:hover::after,
+.conversation-rail button:focus-visible::after {
+  height: 3px;
 }
 .agent-welcome {
   display: grid;
@@ -211,7 +269,8 @@
 .agent-message {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
-  gap: 10px;
+  column-gap: 10px;
+  row-gap: 4px;
   padding: 12px 0;
 }
 .agent-message.user {
@@ -236,7 +295,7 @@
 }
 .agent-message > p,
 .agent-response {
-  max-width: 82ch;
+  max-width: none;
   color: #302e2e;
   font-size: 13px;
   line-height: 1.65;
@@ -257,6 +316,34 @@
   border-radius: 12px 4px 12px 12px;
   background: #ebe8e8;
   line-height: 1.5;
+}
+.agent-message-actions {
+  display: flex;
+  grid-column: 2;
+  align-items: center;
+  gap: 3px;
+  color: #817c7c;
+  font-size: 11px;
+}
+.agent-message.user .agent-message-actions {
+  grid-column: 1;
+  justify-self: end;
+}
+.agent-message-actions button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.agent-message-actions button:hover {
+  background: #ebe7e7;
+  color: #4f4b4b;
 }
 .agent-response {
   min-width: 0;
@@ -499,6 +586,9 @@
   color: #fff;
 }
 .agent-error {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 26px;
+  align-items: start;
   gap: 7px;
   margin: 12px 0;
   padding: 9px 11px;
@@ -506,9 +596,29 @@
   background: #fdeaea;
   color: #a22d2d;
   font-size: 12px;
+  line-height: 1.45;
+}
+.agent-error > svg {
+  margin-top: 2px;
+}
+.agent-error button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  margin: -5px -5px -5px 0;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.agent-error button:hover {
+  background: #f7d4d4;
 }
 .agent-composer {
-  width: min(80%, 1120px);
+  width: 80%;
   justify-self: center;
   margin-bottom: 18px;
   border: 1px solid #d2cece;
@@ -727,7 +837,8 @@
 }
 :root[data-theme="dark"] .agent-chat-header,
 :root[data-theme="dark"] .agent-welcome h1,
-:root[data-theme="dark"] .agent-message p,
+:root[data-theme="dark"] .agent-message > p,
+:root[data-theme="dark"] .agent-response,
 :root[data-theme="dark"] .agent-project strong,
 :root[data-theme="dark"] .environment-row strong {
   color: #eeeaea;
@@ -743,17 +854,37 @@
 :root[data-theme="dark"] .agent-composer textarea {
   color: #eeeaea;
 }
+:root[data-theme="dark"] .agent-composer textarea::placeholder {
+  color: #aaa3a3;
+  opacity: 1;
+}
+:root[data-theme="dark"] .agent-composer .attach-context,
+:root[data-theme="dark"] .agent-composer label,
+:root[data-theme="dark"] .agent-composer select,
+:root[data-theme="dark"] .agent-submission-state {
+  color: #c7c0c0;
+}
 :root[data-theme="dark"] .agent-message.user p,
 :root[data-theme="dark"] .run-summary:hover {
   background: #302c2c;
 }
+:root[data-theme="dark"] .agent-message-actions {
+  color: #aaa3a3;
+}
+:root[data-theme="dark"] .conversation-rail-track {
+  background: repeating-linear-gradient(to bottom, #777171 0 2px, transparent 2px 8px);
+}
 :root[data-theme="dark"] .agent-response code {
   background: #302c2c;
+  color: #f0ecec;
 }
 :root[data-theme="dark"] .agent-response pre,
 :root[data-theme="dark"] .agent-response th {
   border-color: #454040;
   background: #211e1e;
+}
+:root[data-theme="dark"] .agent-response pre code {
+  color: #eeeaea;
 }
 :root[data-theme="dark"] .agent-response th,
 :root[data-theme="dark"] .agent-response td,
@@ -783,8 +914,12 @@
   color: #d4cece;
 }
 :root[data-theme="dark"] .agent-context-list button:hover,
-:root[data-theme="dark"] .agent-composer .attach-context:hover:not(:disabled) {
+:root[data-theme="dark"] .agent-composer .attach-context:hover:not(:disabled),
+:root[data-theme="dark"] .agent-message-actions button:hover {
   background: #403939;
+}
+:root[data-theme="dark"] .agent-message-actions button:hover {
+  color: #eeeaea;
 }
 :root[data-theme="dark"] .agent-environment pre {
   background: #181616;
@@ -809,6 +944,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .agent-history {
+    display: none;
+  }
+  .conversation-rail {
     display: none;
   }
   .agent-transcript {

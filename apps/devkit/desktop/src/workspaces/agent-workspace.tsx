@@ -15,6 +15,9 @@ import { lazy, Suspense } from "react";
 import type { FileEntry, GitChange, Workspace } from "../contracts/desktop";
 import type { ResourceState } from "../shell/use-desktop-session";
 import { MAX_AGENT_CONTEXT_FILES } from "./agent-context";
+import { AgentErrorBanner } from "./agent-error-banner";
+import { AgentMessageActions } from "./agent-message-actions";
+import { ConversationRail } from "./conversation-rail";
 import {
   AgentWelcome,
   ApprovalCard,
@@ -110,38 +113,44 @@ export function AgentWorkspace({
             {session.runtime === "ready" ? "Codex connected" : session.runtime}
           </small>
         </header>
-        <div className="agent-transcript" ref={session.transcript}>
-          {session.messages.length === 0 ? (
-            <AgentWelcome workspace={workspace} onPrompt={session.setComposer} />
-          ) : (
-            session.messages.map((message) => (
-              <article className={`agent-message ${message.role}`} key={message.id}>
-                <span>{message.role === "agent" ? <Bot size={15} /> : "You"}</span>
-                {message.role === "agent" ? (
-                  <Suspense fallback={<p>{message.text}</p>}>
-                    <AgentMarkdown text={message.text} />
-                  </Suspense>
-                ) : (
-                  <p>{message.text}</p>
-                )}
-              </article>
-            ))
-          )}
-          {session.runItems.length ? <RunTimeline items={session.runItems} /> : null}
-          {session.approval ? (
-            <ApprovalCard approval={session.approval} onDecide={session.decide} />
-          ) : null}
-          {session.stalled ? (
-            <div className="agent-stalled">
-              <LoaderCircle size={14} /> No agent activity for one minute. You can wait or stop
-              this turn.
-            </div>
-          ) : null}
-          {session.error ? (
-            <div className="agent-error">
-              <X size={14} /> {session.error}
-            </div>
-          ) : null}
+        <div className="agent-transcript-shell">
+          <ConversationRail messages={session.messages} transcript={session.transcript} />
+          <div className="agent-transcript" ref={session.transcript}>
+            {session.messages.length === 0 ? (
+              <AgentWelcome workspace={workspace} onPrompt={session.setComposer} />
+            ) : (
+              session.messages.map((message) => (
+                <article
+                  className={`agent-message ${message.role}`}
+                  data-message-id={message.id}
+                  key={message.id}
+                >
+                  <span>{message.role === "agent" ? <Bot size={15} /> : "You"}</span>
+                  {message.role === "agent" ? (
+                    <Suspense fallback={<p>{message.text}</p>}>
+                      <AgentMarkdown text={message.text} />
+                    </Suspense>
+                  ) : (
+                    <p>{message.text}</p>
+                  )}
+                  <AgentMessageActions createdAt={message.createdAt} text={message.text} />
+                </article>
+              ))
+            )}
+            {session.runItems.length ? <RunTimeline items={session.runItems} /> : null}
+            {session.approval ? (
+              <ApprovalCard approval={session.approval} onDecide={session.decide} />
+            ) : null}
+            {session.stalled ? (
+              <div className="agent-stalled">
+                <LoaderCircle size={14} /> No agent activity for one minute. You can wait or stop
+                this turn.
+              </div>
+            ) : null}
+            {session.error ? (
+              <AgentErrorBanner message={session.error} />
+            ) : null}
+          </div>
         </div>
         <div className="agent-composer">
           {contextPaths.length ? (

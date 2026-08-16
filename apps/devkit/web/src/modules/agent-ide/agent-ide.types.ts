@@ -13,9 +13,23 @@ export type AgentIdePlanResult = {
   responseId: string;
 };
 
+export type AgentIdeConnectionId = "primary" | "secondary";
+
+export type AgentIdeChatAction = {
+  id: string;
+  label: string;
+  status: "completed" | "failed" | "running";
+  type: "command" | "compaction" | "file" | "search" | "subagent" | "tool";
+};
+
 export type AgentIdeCodexStatus = {
+  available: boolean;
   connected: boolean;
+  default: boolean;
   email: string | null;
+  error: string | null;
+  id: AgentIdeConnectionId;
+  label: string;
   planType: string | null;
 };
 
@@ -28,7 +42,7 @@ export type AgentIdeChatEvent =
       turnId: string;
     }
   | { type: "chat.delta"; delta: string }
-  | { type: "chat.activity"; label: string }
+  | { type: "chat.action"; action: AgentIdeChatAction }
   | { type: "chat.files"; files: string[] }
   | {
       type: "chat.approval";
@@ -40,6 +54,7 @@ export type AgentIdeChatEvent =
   | { type: "chat.failed"; message: string };
 
 export type AgentIdeChatMessage = {
+  actions: AgentIdeChatAction[];
   attachments: Array<{ name: string; size: number }>;
   createdAt: number;
   durationMs: number | null;
@@ -59,6 +74,7 @@ export type AgentIdeApproval = {
 export type AgentIdeChatHistory = {
   access: AgentIdeAccess;
   codexThreadId: string | null;
+  connectionId: AgentIdeConnectionId;
   createdAt: string;
   model: AgentIdeModel;
   projectKey: string;
@@ -77,6 +93,7 @@ export type AgentIdeChatHistory = {
 
 export type AgentIdeChatHistoryDetail = AgentIdeChatHistory & {
   messages: Array<{
+    actions: AgentIdeChatAction[];
     attachments: Array<{ name: string; size: number }>;
     body: string;
     createdAt: string;
@@ -101,6 +118,7 @@ export type AgentIdeAttachment = {
 export type AgentRunSummary = {
   access: AgentIdeAccess;
   agentProfile: string;
+  connectionId: AgentIdeConnectionId;
   supervisorPersonaUuid: string | null;
   assistMode: string;
   budget: {

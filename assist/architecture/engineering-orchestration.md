@@ -46,6 +46,14 @@ The current orchestration slice provides these implemented controls:
 - agent profiles remain definitions, while Codex supplies the current executable runtime;
 - preview, deployment, provider routing, and Codex command interception remain planned.
 - named supervisors and delegates are actor-owned personas that can be assigned to a durable task graph;
+- Agent Connector owns two isolated Codex credential homes and App Server processes. Primary is the
+  default, while parallel delegates rotate across connected primary and secondary slots;
+- Project Agent stores the Codex action timeline with each response. The timeline shows commands,
+  tools, searches, file changes, delegates, and native automatic context compaction;
+- Agent Connector also owns actor-scoped, encrypted model-provider connections for OpenAI,
+  Anthropic Claude, OpenRouter, OpenCode, and DeepSeek. OpenAI remains the default. Native Codex is
+  the current coding runtime; non-Codex providers declare the OpenCode bridge and remain unavailable
+  to coding turns until their provider connection and OpenCode server both pass live checks;
 - calling a ready task now executes its named delegate through Codex in the prepared child worktree;
 - delegate prompts carry the assigned objective, file scope, persona instructions, dependency evidence,
   and a permission ceiling derived from the parent run and Agent profile;

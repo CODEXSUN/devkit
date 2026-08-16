@@ -1,9 +1,9 @@
 import "@xterm/xterm/css/xterm.css";
 import { listen } from "@tauri-apps/api/event";
 import { Terminal as Xterm } from "@xterm/xterm";
-import { TerminalSquare, Trash2 } from "lucide-react";
+import { ChevronDown, Eraser, TerminalSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { TerminalOutput, Workspace } from "../contracts/desktop";
+import type { TerminalOutput, TerminalShell, Workspace } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 
 export function TerminalPanel({
@@ -17,9 +17,11 @@ export function TerminalPanel({
   const terminal = useRef<Xterm | undefined>(undefined);
   const session = useRef<string | undefined>(undefined);
   const [error, setError] = useState<string>();
+  const [shell, setShell] = useState<TerminalShell>("powershell");
 
   useEffect(() => {
     if (!host.current) return;
+    setError(undefined);
     const xterm = new Xterm({
       convertEol: true,
       cursorBlink: true,
@@ -51,7 +53,7 @@ export function TerminalPanel({
       removeListener = remove;
     });
     void desktopClient
-      .startTerminal()
+      .startTerminal(shell)
       .then((id) => {
         if (disposed) return void desktopClient.closeTerminal(id);
         session.current = id;
@@ -67,17 +69,35 @@ export function TerminalPanel({
       if (session.current) void desktopClient.closeTerminal(session.current);
       xterm.dispose();
     };
-  }, [theme]);
+  }, [shell, theme]);
 
   return (
-    <section className="terminal">
+    <section aria-label={`Terminal for ${workspace.name}`} className="terminal">
       <div className="terminal-tabs">
-        <span>
-          <TerminalSquare size={14} /> PowerShell
-        </span>
-        <span className="terminal-path">{error ?? workspace.path}</span>
-        <button aria-label="Clear terminal" onClick={() => terminal.current?.clear()} type="button">
-          <Trash2 size={13} />
+        <label className="terminal-shell-picker" title={workspace.path}>
+          <TerminalSquare size={14} />
+          <select
+            aria-label="Terminal shell"
+            onChange={(event) => setShell(event.target.value as TerminalShell)}
+            value={shell}
+          >
+            <option value="powershell">PowerShell</option>
+            <option value="gitBash">Git Bash</option>
+          </select>
+          <ChevronDown size={12} />
+        </label>
+        {error ? (
+          <span className="terminal-error" title={error}>
+            {error}
+          </span>
+        ) : null}
+        <button
+          aria-label="Clear terminal"
+          onClick={() => terminal.current?.clear()}
+          title="Clear terminal"
+          type="button"
+        >
+          <Eraser size={13} />
         </button>
       </div>
       <div className="terminal-host" ref={host} />

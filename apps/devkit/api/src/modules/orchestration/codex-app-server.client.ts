@@ -49,6 +49,13 @@ export class CodexAppServerClient {
   private startup: Promise<void> | null = null;
   private lastError: string | null = null;
 
+  constructor(
+    readonly connectionId: string,
+    private readonly codexHome: string
+  ) {
+    mkdirSync(this.codexHome, { recursive: true });
+  }
+
   async status(): Promise<CodexAccountStatus> {
     try {
       await this.ensureStarted();
@@ -101,6 +108,52 @@ export class CodexAppServerClient {
   async logout() {
     await this.ensureStarted();
     await this.request("account/logout", {});
+  }
+
+  async loginApiKey(apiKey: string) {
+    await this.stop();
+    mkdirSync(this.codexHome, { recursive: true });
+    const command = resolveCodexCommand([
+      "login",
+      "--with-api-key",
+      "-c",
+      'cli_auth_credentials_store="file"'
+    ]);
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(command.executable, command.args, {
+        cwd: process.cwd(),
+        env: { ...process.env, CODEX_HOME: this.codexHome },
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true
+      });
+      let errorOutput = "";
+      child.stderr.on("data", (chunk: Buffer) => {
+        errorOutput = `${errorOutput}${chunk.toString("utf8")}`.slice(-1_000);
+      });
+      child.once("error", reject);
+      child.once("exit", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(errorOutput.trim() || `Codex API key login failed (${code}).`));
+      });
+      child.stdin.end(`${apiKey}\n`);
+    });
+    return this.status();
+  }
+
+  async stop() {
+    const child = this.process;
+    this.process = null;
+    this.startup = null;
+    if (!child || child.killed) return;
+    child.kill();
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, 2_000);
+      timeout.unref();
+      child.once("exit", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
   }
 
   async reloadMcpServers() {
@@ -172,6 +225,10 @@ export class CodexAppServerClient {
     this.process?.stdin.write(`${JSON.stringify({ id: requestId, result: { decision } })}\n`);
   }
 
+  ownsApproval(threadId: string, requestId: number) {
+    return this.approvalRequests.get(requestId) === threadId;
+  }
+
   subscribe(listener: NotificationListener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -188,12 +245,11 @@ export class CodexAppServerClient {
   }
 
   private async start() {
-    const command = resolveCodexCommand();
-    const codexHome = resolveDevkitCodexHome();
-    mkdirSync(codexHome, { recursive: true });
+    const command = resolveCodexCommand(["app-server", "-c", 'cli_auth_credentials_store="file"']);
+    mkdirSync(this.codexHome, { recursive: true });
     const child = spawn(command.executable, command.args, {
       cwd: process.cwd(),
-      env: { ...process.env, CODEX_HOME: codexHome },
+      env: { ...process.env, CODEX_HOME: this.codexHome },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true
     });
@@ -283,7 +339,9 @@ export class CodexAppServerClient {
       return;
     }
     if (threadId && this.threadAccess.get(threadId) === "auto-approve" && interactiveApproval) {
-      this.process?.stdin.write(`${JSON.stringify({ id: message.id, result: { decision: "acceptForSession" } })}\n`);
+      this.process?.stdin.write(
+        `${JSON.stringify({ id: message.id, result: { decision: "acceptForSession" } })}\n`
+      );
       return;
     }
     const result = message.method?.includes("requestApproval")
@@ -324,28 +382,29 @@ function sandboxPolicy(access: CodexAccess, cwd: string) {
   return { type: "readOnly", networkAccess: false };
 }
 
-function resolveDevkitCodexHome() {
+export function resolveDevkitCodexHome(connectionId: string) {
   const configured = process.env.DEVKIT_CODEX_HOME?.trim();
-  if (configured) return configured;
+  if (configured) {
+    return connectionId === "primary" ? configured : join(configured, "connections", connectionId);
+  }
   const applicationData = process.env.LOCALAPPDATA?.trim() || process.cwd();
-  return join(applicationData, "CodeLogicX", "DevKit", "codex");
+  const base = join(applicationData, "CodeLogicX", "DevKit", "codex");
+  return connectionId === "primary" ? base : join(base, "connections", connectionId);
 }
 
-export const codexAppServer = new CodexAppServerClient();
-
-function resolveCodexCommand() {
+function resolveCodexCommand(subcommand: string[]) {
   const configured = process.env.CODEX_EXECUTABLE?.trim() || "bundled";
   if (configured === "bundled") {
     const require = createRequire(import.meta.url);
     const script = require.resolve("@openai/codex/bin/codex.js");
     return {
       executable: process.execPath,
-      args: [script, "app-server"],
+      args: [script, ...subcommand],
       label: "bundled Codex CLI"
     };
   }
   if (configured.toLowerCase().endsWith(".js")) {
-    return { executable: process.execPath, args: [configured, "app-server"], label: configured };
+    return { executable: process.execPath, args: [configured, ...subcommand], label: configured };
   }
-  return { executable: configured, args: ["app-server"], label: configured };
+  return { executable: configured, args: subcommand, label: configured };
 }

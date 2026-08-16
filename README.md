@@ -29,6 +29,12 @@ Writable Project Agent runs use isolated Git worktrees. The current repository i
 default. Set `DEVKIT_AGENT_ALLOWED_ROOTS` to allow other repository roots. Set
 `DEVKIT_AGENT_WORKTREE_ROOT` to change the managed worktree location.
 
+Agent Connector provides primary and secondary Codex connections. Each connection has a separate
+`CODEX_HOME`, credential cache, and App Server process. The primary connection remains the default.
+Parallel named delegates rotate across connected slots and keep separate Git worktrees. Users can
+connect each slot through browser login, device code, or an API key. API keys pass directly to the
+server-side Codex login process and are never stored in MariaDB or returned to the browser.
+
 ### Docker Agent runtime
 
 The API image includes Git and runs application commands as the unprivileged `node` user. Compose

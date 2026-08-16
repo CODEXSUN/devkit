@@ -17,7 +17,7 @@ import { AgentIdeChat } from "./agent-ide.chat";
 import { AgentIdeChatHistory, AgentIdeProjectAccordion } from "./agent-ide.project-context";
 import { AgentIdeRunConsole } from "./agent-ide.run-console";
 import {
-  getAgentIdeCodexStatus,
+  getAgentIdeCodexConnections,
   getAgentIdeChat,
   listAgentIdeChats,
   resolveAgentIdeApproval,
@@ -29,6 +29,7 @@ import type {
   AgentIdeApproval,
   AgentIdeAttachment,
   AgentIdeChatMessage,
+  AgentIdeConnectionId,
   AgentIdeModel
 } from "./agent-ide.types";
 
@@ -39,9 +40,9 @@ export function AgentIdeWorkspace() {
   const tasksQuery = useProjectManagerRecordsQuery("task");
   const activitiesQuery = useProjectManagerRecordsQuery("activity");
   const reviewsQuery = useProjectManagerRecordsQuery("review");
-  const codexStatus = useQuery({
-    queryKey: ["devkit", "agent-ide", "codex-status"],
-    queryFn: getAgentIdeCodexStatus,
+  const codexConnections = useQuery({
+    queryKey: ["devkit", "agent-ide", "codex-connections"],
+    queryFn: getAgentIdeCodexConnections,
     refetchInterval: 30_000
   });
   const [projectId, setProjectId] = useState(
@@ -67,6 +68,7 @@ export function AgentIdeWorkspace() {
   const [running, setRunning] = useState(false);
   const [activity, setActivity] = useState("");
   const [access, setAccess] = useState<AgentIdeAccess>("read-only");
+  const [connectionId, setConnectionId] = useState<AgentIdeConnectionId>("primary");
   const [model, setModel] = useState<AgentIdeModel>("gpt-5.6-terra");
   const [approval, setApproval] = useState<AgentIdeApproval | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -119,12 +121,18 @@ export function AgentIdeWorkspace() {
     newChat();
   };
 
+  const changeConnection = (value: string) => {
+    setConnectionId(value as AgentIdeConnectionId);
+    newChat();
+  };
+
   const send = async (text: string, attachments: AgentIdeAttachment[]) => {
     if (!project) return;
     const assistantId = crypto.randomUUID();
     setMessages((current) => [
       ...current,
       {
+        actions: [],
         attachments: attachments.map(({ name, size }) => ({ name, size })),
         createdAt: Date.now(),
         durationMs: null,
@@ -135,6 +143,7 @@ export function AgentIdeWorkspace() {
         text
       },
       {
+        actions: [],
         attachments: [],
         createdAt: Date.now(),
         durationMs: null,
@@ -152,6 +161,7 @@ export function AgentIdeWorkspace() {
         {
           access,
           attachments,
+          connectionId,
           conversationId,
           message: text,
           model,
@@ -181,7 +191,22 @@ export function AgentIdeWorkspace() {
               )
             );
           }
-          if (event.type === "chat.activity") setActivity(event.label);
+          if (event.type === "chat.action") {
+            setActivity(event.action.label);
+            setMessages((current) =>
+              current.map((entry) =>
+                entry.id === assistantId
+                  ? {
+                      ...entry,
+                      actions: [
+                        ...entry.actions.filter((action) => action.id !== event.action.id),
+                        event.action
+                      ]
+                    }
+                  : entry
+              )
+            );
+          }
           if (event.type === "chat.files") {
             setMessages((current) =>
               current.map((entry) =>
@@ -259,6 +284,7 @@ export function AgentIdeWorkspace() {
       setConversationId(history.uuid);
       setThreadId(history.codexThreadId);
       setAccess(history.access);
+      setConnectionId(history.connectionId);
       setModel(history.model);
       setWorkItem(
         history.workItem
@@ -277,6 +303,7 @@ export function AgentIdeWorkspace() {
       );
       setMessages(
         history.messages.map((entry) => ({
+          actions: entry.actions,
           attachments: entry.attachments,
           createdAt: new Date(entry.createdAt).getTime(),
           durationMs: entry.durationMs,
@@ -292,7 +319,12 @@ export function AgentIdeWorkspace() {
     }
   };
 
-  const connected = codexStatus.data?.connected ?? false;
+  const selectedConnection = codexConnections.data?.find((item) => item.id === connectionId);
+  const connected = selectedConnection?.connected ?? false;
+  const connectionOptions = (codexConnections.data ?? []).map((item) => ({
+    label: `${item.label}${item.connected ? " · Connected" : " · Offline"}`,
+    value: item.id
+  }));
   return (
     <main className="flex h-[calc(100dvh-3.5rem)] min-h-[38rem] flex-col overflow-hidden bg-background">
       <header className="relative z-20 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
@@ -320,12 +352,22 @@ export function AgentIdeWorkspace() {
               value={projectId}
             />
           </div>
+          <div className="w-56 shrink-0">
+            <WorkspaceSelect
+              ariaLabel="Codex connector"
+              onValueChange={changeConnection}
+              options={connectionOptions}
+              placeholder="Codex connector"
+              value={connectionId}
+            />
+          </div>
           <span
             className={`flex shrink-0 items-center gap-2 text-sm ${
               connected ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
             }`}
           >
-            <CheckCircle2Icon className="size-4" /> {connected ? "Codex connected" : "Disconnected"}
+            <CheckCircle2Icon className="size-4" />{" "}
+            {connected ? selectedConnection?.label : "Disconnected"}
           </span>
           <Button asChild className="gap-2" size="sm" variant="ghost">
             <a href="/app/devkit/honey" title="Open Honey Chat">
@@ -374,6 +416,7 @@ export function AgentIdeWorkspace() {
           onEditMessage={() => newChat()}
           onFeedback={rateMessage}
           onModelChange={changeModel}
+          onReviewChanges={() => setRunConsoleVisible(true)}
           onSend={(message, attachments) => void send(message, attachments)}
           {...(project ? { projectTitle: project.title } : {})}
           running={running}

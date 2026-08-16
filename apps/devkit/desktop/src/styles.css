@@ -449,16 +449,35 @@ button.tree-row:hover,
   display: flex;
   height: 31px;
   align-items: center;
-  gap: 18px;
-  padding: 0 12px;
+  gap: 8px;
+  padding: 0 8px;
   border-bottom: 1px solid #e0e2e4;
   color: #454a50;
   font-size: 12px;
 }
-.terminal-path {
+.terminal-shell-picker {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: #f1f2f3;
+}
+.terminal-shell-picker select {
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.terminal-error {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
-  color: #777c82;
+  color: #a64040;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -477,11 +496,20 @@ button.tree-row:hover,
 }
 .terminal-tabs button {
   display: grid;
+  width: 24px;
+  height: 24px;
   margin-left: auto;
   place-items: center;
+  padding: 0;
   border: 0;
+  border-radius: 5px;
   background: transparent;
+  color: #686d73;
   cursor: pointer;
+}
+.terminal-tabs button:hover {
+  background: #e9ebed;
+  color: #34373b;
 }
 .terminal-host {
   min-width: 0;
@@ -621,6 +649,13 @@ button.tree-row:hover,
   min-height: var(--row);
   border-bottom: 1px solid #eceeef;
 }
+.git-change:hover,
+.git-change.selected {
+  background: #eef3f9;
+}
+.git-change.selected {
+  box-shadow: inset 2px 0 #1a73e8;
+}
 .git-change button {
   border: 0;
   background: transparent;
@@ -680,37 +715,95 @@ button.tree-row:hover,
 .worktree-title button {
   padding: 4px;
 }
-.diff-preview {
-  position: fixed;
-  z-index: 15;
-  right: 18px;
-  bottom: 34px;
+.git-diff-workspace {
   display: grid;
-  width: min(720px, calc(100vw - 350px));
-  max-height: 55vh;
-  grid-template-rows: 32px minmax(0, 1fr);
-  border: 1px solid #c7cbd0;
-  border-radius: 8px;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 40px 27px minmax(0, 1fr);
   background: #fff;
-  box-shadow: 0 12px 32px rgb(30 35 40 / 22%);
 }
-.diff-preview button {
-  justify-self: end;
-  padding: 0 10px;
+.git-diff-header,
+.git-diff-title,
+.git-diff-modes {
+  display: flex;
+  align-items: center;
+}
+.git-diff-header {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid #d9dbde;
+}
+.git-diff-title {
+  min-width: 0;
+  gap: 8px;
+}
+.git-diff-title strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-diff-title i {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+.git-diff-title i.added {
+  background: #d8f3e3;
+  color: #176b3a;
+}
+.git-diff-title i.deleted {
+  background: #f9dada;
+  color: #9b2525;
+}
+.git-diff-title i.modified {
+  background: #fff0c7;
+  color: #765600;
+}
+.git-diff-modes {
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid #d4d7da;
+  border-radius: 6px;
+  background: #f3f4f5;
+}
+.git-diff-modes button {
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
   border: 0;
+  border-radius: 4px;
   background: transparent;
+  color: #62676d;
   cursor: pointer;
+  font-size: 11px;
 }
-.diff-preview pre {
-  margin: 0;
-  padding: 12px;
-  overflow: auto;
-  border-top: 1px solid #e0e2e4;
-  color: #34373b;
-  font:
-    12px/1.5 "Cascadia Code",
-    monospace;
-  white-space: pre;
+.git-diff-modes button.active {
+  background: #fff;
+  color: #25292d;
+  box-shadow: 0 1px 3px rgb(30 35 40 / 16%);
+}
+.git-diff-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #d9dbde;
+  background: #f3f4f5;
+  color: #6b7076;
+  font-size: 11px;
+}
+.git-diff-labels span {
+  overflow: hidden;
+  padding: 6px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-diff-labels span + span {
+  border-left: 1px solid #d9dbde;
 }
 .agent-summary,
 .runtime-heading,
@@ -1355,6 +1448,16 @@ button.tree-row:hover,
 :root[data-theme="dark"] .drawer-theme-options {
   background: #292d32;
 }
+:root[data-theme="dark"] .terminal-shell-picker,
+:root[data-theme="dark"] .terminal-tabs button:hover {
+  background: #2d3136;
+}
+:root[data-theme="dark"] .terminal-tabs button:hover {
+  color: #e4e7eb;
+}
+:root[data-theme="dark"] .terminal-error {
+  color: #e28c8c;
+}
 :root[data-theme="dark"] .drawer-theme-options button.active {
   background: #38414b;
   color: #b9d5f5;
@@ -1405,6 +1508,30 @@ button.tree-row:hover,
 }
 :root[data-theme="dark"] .change-review small {
   color: #aeb4bc;
+}
+:root[data-theme="dark"] .git-change:hover,
+:root[data-theme="dark"] .git-change.selected,
+:root[data-theme="dark"] .git-diff-modes,
+:root[data-theme="dark"] .git-diff-labels {
+  background: #292d32;
+}
+:root[data-theme="dark"] .git-diff-workspace,
+:root[data-theme="dark"] .git-diff-modes button.active {
+  background: #1e2024;
+  color: #e4e7eb;
+}
+:root[data-theme="dark"] .git-diff-header,
+:root[data-theme="dark"] .git-diff-labels,
+:root[data-theme="dark"] .git-diff-labels span + span,
+:root[data-theme="dark"] .git-diff-modes {
+  border-color: #41464d;
+}
+:root[data-theme="dark"] .git-diff-modes button {
+  color: #aeb4bc;
+}
+:root[data-theme="dark"] .git-diff-modes button.active {
+  color: #fff;
+  box-shadow: none;
 }
 :root[data-theme="dark"] .learning-panel {
   border-color: #34383e;

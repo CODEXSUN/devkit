@@ -1,8 +1,39 @@
 # Changelog
 
-Current version: 1.0.63
-Release tag: v-1.0.63
-Changelog label: v 1.0.63
+Current version: 1.0.64
+Release tag: v-1.0.64
+Changelog label: v 1.0.64
+
+### [Session] 2026-08-16 - Persistent Project Agent action history
+
+#### Database Changes
+
+- Database update: Yes.
+- Added the repeatable `devkit.orchestration-chat.sql.v4` migration.
+- Added `actions_json` to Project Agent chat messages with an empty-list default.
+
+#### App Codebase Changes
+
+- Added a provider-neutral action record for commands, tools, searches, file changes, delegates, and context compaction.
+- Streamed action status changes from the Codex App Server to the active Project Agent response.
+- Stored the completed action timeline with each assistant message.
+- Added a compact Work completed timeline with command totals and expandable earlier actions.
+- Kept action history visible after a page reload and conversation reopen.
+- Displayed native Codex automatic context compaction as a completed action.
+- Kept OpenAI Codex responsible for automatic context compaction and preserved the active thread.
+- Updated the orchestration architecture and project inventory records.
+
+#### Verification
+
+- Passed the DevKit API and web TypeScript checks.
+- Passed focused ESLint checks for the changed API and web files.
+- Passed three action-normalization and context-compaction tests.
+- Passed the database lifecycle and module-boundary checks.
+- Built the Platform web production bundle.
+- Applied the v4 migration to the configured local MariaDB database.
+- Ran `git status --short` through the live Project Agent in read-only mode.
+- Confirmed the completed command remained visible after a page reload and history reopen.
+- Did not force a large-context compaction during the live check.
 
 ### [Session] 2026-08-15 - CodeLogix internal coding beta
 
@@ -461,6 +492,39 @@ Changelog label: v 1.0.63
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.64
+
+### [v 1.0.64] 2026-08-16 12:52 am - Multi-provider Agent connector and response review
+
+#### Database Changes
+
+- Database update: Yes.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.64.
+- Added official SDK dependencies for OpenAI, Anthropic, OpenRouter, and OpenCode.
+- Added DeepSeek through its OpenAI-compatible API contract.
+- Kept native Codex and OpenAI as the default coding runtime and model provider.
+- Added actor-scoped provider connections with encrypted API keys in MariaDB.
+- Added provider configure, test, update, and disconnect API routes.
+- Added collapsed provider cards to Agent Connector with model, capability, runtime, and status details.
+- Added OpenCode CLI support for the provider-neutral coding bridge.
+- Added response duration text and an edited-files review card to Project Agent replies.
+- Kept provider credentials on the API server and out of browser responses and prompts.
+
+#### Verification
+
+- Passed DevKit API and web typechecks and lint checks.
+- Passed DevKit API and Platform web production builds.
+- Passed the module boundary and database lifecycle checks.
+- Passed two API runtime smoke cycles.
+- Applied the additive model-provider connection migration in local MariaDB.
+- Verified Agent Connector controls and console output in the live browser.
+- Verified the OpenCode CLI and SDK against a local server.
+- Confirmed the SDK listed 185 providers and one connected provider.
+- Recorded two moderate and one high dependency audit finding without applying an automatic fix.
 
 ## v-1.0.63
 

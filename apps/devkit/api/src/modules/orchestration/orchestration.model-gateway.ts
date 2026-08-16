@@ -60,6 +60,7 @@ export class OpenAiPlanningGateway {
   async testConnection() {
     const result = await this.createPlan({
       brief: "Confirm the planning connection. Return only: CONNECTION READY",
+      provider: "openai",
       projectId: "connection-test",
       projectTitle: "CodeLogicX Agent IDE"
     });

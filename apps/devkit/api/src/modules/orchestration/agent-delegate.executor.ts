@@ -1,4 +1,5 @@
-import { codexAppServer, type CodexNotification } from "./codex-app-server.client.js";
+import type { CodexAppServerClient, CodexNotification } from "./codex-app-server.client.js";
+import { codexConnectorPool } from "./codex-connector.pool.js";
 import { AgentRunBudgetGuard } from "./agent-run.budget.js";
 import { agentRunRepository } from "./agent-run.repository.js";
 import { agentTaskGraphRepository } from "./agent-task-graph.repository.js";
@@ -49,11 +50,22 @@ export class AgentDelegateExecutor {
     let threadId = "";
     let turnId = "";
     let response = "";
-    const unsubscribe = codexAppServer.subscribe((notification) => queue.push(notification));
+    let codexAppServer: CodexAppServerClient | null = null;
+    let unsubscribe = () => false;
     try {
       context = await agentTaskGraphRepository.executionContext(taskUuid, actorId);
       const activeContext = context;
-      threadId = await codexAppServer.startThread(activeContext.workspace.path, activeContext.model, activeContext.access);
+      const connectionId = await codexConnectorPool.nextConnected(
+        recovering ? activeContext.connectionId : undefined
+      );
+      await agentRunRepository.setConnection(activeContext.childRunUuid, actorId, connectionId);
+      codexAppServer = codexConnectorPool.client(connectionId);
+      unsubscribe = codexAppServer.subscribe((notification) => queue.push(notification));
+      threadId = await codexAppServer.startThread(
+        activeContext.workspace.path,
+        activeContext.model,
+        activeContext.access
+      );
       turnId = await codexAppServer.startTurn(
         threadId,
         activeContext.workspace.path,
@@ -61,7 +73,8 @@ export class AgentDelegateExecutor {
         activeContext.model,
         activeContext.access
       );
-      if (recovering) await agentRunRepository.recover(activeContext.childRunUuid, actorId, threadId, turnId);
+      if (recovering)
+        await agentRunRepository.recover(activeContext.childRunUuid, actorId, threadId, turnId);
       else await agentRunRepository.start(activeContext.childRunUuid, actorId, threadId, turnId);
       while (true) {
         const notification = await queue.next(budget.remainingDurationMs());
@@ -90,18 +103,35 @@ export class AgentDelegateExecutor {
         if (event.type === "completed") break;
       }
       const inspection = await agentWorktreeService.inspect(activeContext.workspace);
-      const outOfScope = inspection.changedFiles.filter((file) => !inScope(file, activeContext.scopePaths));
+      const outOfScope = inspection.changedFiles.filter(
+        (file) => !inScope(file, activeContext.scopePaths)
+      );
       if (outOfScope.length) {
-        throw new Error(`Delegate changed files outside its assigned scope: ${outOfScope.join(", ")}`);
+        throw new Error(
+          `Delegate changed files outside its assigned scope: ${outOfScope.join(", ")}`
+        );
       }
-      if (requiresChanges(activeContext.persona.agentProfile) && inspection.changedFiles.length === 0) {
+      if (
+        requiresChanges(activeContext.persona.agentProfile) &&
+        inspection.changedFiles.length === 0
+      ) {
         const explanation = response.trim() ? ` Delegate response: ${response.trim()}` : "";
-        throw new Error(`${activeContext.persona.name} completed without changing a file in the assigned scope.${explanation}`);
+        throw new Error(
+          `${activeContext.persona.name} completed without changing a file in the assigned scope.${explanation}`
+        );
       }
       if (inspection.changedFiles.length) {
-        await agentRunRepository.files(activeContext.childRunUuid, actorId, inspection.changedFiles);
+        await agentRunRepository.files(
+          activeContext.childRunUuid,
+          actorId,
+          inspection.changedFiles
+        );
       }
-      await agentRunRepository.setWorkspaceStatus(activeContext.childRunUuid, actorId, inspection.status);
+      await agentRunRepository.setWorkspaceStatus(
+        activeContext.childRunUuid,
+        actorId,
+        inspection.status
+      );
       await agentTaskGraphRepository.finish(
         taskUuid,
         actorId,
@@ -109,11 +139,18 @@ export class AgentDelegateExecutor {
         response.trim() || `${activeContext.persona.name} completed the assigned task.`
       );
     } catch (error) {
-      if (threadId && turnId) await codexAppServer.interruptTurn(threadId, turnId).catch(() => undefined);
+      if (codexAppServer && threadId && turnId) {
+        await codexAppServer.interruptTurn(threadId, turnId).catch(() => undefined);
+      }
       const message = error instanceof Error ? error.message : "The named delegate failed.";
-      await agentTaskGraphRepository.finish(taskUuid, actorId, "failed", message).catch(async () => {
-        if (context) await agentRunRepository.fail(context.childRunUuid, actorId, message).catch(() => undefined);
-      });
+      await agentTaskGraphRepository
+        .finish(taskUuid, actorId, "failed", message)
+        .catch(async () => {
+          if (context)
+            await agentRunRepository
+              .fail(context.childRunUuid, actorId, message)
+              .catch(() => undefined);
+        });
     } finally {
       unsubscribe();
     }
@@ -151,23 +188,35 @@ Execution contract:
 7. Finish with a concise result, changed files, checks, and remaining risks.`;
 }
 
-function delegateEvent(notification: CodexNotification, threadId: string, turnId: string): DelegateEvent | null {
+function delegateEvent(
+  notification: CodexNotification,
+  threadId: string,
+  turnId: string
+): DelegateEvent | null {
   const params = notification.params as Record<string, unknown> | undefined;
   if (params?.threadId !== threadId) return null;
   if (typeof notification.id === "number" && notification.method?.includes("requestApproval")) {
     const approval = params as { command?: string; reason?: string };
-    return { type: "approval", reason: approval.reason || approval.command || "Delegate requests approval.", requestId: notification.id };
+    return {
+      type: "approval",
+      reason: approval.reason || approval.command || "Delegate requests approval.",
+      requestId: notification.id
+    };
   }
-  if (notification.method === "item/agentMessage/delta" && typeof params.delta === "string") return { type: "delta", value: params.delta };
+  if (notification.method === "item/agentMessage/delta" && typeof params.delta === "string")
+    return { type: "delta", value: params.delta };
   if (notification.method === "item/started") {
     const item = params.item as { type?: string } | undefined;
     if (item?.type && item.type !== "agentMessage") return { type: "activity", value: item.type };
   }
-  if (notification.method === "turn/diff/updated" && typeof params.diff === "string") return { type: "files", value: editedFiles(params.diff) };
+  if (notification.method === "turn/diff/updated" && typeof params.diff === "string")
+    return { type: "files", value: editedFiles(params.diff) };
   if (notification.method === "turn/completed") {
     const turn = params.turn as { id?: string; error?: { message?: string } };
     if (turn.id !== turnId) return null;
-    return turn.error?.message ? { type: "failed", value: turn.error.message } : { type: "completed" };
+    return turn.error?.message
+      ? { type: "failed", value: turn.error.message }
+      : { type: "completed" };
   }
   return null;
 }
@@ -182,7 +231,9 @@ function editedFiles(diff: string) {
 
 function inScope(file: string, scopes: string[]) {
   const normalized = file.replaceAll("\\", "/").replace(/^\.\//u, "");
-  return scopes.some((scope) => normalized === scope || normalized.startsWith(`${scope.replace(/\/$/u, "")}/`));
+  return scopes.some(
+    (scope) => normalized === scope || normalized.startsWith(`${scope.replace(/\/$/u, "")}/`)
+  );
 }
 
 function requiresChanges(profile: string) {
@@ -205,9 +256,15 @@ class NotificationQueue {
     const value = this.values.shift();
     if (value) return Promise.resolve(value);
     return new Promise<CodexNotification | null>((resolve) => {
-      const timer = setTimeout(() => { this.waiting = null; resolve(null); }, timeoutMs);
+      const timer = setTimeout(() => {
+        this.waiting = null;
+        resolve(null);
+      }, timeoutMs);
       timer.unref();
-      this.waiting = (notification) => { clearTimeout(timer); resolve(notification); };
+      this.waiting = (notification) => {
+        clearTimeout(timer);
+        resolve(notification);
+      };
     });
   }
 }

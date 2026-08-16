@@ -17,6 +17,7 @@ export function DesktopSidePanel({
   files,
   filesState,
   onRefreshChanges,
+  onSelectChange,
   onSelectFile,
   selectedPath,
   system,
@@ -28,6 +29,7 @@ export function DesktopSidePanel({
   files: FileEntry[];
   filesState: ResourceState;
   onRefreshChanges: () => Promise<void>;
+  onSelectChange: (change: GitChange) => void;
   onSelectFile: (path: string) => void;
   selectedPath: string | undefined;
   system: SystemStatus | undefined;
@@ -38,7 +40,13 @@ export function DesktopSidePanel({
   }
   if (activity === "git") {
     return (
-      <GitPanel changes={changes} onRefresh={onRefreshChanges} workspacePath={workspace.path} />
+      <GitPanel
+        changes={changes}
+        onRefresh={onRefreshChanges}
+        onSelectChange={onSelectChange}
+        selectedPath={selectedPath}
+        workspacePath={workspace.path}
+      />
     );
   }
   if (activity === "search") return <SearchPanel onOpen={onSelectFile} />;

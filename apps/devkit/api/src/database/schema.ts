@@ -26,6 +26,7 @@ export type DevkitDatabase = {
   devkit_agent_task_dependencies: AgentTaskDependenciesTable;
   devkit_agent_parent_reviews: AgentParentReviewsTable;
   devkit_agent_personas: AgentPersonasTable;
+  devkit_model_provider_connections: ModelProviderConnectionsTable;
   devkit_project_manager_activity: ProjectManagerActivityTable;
   devkit_project_manager_attachments: ProjectManagerAttachmentsTable;
   devkit_project_manager_items: ProjectManagerItemsTable;
@@ -48,6 +49,22 @@ export type DevkitDatabase = {
   devkit_sync_runs: DevkitSyncRunsTable;
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
+};
+
+export type ModelProviderConnectionsTable = {
+  actor_id: string;
+  base_url: string;
+  created_at: TimestampColumn;
+  encrypted_api_key: string | null;
+  id: Generated<number>;
+  label: string;
+  last_error: string | null;
+  last_tested_at: TimestampColumn | null;
+  model: string;
+  provider: string;
+  status: string;
+  updated_at: TimestampColumn;
+  uuid: string;
 };
 
 export type NotificationsTable = {
@@ -194,6 +211,7 @@ export type AgentRunsTable = {
   access_mode: string;
   actor_id: string;
   agent_profile: string;
+  connection_id: string;
   supervisor_persona_uuid: string | null;
   assist_mode: string;
   budget_json: string;
@@ -315,6 +333,7 @@ export type OrchestrationChatThreadsTable = {
   access_mode: string;
   actor_id: string;
   codex_thread_id: string | null;
+  connection_id: string;
   created_at: TimestampColumn;
   id: Generated<number>;
   model: string;
@@ -332,6 +351,7 @@ export type OrchestrationChatThreadsTable = {
 };
 
 export type OrchestrationChatMessagesTable = {
+  actions_json: string;
   actor_id: string;
   attachments_json: string;
   body: string;

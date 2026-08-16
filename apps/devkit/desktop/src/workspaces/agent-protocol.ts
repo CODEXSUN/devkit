@@ -27,6 +27,16 @@ export function parseAgentProtocolMessage(value: unknown): AgentProtocolMessage 
   return message;
 }
 
+export function agentErrorFrom(value: unknown) {
+  const message = parseAgentProtocolMessage(value);
+  if (!message) return undefined;
+  const protocolError = message.error?.message?.trim();
+  if (protocolError) return protocolError;
+  if (message.method !== "runtime/error") return undefined;
+  const runtimeError = textAt(message, "params", "message")?.trim();
+  return runtimeError || undefined;
+}
+
 export function threadIdFrom(message: AgentProtocolMessage) {
   return textAt(message, "result", "thread", "id") ?? textAt(message, "params", "thread", "id");
 }

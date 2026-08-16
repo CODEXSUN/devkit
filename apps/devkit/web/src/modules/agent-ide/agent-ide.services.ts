@@ -6,6 +6,7 @@ import type {
   AgentIdeCodexStatus,
   AgentIdeChatHistory,
   AgentIdeChatHistoryDetail,
+  AgentIdeConnectionId,
   AgentIdeModel,
   AgentIdePlanResult,
   AgentIdeSettings
@@ -26,8 +27,8 @@ export const createAgentIdePlan = (input: {
   projectTitle: string;
 }) => apiPost<AgentIdePlanResult>("/orchestration/agent-ide/plan", input);
 
-export const getAgentIdeCodexStatus = () =>
-  apiGet<AgentIdeCodexStatus>("/orchestration/codex/status");
+export const getAgentIdeCodexConnections = () =>
+  apiGet<AgentIdeCodexStatus[]>("/orchestration/codex/connections");
 
 export const listAgentIdeChats = () =>
   apiGet<AgentIdeChatHistory[]>("/orchestration/agent-ide/chats");
@@ -46,8 +47,7 @@ export const getAgentRun = (uuid: string) =>
 export const getAgentTaskGraph = (uuid: string) =>
   apiGet<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`);
 
-export const listAgentPersonas = () =>
-  apiGet<AgentPersona[]>("/orchestration/agent-ide/personas");
+export const listAgentPersonas = () => apiGet<AgentPersona[]>("/orchestration/agent-ide/personas");
 
 export const createStarterAgentTeam = () =>
   apiPost<AgentPersona[]>("/orchestration/agent-ide/personas/starter-team");
@@ -74,10 +74,11 @@ export const saveAgentTaskGraph = (
     title: string;
   }>,
   supervisorPersonaUuid: string | null
-) => apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, {
-  supervisorPersonaUuid,
-  tasks
-});
+) =>
+  apiPut<AgentTaskGraph>(`/orchestration/agent-ide/runs/${uuid}/tasks`, {
+    supervisorPersonaUuid,
+    tasks
+  });
 
 export const assignAgentTaskDelegate = (uuid: string, personaUuid: string) =>
   apiPut<AgentTaskGraph>(`/orchestration/agent-ide/tasks/${uuid}/delegate`, { personaUuid });
@@ -137,6 +138,7 @@ export async function streamAgentIdeChat(
   input: {
     access: AgentIdeAccess;
     attachments: AgentIdeAttachment[];
+    connectionId: AgentIdeConnectionId;
     conversationId: string | null;
     message: string;
     model: AgentIdeModel;

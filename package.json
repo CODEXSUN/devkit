@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.63",
+  "version": "1.0.64",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -102,6 +102,7 @@
   "allowScripts": {
     "bullmq": false,
     "esbuild": true,
-    "msgpackr-extract": false
+    "msgpackr-extract": false,
+    "opencode-ai@1.18.18": true
   }
 }

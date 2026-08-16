@@ -10,6 +10,7 @@ import type {
 import { desktopClient } from "../services/desktop-client";
 import type { Approval, RunItem } from "./agent-workspace-parts";
 import {
+  agentErrorFrom,
   parseAgentProtocolMessage,
   runItemFrom,
   textAt,
@@ -18,7 +19,12 @@ import {
 import { AgentTurnWatchdog } from "./agent-turn-watchdog";
 import { buildAgentPrompt, loadBoundedFileContext } from "./agent-context";
 
-export type ChatMessage = { id: string; role: "agent" | "user"; text: string };
+export type ChatMessage = {
+  id: string;
+  role: "agent" | "user";
+  text: string;
+  createdAt: string;
+};
 export type SubmissionPhase = "idle" | "preparing" | "sending";
 
 export function useAgentSession({
@@ -81,7 +87,7 @@ export function useAgentSession({
         if (message) handleAgentEvent(message);
       }),
       listen<unknown>("agent-error", (event) => {
-        const message = textAt(parseAgentProtocolMessage(event.payload), "params", "message");
+        const message = agentErrorFrom(event.payload);
         if (message) setError(message);
       })
     ]).then(async ([events, errors]) => {
@@ -186,9 +192,14 @@ export function useAgentSession({
         loadBoundedFileContext(contextPaths, (path) => desktopClient.readFile(path))
       ]);
       const task = await ensureTask(threadId, prompt);
-      await desktopClient.saveAgentMessage(task.id, message.id, message.role, message.text);
+      const persistedMessage = await desktopClient.saveAgentMessage(
+        task.id,
+        message.id,
+        message.role,
+        message.text
+      );
       savedMessage = { id: message.id, taskId: task.id };
-      setMessages((current) => [...current, message]);
+      setMessages((current) => [...current, toChatMessage(persistedMessage)]);
       setRunning(true);
       setSubmissionPhase("sending");
       await desktopClient.sendAgentTurn(
@@ -285,7 +296,12 @@ export function useAgentSession({
     const taskId = activeTaskIdRef.current;
     if (!taskId || !text) return;
     try {
-      await desktopClient.saveAgentMessage(taskId, id, role, text);
+      const message = await desktopClient.saveAgentMessage(taskId, id, role, text);
+      setMessages((current) =>
+        current.map((entry) =>
+          entry.id === message.id ? { ...entry, createdAt: message.createdAt } : entry
+        )
+      );
       setTasks((current) => {
         const task = current.find((entry) => entry.id === taskId);
         return task ? [task, ...current.filter((entry) => entry.id !== taskId)] : current;
@@ -325,7 +341,15 @@ export function useAgentSession({
       if (last?.role === "agent") {
         return [...current.slice(0, -1), { ...last, text: last.text + delta }];
       }
-      return [...current, { id: crypto.randomUUID(), role: "agent", text: delta }];
+      return [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "agent",
+          text: delta,
+          createdAt: new Date().toISOString()
+        }
+      ];
     });
   }
 
@@ -333,8 +357,10 @@ export function useAgentSession({
     if (!text) return;
     setMessages((current) => {
       const last = current.at(-1);
-      if (last?.role === "agent") return [...current.slice(0, -1), { id, role: "agent", text }];
-      return [...current, { id, role: "agent", text }];
+      if (last?.role === "agent") {
+        return [...current.slice(0, -1), { id, role: "agent", text, createdAt: last.createdAt }];
+      }
+      return [...current, { id, role: "agent", text, createdAt: new Date().toISOString() }];
     });
   }
 
@@ -377,7 +403,12 @@ export function useAgentSession({
 }
 
 function toChatMessage(message: AgentMessage): ChatMessage {
-  return { id: message.id, role: message.role, text: message.content };
+  return {
+    id: message.id,
+    role: message.role,
+    text: message.content,
+    createdAt: message.createdAt
+  };
 }
 
 function taskTitle(prompt: string) {

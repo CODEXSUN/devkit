@@ -11,14 +11,18 @@ import {
   agentParentReviewInputSchema,
   agentReworkInputSchema,
   agentTaskStatusInputSchema,
+  codexApiKeyLoginSchema,
   codexApprovalInputSchema,
   codexChatInputSchema,
-  codexLoginCancelSchema
+  codexConnectionInputSchema,
+  codexLoginCancelSchema,
+  modelProviderInputSchema,
+  modelProviderParamSchema
 } from "./orchestration.schemas.js";
 import { OpenAiPlanningGateway } from "./orchestration.model-gateway.js";
 import { launchDeskInputSchema } from "./orchestration.schemas.js";
 import { LaunchDeskAgent } from "./launch-desk.agent.js";
-import { codexAppServer } from "./codex-app-server.client.js";
+import { codexAppServer, codexConnectorPool } from "./codex-connector.pool.js";
 import { CodexChatService } from "./codex-chat.service.js";
 import { requireDevkitActor } from "../../request-context.js";
 import { orchestrationChatRepository } from "./orchestration-chat.repository.js";
@@ -33,18 +37,36 @@ import { agentDelegateExecutor } from "./agent-delegate.executor.js";
 import { hostingerMcpService } from "./hostinger-mcp.service.js";
 import { hostingerDashboardService } from "./hostinger-dashboard.service.js";
 import { hostingerSshService } from "./hostinger-ssh.service.js";
+import { modelProviderService } from "./model-provider.service.js";
 
 const service = new OrchestrationService();
 const planningGateway = new OpenAiPlanningGateway();
 const launchDesk = new LaunchDeskAgent();
 const codexChat = new CodexChatService();
-const hostingerSshTargetSchema = z.object({
-  host: z.string().trim().min(1).max(253).regex(/^[a-z0-9.:-]+$/iu),
-  name: z.string().trim().min(3).max(80).regex(/^[a-z0-9._-]+$/iu),
-  port: z.coerce.number().int().min(1).max(65535),
-  user: z.string().trim().min(1).max(32).regex(/^[a-z_][a-z0-9_-]*$/iu),
-  virtualMachineId: z.coerce.number().int().positive()
-}).strict();
+const hostingerSshTargetSchema = z
+  .object({
+    host: z
+      .string()
+      .trim()
+      .min(1)
+      .max(253)
+      .regex(/^[a-z0-9.:-]+$/iu),
+    name: z
+      .string()
+      .trim()
+      .min(3)
+      .max(80)
+      .regex(/^[a-z0-9._-]+$/iu),
+    port: z.coerce.number().int().min(1).max(65535),
+    user: z
+      .string()
+      .trim()
+      .min(1)
+      .max(32)
+      .regex(/^[a-z_][a-z0-9_-]*$/iu),
+    virtualMachineId: z.coerce.number().int().positive()
+  })
+  .strict();
 
 export async function registerOrchestrationRoutes(app: FastifyInstance) {
   let recoveryReported = false;
@@ -60,6 +82,32 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   app.get("/orchestration/agent-ide/settings", async (request) =>
     ok(planningGateway.status(), { requestId: request.id })
   );
+  app.get("/orchestration/model-providers", async (request) =>
+    ok(await modelProviderService.list(requireDevkitActor().id), { requestId: request.id })
+  );
+  app.put("/orchestration/model-providers/:provider", async (request) => {
+    const { provider } = modelProviderParamSchema.parse(request.params);
+    return ok(
+      await modelProviderService.save(
+        provider,
+        modelProviderInputSchema.parse(request.body),
+        requireDevkitActor().id
+      ),
+      { requestId: request.id }
+    );
+  });
+  app.post("/orchestration/model-providers/:provider/test", async (request) => {
+    const { provider } = modelProviderParamSchema.parse(request.params);
+    return ok(await modelProviderService.test(provider, requireDevkitActor().id), {
+      requestId: request.id
+    });
+  });
+  app.post("/orchestration/model-providers/:provider/disconnect", async (request) => {
+    const { provider } = modelProviderParamSchema.parse(request.params);
+    return ok(await modelProviderService.remove(provider, requireDevkitActor().id), {
+      requestId: request.id
+    });
+  });
   app.post("/orchestration/agent-ide/settings/test", async (request) =>
     ok(await planningGateway.testConnection(), { requestId: request.id })
   );
@@ -110,7 +158,10 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     )
   );
   app.put("/orchestration/agent-ide/personas/:uuid", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     return ok(
       await agentPersonaRepository.update(
         uuid,
@@ -163,7 +214,10 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     });
   });
   app.put("/orchestration/agent-ide/tasks/:uuid/delegate", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const { personaUuid } = agentPersonaAssignmentSchema.parse(request.body);
     return ok(
       await agentTaskGraphRepository.assignDelegate(uuid, requireDevkitActor().id, personaUuid),
@@ -171,7 +225,10 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     );
   });
   app.put("/orchestration/agent-ide/runs/:uuid/supervisor", async (request) => {
-    const { uuid } = z.object({ uuid: z.string().length(16) }).strict().parse(request.params);
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
     const { personaUuid } = agentPersonaAssignmentSchema.parse(request.body);
     return ok(
       await agentTaskGraphRepository.assignSupervisor(uuid, requireDevkitActor().id, personaUuid),
@@ -290,26 +347,42 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   });
   app.post("/orchestration/agent-ide/codex/approval", async (request) => {
     const input = codexApprovalInputSchema.parse(request.body);
-    codexAppServer.resolveApproval(input.threadId, input.requestId, input.decision);
+    codexConnectorPool.resolveApproval(input.threadId, input.requestId, input.decision);
     await agentRunRepository.resolveApproval(requireDevkitActor().id, input);
     return ok({ resolved: true }, { requestId: request.id });
   });
   app.get("/orchestration/codex/status", async (request) =>
     ok(await codexAppServer.status(), { requestId: request.id })
   );
-  app.post("/orchestration/codex/device-login", async (request) =>
-    ok(await codexAppServer.startDeviceLogin(), { requestId: request.id })
+  app.get("/orchestration/codex/connections", async (request) =>
+    ok(await codexConnectorPool.statuses(), { requestId: request.id })
   );
-  app.post("/orchestration/codex/browser-login", async (request) =>
-    ok(await codexAppServer.startBrowserLogin(), { requestId: request.id })
-  );
+  app.post("/orchestration/codex/device-login", async (request) => {
+    const { connectionId } = codexConnectionInputSchema.parse(request.body ?? {});
+    return ok(await codexConnectorPool.client(connectionId).startDeviceLogin(), {
+      requestId: request.id
+    });
+  });
+  app.post("/orchestration/codex/browser-login", async (request) => {
+    const { connectionId } = codexConnectionInputSchema.parse(request.body ?? {});
+    return ok(await codexConnectorPool.client(connectionId).startBrowserLogin(), {
+      requestId: request.id
+    });
+  });
+  app.post("/orchestration/codex/api-key-login", async (request) => {
+    const { apiKey, connectionId } = codexApiKeyLoginSchema.parse(request.body);
+    return ok(await codexConnectorPool.client(connectionId).loginApiKey(apiKey), {
+      requestId: request.id
+    });
+  });
   app.post("/orchestration/codex/login-cancel", async (request) => {
-    const { loginId } = codexLoginCancelSchema.parse(request.body);
-    await codexAppServer.cancelLogin(loginId);
+    const { connectionId, loginId } = codexLoginCancelSchema.parse(request.body);
+    await codexConnectorPool.client(connectionId).cancelLogin(loginId);
     return ok({ cancelled: true }, { requestId: request.id });
   });
   app.post("/orchestration/codex/logout", async (request) => {
-    await codexAppServer.logout();
+    const { connectionId } = codexConnectionInputSchema.parse(request.body ?? {});
+    await codexConnectorPool.client(connectionId).logout();
     return ok({ disconnected: true }, { requestId: request.id });
   });
   app.get("/orchestration/integrations/hostinger/status", async (request) =>
@@ -322,13 +395,19 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     ok(await hostingerDashboardService.dashboard(), { requestId: request.id })
   );
   app.get("/orchestration/integrations/hostinger/ssh", async (request) =>
-    ok(await hostingerSshService.status(hostingerSshTargetSchema.parse(request.query)), { requestId: request.id })
+    ok(await hostingerSshService.status(hostingerSshTargetSchema.parse(request.query)), {
+      requestId: request.id
+    })
   );
   app.post("/orchestration/integrations/hostinger/ssh/generate", async (request) =>
-    ok(await hostingerSshService.generateAndAttach(hostingerSshTargetSchema.parse(request.body)), { requestId: request.id })
+    ok(await hostingerSshService.generateAndAttach(hostingerSshTargetSchema.parse(request.body)), {
+      requestId: request.id
+    })
   );
   app.post("/orchestration/integrations/hostinger/ssh/test", async (request) =>
-    ok(await hostingerSshService.test(hostingerSshTargetSchema.parse(request.body)), { requestId: request.id })
+    ok(await hostingerSshService.test(hostingerSshTargetSchema.parse(request.body)), {
+      requestId: request.id
+    })
   );
   app.post("/orchestration/launch-desk/stream", async (request, reply) => {
     const input = launchDeskInputSchema.parse(request.body);

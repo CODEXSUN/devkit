@@ -7,15 +7,18 @@ import { reviewIsCurrent } from "./change-review";
 export function GitPanel({
   changes,
   onRefresh,
+  onSelectChange,
+  selectedPath,
   workspacePath
 }: {
   changes: GitChange[];
   onRefresh: () => Promise<void>;
+  onSelectChange: (change: GitChange) => void;
+  selectedPath: string | undefined;
   workspacePath: string;
 }) {
   const [message, setMessage] = useState("");
   const [worktrees, setWorktrees] = useState<GitWorktree[]>([]);
-  const [diff, setDiff] = useState<string>();
   const [worktreeName, setWorktreeName] = useState("");
   const [error, setError] = useState<string>();
   const [currentFingerprint, setCurrentFingerprint] = useState<string>();
@@ -115,10 +118,10 @@ export function GitPanel({
       {error ? <div className="panel-error">{error}</div> : null}
       <div className="tree-section">Changes {changes.length}</div>
       {changes.map((change) => (
-        <div className="git-change" key={change.path}>
+        <div className={`git-change${selectedPath === change.path ? " selected" : ""}`} key={change.path}>
           <button
             className="git-path"
-            onClick={() => void desktopClient.gitDiff(change.path).then(setDiff)}
+            onClick={() => onSelectChange(change)}
             title="Inspect diff"
             type="button"
           >
@@ -199,14 +202,6 @@ export function GitPanel({
           </span>
         </div>
       ))}
-      {diff !== undefined ? (
-        <div className="diff-preview">
-          <button onClick={() => setDiff(undefined)} type="button">
-            Close diff
-          </button>
-          <pre>{diff || "No unstaged diff for this file."}</pre>
-        </div>
-      ) : null}
     </div>
   );
 }

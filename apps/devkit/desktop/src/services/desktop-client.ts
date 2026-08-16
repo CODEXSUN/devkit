@@ -7,6 +7,7 @@ import type {
   FileEntry,
   ExternalEditor,
   GitChange,
+  GitFileDiff,
   GitWorktree,
   LocalTask,
   SyncResult,
@@ -18,6 +19,7 @@ import type {
   ProjectLearningSummary,
   PythonEnvironment,
   TerminalResult,
+  TerminalShell,
   Workspace
 } from "../contracts/desktop";
 
@@ -105,6 +107,13 @@ export class DesktopClient {
     return invoke<string>("git_diff", { path: path ?? null });
   }
 
+  async gitFileDiff(path: string, originalPath?: string) {
+    return invoke<GitFileDiff>("git_file_diff", {
+      originalPath: originalPath ?? null,
+      path
+    });
+  }
+
   async gitStage(paths: string[], expectedFingerprint: string) {
     return invoke<void>("git_stage", { expectedFingerprint, paths });
   }
@@ -160,8 +169,8 @@ export class DesktopClient {
     return invoke<string>("project_learning_context");
   }
 
-  async startTerminal() {
-    return invoke<string>("start_terminal");
+  async startTerminal(shell: TerminalShell) {
+    return invoke<string>("start_terminal", { shell });
   }
 
   async writeTerminal(sessionId: string, data: string) {

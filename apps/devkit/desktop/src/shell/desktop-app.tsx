@@ -34,6 +34,11 @@ type Theme = "dark" | "light" | "system";
 const EditorWorkspace = lazy(() =>
   import("../workspaces/editor-workspace").then((module) => ({ default: module.EditorWorkspace }))
 );
+const GitDiffWorkspace = lazy(() =>
+  import("../workspaces/git-diff-workspace").then((module) => ({
+    default: module.GitDiffWorkspace
+  }))
+);
 const TerminalPanel = lazy(() =>
   import("../workspaces/terminal-panel").then((module) => ({ default: module.TerminalPanel }))
 );
@@ -64,6 +69,7 @@ export function DesktopApp() {
   const updater = useDesktopUpdater();
   const session = useDesktopSession();
   const { changes, files, system, workspace } = session;
+  const selectedChange = changes.find((change) => change.path === selectedPath);
 
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
@@ -83,6 +89,12 @@ export function DesktopApp() {
     setAgentContextPaths([]);
     setSelectedPath(undefined);
   }, [workspace?.path]);
+
+  useEffect(() => {
+    if (ui.activity === "git" && changes.length && !selectedChange) {
+      setSelectedPath(changes[0]?.path);
+    }
+  }, [changes, selectedChange, ui.activity]);
 
   useLayoutEffect(() => {
     if (ui.activity !== "assist") setEditorStarted(true);
@@ -233,11 +245,12 @@ export function DesktopApp() {
               changesState={session.changesState}
               files={files}
               filesState={session.filesState}
+              onRefreshChanges={session.refreshChanges}
+              onSelectChange={(change) => setSelectedPath(change.path)}
               onSelectFile={setSelectedPath}
               selectedPath={selectedPath}
-              workspace={workspace}
               system={system}
-              onRefreshChanges={session.refreshChanges}
+              workspace={workspace}
             />
           </aside>
         ) : null}
@@ -273,7 +286,10 @@ export function DesktopApp() {
             />
           </div>
           {editorStarted ? (
-            <div className="workspace-surface" hidden={ui.activity === "assist"}>
+            <div
+              className="workspace-surface"
+              hidden={ui.activity === "assist" || (ui.activity === "git" && Boolean(selectedChange))}
+            >
               <Suspense fallback={<div className="workspace-loading">Loading editor...</div>}>
                 <EditorWorkspace
                   key={workspace.path}
@@ -281,6 +297,13 @@ export function DesktopApp() {
                   path={selectedPath}
                   theme={resolvedTheme}
                 />
+              </Suspense>
+            </div>
+          ) : null}
+          {ui.activity === "git" && selectedChange ? (
+            <div className="workspace-surface">
+              <Suspense fallback={<div className="workspace-loading">Loading diff reviewer...</div>}>
+                <GitDiffWorkspace change={selectedChange} theme={resolvedTheme} />
               </Suspense>
             </div>
           ) : null}

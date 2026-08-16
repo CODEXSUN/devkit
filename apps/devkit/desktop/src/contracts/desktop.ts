@@ -11,8 +11,15 @@ export type FileEntry = {
 };
 
 export type GitChange = {
+  originalPath?: string;
   path: string;
   status: string;
+};
+
+export type GitFileDiff = {
+  binary: boolean;
+  modified: string;
+  original: string;
 };
 
 export type ExternalEditor = {
@@ -55,6 +62,7 @@ export type ProjectLearningSummary = {
   staleCount: number;
 };
 export type TerminalOutput = { sessionId: string; data: string };
+export type TerminalShell = "gitBash" | "powershell";
 export type PythonEnvironment = {
   available: boolean;
   configured: boolean;

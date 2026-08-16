@@ -1,6 +1,6 @@
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::Path;
+use std::path::{Component, Path};
 use std::process::Command;
 
 use serde::Serialize;
@@ -15,7 +15,16 @@ use crate::state::DesktopState;
 #[serde(rename_all = "camelCase")]
 pub struct GitChange {
     path: String,
+    original_path: Option<String>,
     status: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileDiff {
+    original: String,
+    modified: String,
+    binary: bool,
 }
 
 #[derive(Serialize)]
@@ -45,11 +54,19 @@ fn git_status_for(root: &Path) -> DesktopResult<Vec<GitChange>> {
     Ok(parse_status(&output.stdout)
         .into_iter()
         .filter_map(|change| {
-            let GitChange { path, status } = change;
+            let GitChange {
+                original_path,
+                path,
+                status,
+            } = change;
             if status == "??" && is_generated_untracked_path(&path) {
                 return None;
             }
-            Some(GitChange { status, path })
+            Some(GitChange {
+                original_path,
+                status,
+                path,
+            })
         })
         .collect())
 }
@@ -65,10 +82,18 @@ fn parse_status(output: &[u8]) -> Vec<GitChange> {
         }
         let status = String::from_utf8_lossy(&record[..2]).trim().to_owned();
         let path = String::from_utf8_lossy(&record[3..]).into_owned();
-        if status.contains('R') || status.contains('C') {
-            let _previous_path = records.next();
-        }
-        changes.push(GitChange { path, status });
+        let original_path = if status.contains('R') || status.contains('C') {
+            records
+                .next()
+                .map(|value| String::from_utf8_lossy(value).into_owned())
+        } else {
+            None
+        };
+        changes.push(GitChange {
+            original_path,
+            path,
+            status,
+        });
     }
     changes
 }
@@ -138,6 +163,57 @@ pub fn git_diff(path: Option<String>, state: State<'_, DesktopState>) -> Desktop
         command.arg(path);
     }
     checked_output(command.current_dir(root), "Git diff failed.")
+}
+
+#[tauri::command]
+pub fn git_file_diff(
+    path: String,
+    original_path: Option<String>,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<GitFileDiff> {
+    let root = workspace_root(&state)?;
+    let path = validated_git_path(&path)?;
+    let original_path = validated_git_path(original_path.as_deref().unwrap_or(&path))?;
+    let original = git_head_file(&root, &original_path)?;
+    let modified = read_worktree_file(&root.join(&path))?;
+    let binary = original.is_none() || modified.is_none();
+    Ok(GitFileDiff {
+        original: original.unwrap_or_default(),
+        modified: modified.unwrap_or_default(),
+        binary,
+    })
+}
+
+fn git_head_file(root: &Path, path: &str) -> DesktopResult<Option<String>> {
+    let output = Command::new("git")
+        .arg("show")
+        .arg(format!("HEAD:{path}"))
+        .current_dir(root)
+        .output()?;
+    if !output.status.success() {
+        return Ok(Some(String::new()));
+    }
+    Ok(String::from_utf8(output.stdout).ok())
+}
+
+fn read_worktree_file(path: &Path) -> DesktopResult<Option<String>> {
+    if !path.is_file() {
+        return Ok(Some(String::new()));
+    }
+    Ok(String::from_utf8(fs::read(path)?).ok())
+}
+
+fn validated_git_path(path: &str) -> DesktopResult<String> {
+    let value = Path::new(path);
+    if path.is_empty()
+        || value.is_absolute()
+        || value
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
+    {
+        return Err(DesktopError::Policy("The Git path is invalid.".into()));
+    }
+    Ok(path.replace('\\', "/"))
 }
 
 #[tauri::command]
@@ -338,7 +414,7 @@ fn registered_worktree_paths(root: &Path) -> DesktopResult<Vec<std::path::PathBu
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_status, worktree_slug};
+    use super::{parse_status, validated_git_path, worktree_slug};
 
     #[test]
     fn accepts_a_bounded_worktree_name() {
@@ -361,5 +437,13 @@ mod tests {
         assert_eq!(changes.len(), 2);
         assert_eq!(changes[0].path, "file with spaces.txt");
         assert_eq!(changes[1].path, "new name.txt");
+        assert_eq!(changes[1].original_path.as_deref(), Some("old name.txt"));
+    }
+
+    #[test]
+    fn rejects_git_paths_outside_the_workspace() {
+        assert!(validated_git_path("../outside.txt").is_err());
+        assert!(validated_git_path("C:\\outside.txt").is_err());
+        assert_eq!(validated_git_path("src/main.ts").unwrap(), "src/main.ts");
     }
 }

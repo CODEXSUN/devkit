@@ -6,6 +6,7 @@ import type {
   OrchestrationChatMessagesTable,
   OrchestrationChatThreadsTable
 } from "../../database/schema.js";
+import type { OrchestrationChatAction } from "./orchestration-chat.actions.js";
 
 export class OrchestrationChatRepository {
   private readonly database = getDevkitDatabase();
@@ -37,6 +38,7 @@ export class OrchestrationChatRepository {
   async create(
     input: {
       access: string;
+      connectionId: string;
       message: string;
       model: string;
       projectKey: string;
@@ -53,6 +55,7 @@ export class OrchestrationChatRepository {
         access_mode: input.access,
         actor_id: actorId,
         codex_thread_id: null,
+        connection_id: input.connectionId,
         model: input.model,
         project_key: input.projectKey,
         project_title: input.projectTitle,
@@ -72,7 +75,7 @@ export class OrchestrationChatRepository {
   async updateRuntime(
     uuid: string,
     actorId: string,
-    input: { access: string; codexThreadId: string; model: string }
+    input: { access: string; codexThreadId: string; connectionId: string; model: string }
   ) {
     await this.requireThread(uuid, actorId);
     await this.database
@@ -80,6 +83,7 @@ export class OrchestrationChatRepository {
       .set({
         access_mode: input.access,
         codex_thread_id: input.codexThreadId,
+        connection_id: input.connectionId,
         model: input.model,
         updated_at: new Date()
       })
@@ -90,6 +94,7 @@ export class OrchestrationChatRepository {
 
   async addMessage(
     input: {
+      actions: OrchestrationChatAction[];
       attachments: Array<{ name: string; size: number }>;
       body: string;
       durationMs: number | null;
@@ -104,6 +109,7 @@ export class OrchestrationChatRepository {
     await this.database
       .insertInto("devkit_orchestration_chat_messages")
       .values({
+        actions_json: JSON.stringify(input.actions),
         actor_id: actorId,
         attachments_json: JSON.stringify(input.attachments),
         body: input.body,
@@ -164,6 +170,7 @@ function mapThread(row: Selectable<OrchestrationChatThreadsTable>) {
   return {
     access: row.access_mode,
     codexThreadId: row.codex_thread_id,
+    connectionId: row.connection_id,
     createdAt: new Date(row.created_at).toISOString(),
     model: row.model,
     projectKey: row.project_key,
@@ -185,6 +192,7 @@ function mapThread(row: Selectable<OrchestrationChatThreadsTable>) {
 
 function mapMessage(row: Selectable<OrchestrationChatMessagesTable>) {
   return {
+    actions: JSON.parse(row.actions_json) as OrchestrationChatAction[],
     attachments: JSON.parse(row.attachments_json) as Array<{ name: string; size: number }>,
     body: row.body,
     createdAt: new Date(row.created_at).toISOString(),

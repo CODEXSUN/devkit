@@ -5,6 +5,7 @@ import {
   Clock3Icon,
   CopyIcon,
   FileCode2Icon,
+  FilesIcon,
   PaperclipIcon,
   PencilIcon,
   ThumbsDownIcon,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AgentIdeComposer } from "./agent-ide.composer";
+import { AgentIdeActionTimeline } from "./agent-ide.action-timeline";
 import type {
   AgentIdeAccess,
   AgentIdeApproval,
@@ -33,6 +35,7 @@ type Props = {
   onEditMessage: (messageId: string) => void;
   onFeedback: (messageId: string, feedback: "down" | "up") => void;
   onModelChange: (model: AgentIdeModel) => void;
+  onReviewChanges: () => void;
   onSend: (message: string, attachments: AgentIdeAttachment[]) => void;
   projectTitle?: string;
   running: boolean;
@@ -57,6 +60,7 @@ export function AgentIdeChat({
   onEditMessage,
   onFeedback,
   onModelChange,
+  onReviewChanges,
   onSend,
   projectTitle,
   running
@@ -101,6 +105,7 @@ export function AgentIdeChat({
                   key={entry.id}
                   onCopy={() => void copyMessage(entry)}
                   onFeedback={(feedback) => onFeedback(entry.id, feedback)}
+                  onReviewChanges={onReviewChanges}
                   running={running && entry === messages.at(-1)}
                 />
               )
@@ -121,9 +126,27 @@ export function AgentIdeChat({
             <p className="font-medium">Codex needs your approval</p>
             <p className="truncate text-xs text-muted-foreground">{approval.reason}</p>
           </div>
-          <button className="rounded-md px-3 py-2 text-xs hover:bg-muted" onClick={() => onApprovalDecision("decline")} type="button">Decline</button>
-          <button className="rounded-md border px-3 py-2 text-xs hover:bg-muted" onClick={() => onApprovalDecision("accept")} type="button">Approve once</button>
-          <button className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground" onClick={() => onApprovalDecision("acceptForSession")} type="button">Approve for chat</button>
+          <button
+            className="rounded-md px-3 py-2 text-xs hover:bg-muted"
+            onClick={() => onApprovalDecision("decline")}
+            type="button"
+          >
+            Decline
+          </button>
+          <button
+            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+            onClick={() => onApprovalDecision("accept")}
+            type="button"
+          >
+            Approve once
+          </button>
+          <button
+            className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
+            onClick={() => onApprovalDecision("acceptForSession")}
+            type="button"
+          >
+            Approve for chat
+          </button>
         </div>
       ) : null}
       <AgentIdeComposer
@@ -200,12 +223,14 @@ function AssistantMessage({
   entry,
   onCopy,
   onFeedback,
+  onReviewChanges,
   running
 }: {
   copied: boolean;
   entry: AgentIdeChatMessage;
   onCopy: () => void;
   onFeedback: (feedback: "down" | "up") => void;
+  onReviewChanges: () => void;
   running: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -221,22 +246,49 @@ function AssistantMessage({
         <div className="whitespace-pre-wrap text-sm leading-7">
           {entry.text || (running ? "Thinking…" : "No response returned.")}
         </div>
+        <AgentIdeActionTimeline actions={entry.actions} running={running} />
         {entry.files.length ? (
-          <div className="grid gap-1.5 pt-3 text-xs">
-            {visibleFiles.map((file) => (
-              <div className="flex min-w-0 items-center gap-2 text-muted-foreground" key={file}>
-                <FileCode2Icon className="size-3.5 shrink-0" />
-                <span className="truncate">{file}</span>
-              </div>
-            ))}
-            {hiddenFiles > 0 ? (
-              <button className="flex items-center gap-1 py-1 text-left font-medium hover:text-foreground" onClick={() => setExpanded(true)} type="button">
-                Show {hiddenFiles} more file{hiddenFiles === 1 ? "" : "s"} <ChevronDownIcon className="size-3.5" />
+          <section className="mt-4 overflow-hidden rounded-xl border bg-muted/20 text-xs">
+            <header className="flex items-center justify-between gap-3 border-b px-3 py-2.5">
+              <span className="flex items-center gap-2 font-semibold text-foreground">
+                <FilesIcon className="size-4" /> Edited {entry.files.length} file
+                {entry.files.length === 1 ? "" : "s"}
+              </span>
+              <button
+                className="rounded-md border bg-background px-2.5 py-1.5 font-medium hover:bg-muted"
+                onClick={onReviewChanges}
+                type="button"
+              >
+                Review
               </button>
-            ) : expanded && entry.files.length > 3 ? (
-              <button className="py-1 text-left font-medium hover:text-foreground" onClick={() => setExpanded(false)} type="button">Show fewer files</button>
-            ) : null}
-          </div>
+            </header>
+            <div className="grid gap-1.5 px-3 py-2.5">
+              {visibleFiles.map((file) => (
+                <div className="flex min-w-0 items-center gap-2 text-muted-foreground" key={file}>
+                  <FileCode2Icon className="size-3.5 shrink-0" />
+                  <span className="truncate">{file}</span>
+                </div>
+              ))}
+              {hiddenFiles > 0 ? (
+                <button
+                  className="flex items-center gap-1 py-1 text-left font-medium hover:text-foreground"
+                  onClick={() => setExpanded(true)}
+                  type="button"
+                >
+                  Show {hiddenFiles} more file{hiddenFiles === 1 ? "" : "s"}{" "}
+                  <ChevronDownIcon className="size-3.5" />
+                </button>
+              ) : expanded && entry.files.length > 3 ? (
+                <button
+                  className="py-1 text-left font-medium hover:text-foreground"
+                  onClick={() => setExpanded(false)}
+                  type="button"
+                >
+                  Show fewer files
+                </button>
+              ) : null}
+            </div>
+          </section>
         ) : null}
         {entry.text || running ? (
           <div className="pointer-events-none flex items-center gap-1 pt-2 text-xs text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
@@ -248,9 +300,25 @@ function AssistantMessage({
             >
               {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
             </button>
-            <FeedbackButton active={entry.feedback === "up"} disabled={running || entry.id.length !== 16} label="Helpful response" onClick={() => onFeedback("up")}><ThumbsUpIcon /></FeedbackButton>
-            <FeedbackButton active={entry.feedback === "down"} disabled={running || entry.id.length !== 16} label="Unhelpful response" onClick={() => onFeedback("down")}><ThumbsDownIcon /></FeedbackButton>
-            <span className="flex items-center gap-1 px-1.5"><Clock3Icon className="size-3.5" /> {formatDuration(elapsed)}</span>
+            <FeedbackButton
+              active={entry.feedback === "up"}
+              disabled={running || entry.id.length !== 16}
+              label="Helpful response"
+              onClick={() => onFeedback("up")}
+            >
+              <ThumbsUpIcon />
+            </FeedbackButton>
+            <FeedbackButton
+              active={entry.feedback === "down"}
+              disabled={running || entry.id.length !== 16}
+              label="Unhelpful response"
+              onClick={() => onFeedback("down")}
+            >
+              <ThumbsDownIcon />
+            </FeedbackButton>
+            <span className="flex items-center gap-1 px-1.5">
+              <Clock3Icon className="size-3.5" /> Worked for {formatDuration(elapsed)}
+            </span>
             <time className="px-1.5">{formatTime(entry.createdAt)}</time>
           </div>
         ) : null}

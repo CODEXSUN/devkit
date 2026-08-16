@@ -65,9 +65,31 @@ export const orchestrationCatalogSchema = z
 
 export type OrchestrationCatalog = z.infer<typeof orchestrationCatalogSchema>;
 
+export const modelProviderIdSchema = z.enum([
+  "openai",
+  "anthropic",
+  "openrouter",
+  "opencode",
+  "deepseek"
+]);
+export type ModelProviderId = z.infer<typeof modelProviderIdSchema>;
+
+export const modelProviderInputSchema = z
+  .object({
+    apiKey: z.string().trim().min(20).max(2_000).optional(),
+    baseUrl: z.url().max(500),
+    label: z.string().trim().min(2).max(120),
+    model: z.string().trim().min(1).max(160)
+  })
+  .strict();
+export type ModelProviderInput = z.infer<typeof modelProviderInputSchema>;
+
+export const modelProviderParamSchema = z.object({ provider: modelProviderIdSchema }).strict();
+
 export const agentIdePlanInputSchema = z
   .object({
     brief: z.string().min(10).max(30_000),
+    provider: modelProviderIdSchema.default("openai"),
     projectId: z.string().min(1).max(160),
     projectTitle: z.string().min(1).max(240)
   })
@@ -77,7 +99,7 @@ export const agentIdePlanResultSchema = z
   .object({
     model: z.string().min(1),
     output: z.string().min(1),
-    provider: z.literal("openai"),
+    provider: modelProviderIdSchema,
     responseId: z.string().min(1)
   })
   .strict();
@@ -96,12 +118,25 @@ export const launchDeskInputSchema = z.object({
 export type LaunchDeskInput = z.infer<typeof launchDeskInputSchema>;
 
 export const codexLoginCancelSchema = z.object({
+  connectionId: z.enum(["primary", "secondary"]).default("primary"),
   loginId: z.string().uuid()
 });
+
+export const codexConnectionInputSchema = z
+  .object({ connectionId: z.enum(["primary", "secondary"]).default("primary") })
+  .strict();
+
+export const codexApiKeyLoginSchema = z
+  .object({
+    apiKey: z.string().trim().min(20).max(512),
+    connectionId: z.enum(["primary", "secondary"]).default("primary")
+  })
+  .strict();
 
 export const codexChatInputSchema = z
   .object({
     access: z.enum(["plan", "read-only", "ask-approval", "auto-approve", "full-access"]),
+    connectionId: z.enum(["primary", "secondary"]).default("primary"),
     attachments: z
       .array(
         z.object({
@@ -175,7 +210,11 @@ export const agentPersonaInputSchema = z
     agentProfile: z.enum(["coding", "devops", "planning", "review", "security", "testing"]),
     description: z.string().trim().min(3).max(500),
     instructions: z.string().trim().min(3).max(4_000),
-    key: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/u).max(80),
+    key: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9][a-z0-9-]*$/u)
+      .max(80),
     name: z.string().trim().min(2).max(80),
     role: z.enum(["supervisor", "delegate"])
   })

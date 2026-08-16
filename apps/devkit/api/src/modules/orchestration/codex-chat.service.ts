@@ -1,10 +1,16 @@
-import { codexAppServer, type CodexNotification } from "./codex-app-server.client.js";
+import type { CodexNotification } from "./codex-app-server.client.js";
+import { codexConnectorPool } from "./codex-connector.pool.js";
 import type { CodexChatInput } from "./orchestration.schemas.js";
 import { skillsRepository } from "../skills/index.js";
 import { orchestrationChatRepository } from "./orchestration-chat.repository.js";
 import { agentRunRepository } from "./agent-run.repository.js";
 import { agentWorktreeService, type AgentWorkspace } from "./agent-worktree.service.js";
 import { AgentRunBudgetGuard } from "./agent-run.budget.js";
+import {
+  chatActionFrom,
+  upsertChatAction,
+  type OrchestrationChatAction
+} from "./orchestration-chat.actions.js";
 
 export type CodexChatEvent =
   | {
@@ -15,7 +21,7 @@ export type CodexChatEvent =
       turnId: string;
     }
   | { type: "chat.delta"; delta: string }
-  | { type: "chat.activity"; label: string }
+  | { type: "chat.action"; action: OrchestrationChatAction }
   | { type: "chat.files"; files: string[] }
   | { type: "chat.approval"; requestId: number; reason: string; threadId: string }
   | { type: "chat.completed"; messageId: string; status: string }
@@ -27,6 +33,7 @@ export class CodexChatService {
     let conversationId = input.conversationId;
     let assistantText = "";
     let editedFileList: string[] = [];
+    let actions: OrchestrationChatAction[] = [];
     let runId: string | null = null;
     let workspace: AgentWorkspace | null = null;
     const startedAt = Date.now();
@@ -37,6 +44,7 @@ export class CodexChatService {
         : await orchestrationChatRepository.create(
             {
               access: input.access,
+              connectionId: input.connectionId,
               message: input.message,
               model: input.model,
               projectKey: input.project.key,
@@ -50,8 +58,13 @@ export class CodexChatService {
       if (conversation.projectUuid !== input.project.id) {
         throw new Error("The selected project does not match this chat conversation.");
       }
+      if (conversation.connectionId !== input.connectionId) {
+        throw new Error("Start a new chat to change the Codex connector.");
+      }
+      const codexAppServer = codexConnectorPool.client(input.connectionId);
       await orchestrationChatRepository.addMessage(
         {
+          actions: [],
           attachments: input.attachments.map(({ name, size }) => ({ name, size })),
           body: input.message,
           durationMs: null,
@@ -65,6 +78,7 @@ export class CodexChatService {
         {
           access: input.access,
           chatThreadUuid: conversationId,
+          connectionId: input.connectionId,
           message: input.message,
           model: input.model,
           projectKey: input.project.key,
@@ -101,6 +115,7 @@ export class CodexChatService {
       await orchestrationChatRepository.updateRuntime(conversationId, actorId, {
         access: input.access,
         codexThreadId: threadId,
+        connectionId: input.connectionId,
         model: input.model
       });
       await agentRunRepository.start(runId, actorId, threadId, turnId);
@@ -117,6 +132,7 @@ export class CodexChatService {
             message,
             startedAt,
             editedFileList,
+            actions,
             workspace
           );
           yield { type: "chat.failed", message };
@@ -126,9 +142,12 @@ export class CodexChatService {
         if (!event) continue;
         if (event.type === "chat.delta") assistantText += event.delta;
         let budgetViolation: string | null = null;
-        if (event.type === "chat.activity") {
-          await agentRunRepository.activity(runId, actorId, event.label);
-          budgetViolation = budget.observeActivity(event.label);
+        if (event.type === "chat.action") {
+          actions = upsertChatAction(actions, event.action);
+          await agentRunRepository.activity(runId, actorId, event.action.label);
+          if (event.action.status === "running") {
+            budgetViolation = budget.observeActivity(event.action.label);
+          }
         }
         if (event.type === "chat.files") {
           editedFileList = event.files;
@@ -144,6 +163,7 @@ export class CodexChatService {
             budgetViolation,
             startedAt,
             editedFileList,
+            actions,
             workspace
           );
           yield { type: "chat.failed", message: budgetViolation };
@@ -155,6 +175,7 @@ export class CodexChatService {
         if (event.type === "chat.completed") {
           const messageId = await orchestrationChatRepository.addMessage(
             {
+              actions,
               attachments: [],
               body: assistantText || "No response returned.",
               durationMs: Date.now() - startedAt,
@@ -175,6 +196,7 @@ export class CodexChatService {
         if (event.type === "chat.failed") {
           await orchestrationChatRepository.addMessage(
             {
+              actions,
               attachments: [],
               body: event.message,
               durationMs: Date.now() - startedAt,
@@ -201,6 +223,7 @@ export class CodexChatService {
         await orchestrationChatRepository
           .addMessage(
             {
+              actions,
               attachments: [],
               body: error instanceof Error ? error.message : "Codex chat failed.",
               durationMs: Date.now() - startedAt,
@@ -262,6 +285,8 @@ function toChatEvent(
 ): CodexChatEvent | null {
   const params = notification.params as Record<string, unknown> | undefined;
   if (params?.threadId !== threadId) return null;
+  const action = chatActionFrom(notification, threadId);
+  if (action) return { type: "chat.action", action };
   if (typeof notification.id === "number" && notification.method?.includes("requestApproval")) {
     return {
       type: "chat.approval",
@@ -272,12 +297,6 @@ function toChatEvent(
   }
   if (notification.method === "item/agentMessage/delta" && typeof params.delta === "string") {
     return { type: "chat.delta", delta: params.delta };
-  }
-  if (notification.method === "item/started") {
-    const item = params.item as { type?: string } | undefined;
-    if (item?.type && item.type !== "agentMessage") {
-      return { type: "chat.activity", label: item.type };
-    }
   }
   if (notification.method === "turn/diff/updated" && typeof params.diff === "string") {
     return { type: "chat.files", files: editedFiles(params.diff) };
@@ -351,10 +370,12 @@ async function persistFailure(
   message: string,
   startedAt: number,
   files: string[],
+  actions: OrchestrationChatAction[],
   workspace: AgentWorkspace
 ) {
   await orchestrationChatRepository.addMessage(
     {
+      actions,
       attachments: [],
       body: message,
       durationMs: Date.now() - startedAt,

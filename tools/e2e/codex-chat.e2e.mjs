@@ -55,10 +55,12 @@ try {
             size: 68
           }
         ],
+        connectionId: "primary",
         conversationId: null,
         message: "Reply with one short sentence confirming the project key and read-only mode.",
         model: "gpt-5.6-terra",
         threadId: null,
+        workItem: null,
         project: {
           id: "e2e-project",
           key: "DEVKIT-E2E",
@@ -112,6 +114,7 @@ try {
   assert.ok(assistantMessageId, "Codex chat did not return a persisted assistant message ID.");
   const history = await get(`/api/devkit/orchestration/agent-ide/chats/${conversationId}`, token);
   assert.equal(history.data?.messages?.length, 2, "Persisted chat should contain user and assistant messages.");
+  assert.equal(history.data?.connectionId, "primary", "The chat lost its selected Codex connector.");
   await jsonRequest(
     `/api/devkit/orchestration/agent-ide/chat-messages/${assistantMessageId}/feedback`,
     token,
@@ -122,6 +125,7 @@ try {
   assert.equal(reviewed.data?.messages?.[1]?.feedback, "up", "Assistant feedback was not persisted.");
   const run = await get(`/api/devkit/orchestration/agent-ide/runs/${runId}`, token);
   assert.equal(run.data?.status, "completed", "The Agent run did not complete.");
+  assert.equal(run.data?.connectionId, "primary", "The Agent run lost its selected Codex connector.");
   assert.equal(run.data?.projectUuid, "e2e-project", "The Agent run lost its project context.");
   assert.equal(run.data?.workspaceMode, "source", "Read-only Agent runs must stay on the source checkout.");
   assert.equal(run.data?.workspaceStatus, "source", "Read-only workspace evidence was not persisted.");

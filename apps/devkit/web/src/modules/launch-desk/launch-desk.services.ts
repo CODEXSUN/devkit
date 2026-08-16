@@ -1,20 +1,51 @@
-import { apiGet, apiPost } from "../../shared/api/devkit-api";
+import { apiGet, apiPost, apiPut } from "../../shared/api/devkit-api";
 import type {
   CodexStatus,
+  CodexConnectionId,
+  CodexConnectionStatus,
   BrowserLogin,
   DeviceLogin,
   LaunchDeskInput,
-  LaunchDeskStreamEvent
+  LaunchDeskStreamEvent,
+  ModelProviderId,
+  ModelProviderStatus
 } from "./launch-desk.types";
 
 export const getCodexStatus = () => apiGet<CodexStatus>("/orchestration/codex/status");
-export const startCodexDeviceLogin = () =>
-  apiPost<DeviceLogin>("/orchestration/codex/device-login");
-export const startCodexBrowserLogin = () =>
-  apiPost<BrowserLogin>("/orchestration/codex/browser-login");
-export const cancelCodexLogin = (loginId: string) =>
-  apiPost<{ cancelled: true }>("/orchestration/codex/login-cancel", { loginId });
-export const logoutCodex = () => apiPost<{ disconnected: true }>("/orchestration/codex/logout");
+export const getCodexConnections = () =>
+  apiGet<CodexConnectionStatus[]>("/orchestration/codex/connections");
+export const startCodexDeviceLogin = (connectionId: CodexConnectionId) =>
+  apiPost<DeviceLogin>("/orchestration/codex/device-login", { connectionId });
+export const startCodexBrowserLogin = (connectionId: CodexConnectionId) =>
+  apiPost<BrowserLogin>("/orchestration/codex/browser-login", { connectionId });
+export const loginCodexApiKey = (connectionId: CodexConnectionId, apiKey: string) =>
+  apiPost<CodexStatus>("/orchestration/codex/api-key-login", { apiKey, connectionId });
+export const cancelCodexLogin = (connectionId: CodexConnectionId, loginId: string) =>
+  apiPost<{ cancelled: true }>("/orchestration/codex/login-cancel", {
+    connectionId,
+    loginId
+  });
+export const logoutCodex = (connectionId: CodexConnectionId) =>
+  apiPost<{ disconnected: true }>("/orchestration/codex/logout", { connectionId });
+
+export const getModelProviders = () =>
+  apiGet<ModelProviderStatus[]>("/orchestration/model-providers");
+
+export const saveModelProvider = (input: {
+  apiKey?: string;
+  baseUrl: string;
+  label: string;
+  model: string;
+  provider: ModelProviderId;
+}) => apiPut<ModelProviderStatus>(`/orchestration/model-providers/${input.provider}`, input);
+
+export const testModelProvider = (provider: ModelProviderId) =>
+  apiPost<ModelProviderStatus>(`/orchestration/model-providers/${provider}/test`);
+
+export const disconnectModelProvider = (provider: ModelProviderId) =>
+  apiPost<{ disconnected: true; provider: ModelProviderId }>(
+    `/orchestration/model-providers/${provider}/disconnect`
+  );
 
 export async function streamLaunchPlan(
   input: LaunchDeskInput,

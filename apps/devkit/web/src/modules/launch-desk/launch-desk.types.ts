@@ -22,6 +22,14 @@ export type CodexStatus = {
   error: string | null;
 };
 
+export type CodexConnectionId = "primary" | "secondary";
+
+export type CodexConnectionStatus = CodexStatus & {
+  default: boolean;
+  id: CodexConnectionId;
+  label: string;
+};
+
 export type DeviceLogin = {
   type: "chatgptDeviceCode";
   loginId: string;
@@ -33,4 +41,20 @@ export type BrowserLogin = {
   type: "chatgpt";
   loginId: string;
   authUrl: string;
+};
+
+export type ModelProviderId = "openai" | "anthropic" | "openrouter" | "opencode" | "deepseek";
+
+export type ModelProviderStatus = {
+  baseUrl: string;
+  capabilities: string[];
+  configured: boolean;
+  connected: boolean;
+  default: boolean;
+  error: string | null;
+  label: string;
+  lastTestedAt: string | null;
+  model: string;
+  provider: ModelProviderId;
+  runtime: "codex" | "opencode";
 };

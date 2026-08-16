@@ -1,4 +1,5 @@
-import { codexAppServer, type CodexNotification } from "./codex-app-server.client.js";
+import type { CodexNotification } from "./codex-app-server.client.js";
+import { codexAppServer } from "./codex-connector.pool.js";
 
 class CodexAssistantGateway {
   async ask(input: { message: string; system: string; threadId: string | null }) {

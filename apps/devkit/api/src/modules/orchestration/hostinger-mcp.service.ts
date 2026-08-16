@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { AppError } from "@codexsun/framework/errors";
-import { codexAppServer, type CodexMcpServerList } from "./codex-app-server.client.js";
+import type { CodexMcpServerList } from "./codex-app-server.client.js";
+import { codexAppServer } from "./codex-connector.pool.js";
 import {
   HOSTINGER_MCP_SERVER_NAME,
   hostingerApiToken,

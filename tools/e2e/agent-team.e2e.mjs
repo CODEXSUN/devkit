@@ -30,8 +30,11 @@ try {
   await createFixture();
   await waitForHealth();
   const token = await login();
-  const status = await get("/api/devkit/orchestration/codex/status", token);
-  assert.equal(status.data?.connected, true, "Codex is not connected.");
+  const connections = await get("/api/devkit/orchestration/codex/connections", token);
+  const connectedConnectorIds = connections.data
+    .filter((connection) => connection.connected)
+    .map((connection) => connection.id);
+  assert.ok(connectedConnectorIds.length, "No Codex connector is connected.");
 
   const team = await ensureTeam(token);
   const atlas = requirePersona(team, "atlas");
@@ -92,8 +95,17 @@ try {
     current.tasks[0]?.status === "completed" && current.tasks[1]?.status === "completed"
   );
   assert.equal(codingComplete.tasks[2]?.status, "ready");
-  await verifyDelegateFile(codingComplete.tasks[0], "backend-complete\n", token, true);
-  await verifyDelegateFile(codingComplete.tasks[1], "frontend-complete\n", token, true);
+  const backendRun = await verifyDelegateFile(codingComplete.tasks[0], "backend-complete\n", token, true);
+  const frontendRun = await verifyDelegateFile(codingComplete.tasks[1], "frontend-complete\n", token, true);
+  assert.ok(connectedConnectorIds.includes(backendRun.connectionId));
+  assert.ok(connectedConnectorIds.includes(frontendRun.connectionId));
+  if (connectedConnectorIds.length > 1) {
+    assert.notEqual(
+      backendRun.connectionId,
+      frontendRun.connectionId,
+      "Parallel delegates did not rotate across the connected Codex slots."
+    );
+  }
 
   await request(
     `/api/devkit/orchestration/agent-ide/tasks/${codingComplete.tasks[2].uuid}/start`,
@@ -154,6 +166,7 @@ async function createParentRun(token) {
     body: JSON.stringify({
       access: "auto-approve",
       attachments: [],
+      connectionId: "primary",
       conversationId: null,
       message: "Coordinate a supervised team that updates the backend and frontend marker files. For this parent turn only, reply with exactly READY without inspecting, running commands, or changing files.",
       model: "gpt-5.6-terra",
@@ -227,6 +240,7 @@ async function verifyDelegateFile(taskResult, expected, token, recovered = false
       `${taskResult.title} has no child recovery event.`
     );
   }
+  return run.data;
 }
 
 function requirePersona(team, key) {
