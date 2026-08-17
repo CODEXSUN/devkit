@@ -7,6 +7,7 @@ pub mod learning;
 pub mod process;
 pub mod python;
 pub mod search;
+pub mod settings;
 pub mod skills;
 pub mod sync;
 pub mod system;

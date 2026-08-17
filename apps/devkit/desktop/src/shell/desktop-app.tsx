@@ -11,10 +11,12 @@ import {
   Menu,
   PanelBottom,
   Search,
-  Settings
+  Settings,
+  SlidersHorizontal
 } from "lucide-react";
 import { AgentWorkspace } from "../workspaces/agent-workspace";
 import { MAX_AGENT_CONTEXT_FILES } from "../workspaces/agent-context";
+import { SettingsPanel } from "../workspaces/settings-panel";
 import { SetupWorkspace } from "../workspaces/setup-workspace";
 import { AppDrawer } from "./app-drawer";
 import { OpenInMenu } from "./open-in-menu";
@@ -53,7 +55,8 @@ const activities = [
   { icon: GitBranch, id: "git", label: "Source control" },
   { icon: ListTodo, id: "tasks", label: "Tasks" },
   { icon: BrainCircuit, id: "learning", label: "Project learning" },
-  { icon: Box, id: "docker", label: "Docker" }
+  { icon: Box, id: "docker", label: "Docker" },
+  { icon: SlidersHorizontal, id: "settings", label: "Settings" }
 ] as const;
 
 export function DesktopApp() {
@@ -308,6 +311,11 @@ export function DesktopApp() {
               workspace={workspace}
             />
           </div>
+          <div className="workspace-surface" hidden={ui.activity !== "settings"}>
+            <Suspense fallback={<div className="workspace-loading">Loading settings...</div>}>
+              <SettingsPanel onClose={() => ui.setActivity("assist")} />
+            </Suspense>
+          </div>
           {editorStarted ? (
             <div
               className="workspace-surface"
@@ -331,9 +339,7 @@ export function DesktopApp() {
             </div>
           ) : null}
           {ui.terminalOpen ? (
-            <Suspense fallback={<div className="terminal-loading">Starting terminal...</div>}>
-              <TerminalPanel theme={resolvedTheme} workspace={workspace} />
-            </Suspense>
+            <TerminalPanel theme={resolvedTheme} workspace={workspace} />
           ) : null}
         </main>
       </div>
@@ -355,6 +361,7 @@ export function DesktopApp() {
       <AppDrawer
         onClose={() => ui.setDrawerOpen(false)}
         onOpenCommands={() => ui.setPaletteOpen(true)}
+        onOpenSettings={() => ui.setActivity("settings")}
         onOpenUpdates={() => ui.setUpdateOpen(true)}
         onOpenWorkspace={() => void session.openWorkspace()}
         onThemeChange={setTheme}

@@ -117,3 +117,15 @@ export type AgentProtocolMessage = {
   result?: Record<string, unknown>;
   error?: { message?: string };
 };
+
+export type AgentConfig = {
+  codexPath?: string;
+  model?: string;
+  defaultAccess: "readOnly" | "workspaceWrite";
+  autoStart: boolean;
+  approvalPolicy: "on-request" | "never" | "always";
+  sandboxType: "workspace-write" | "read-only" | "danger-full-access";
+  networkAccess: boolean;
+  maxTurns: number;
+  idleTimeout: number;
+};

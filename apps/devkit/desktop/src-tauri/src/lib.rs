@@ -68,7 +68,9 @@ pub fn run() {
             commands::tasks::save_local_task,
             commands::terminal::start_terminal,
             commands::terminal::write_terminal,
-            commands::terminal::close_terminal
+            commands::terminal::close_terminal,
+            commands::settings::get_agent_config,
+            commands::settings::save_agent_config
         ])
         .run(tauri::generate_context!())
         .expect("CodeLogix runtime failed");

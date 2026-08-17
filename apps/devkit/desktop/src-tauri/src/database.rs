@@ -13,6 +13,36 @@ pub use learning::{
     DetectedLearning, ProjectLearning, ProjectLearningSettings, ProjectLearningSummary,
 };
 
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentConfig {
+    pub codex_path: Option<String>,
+    pub model: Option<String>,
+    pub default_access: String,
+    pub auto_start: bool,
+    pub approval_policy: String,
+    pub sandbox_type: String,
+    pub network_access: bool,
+    pub max_turns: i64,
+    pub idle_timeout: i64,
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            codex_path: None,
+            model: None,
+            default_access: "workspaceWrite".into(),
+            auto_start: false,
+            approval_policy: "on-request".into(),
+            sandbox_type: "workspace-write".into(),
+            network_access: false,
+            max_turns: 50,
+            idle_timeout: 180,
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalTask {
@@ -187,6 +217,56 @@ impl DesktopDatabase {
         Ok(count as usize)
     }
 
+    pub fn get_agent_config(&self) -> DesktopResult<AgentConfig> {
+        let mut statement = self.connection.prepare(
+            "SELECT key, value FROM desktop_settings WHERE key LIKE 'agent.%'",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        let mut config = AgentConfig::default();
+        for row in rows {
+            let (key, value) = row?;
+            match key.as_str() {
+                "agent.codex_path" => config.codex_path = if value.is_empty() { None } else { Some(value) },
+                "agent.model" => config.model = if value.is_empty() { None } else { Some(value) },
+                "agent.default_access" => config.default_access = value,
+                "agent.auto_start" => config.auto_start = value == "true",
+                "agent.approval_policy" => config.approval_policy = value,
+                "agent.sandbox_type" => config.sandbox_type = value,
+                "agent.network_access" => config.network_access = value == "true",
+                "agent.max_turns" => config.max_turns = value.parse().unwrap_or(50),
+                "agent.idle_timeout" => config.idle_timeout = value.parse().unwrap_or(180),
+                _ => {}
+            }
+        }
+        Ok(config)
+    }
+
+    pub fn save_agent_config(&mut self, config: &AgentConfig) -> DesktopResult<AgentConfig> {
+        let transaction = self.connection.transaction()?;
+        let settings = [
+            ("agent.codex_path", config.codex_path.clone().unwrap_or_default()),
+            ("agent.model", config.model.clone().unwrap_or_default()),
+            ("agent.default_access", config.default_access.clone()),
+            ("agent.auto_start", config.auto_start.to_string()),
+            ("agent.approval_policy", config.approval_policy.clone()),
+            ("agent.sandbox_type", config.sandbox_type.clone()),
+            ("agent.network_access", config.network_access.to_string()),
+            ("agent.max_turns", config.max_turns.to_string()),
+            ("agent.idle_timeout", config.idle_timeout.to_string()),
+        ];
+        for (key, value) in settings {
+            transaction.execute(
+                "INSERT INTO desktop_settings (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+                params![key, value],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(config.clone())
+    }
+
     fn migrate(&self) -> DesktopResult<()> {
         self.connection
             .execute_batch(include_str!("../migrations/0001_desktop.sql"))?;
@@ -194,6 +274,8 @@ impl DesktopDatabase {
             .execute_batch(include_str!("../migrations/0002_agent_history.sql"))?;
         self.connection
             .execute_batch(include_str!("../migrations/0003_project_learning.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0004_settings.sql"))?;
         Ok(())
     }
 }

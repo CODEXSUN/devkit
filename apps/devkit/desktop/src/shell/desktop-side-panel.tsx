@@ -8,7 +8,7 @@ import { SkillsPanel } from "../workspaces/skills-panel";
 import { TasksPanel } from "../workspaces/tasks-panel";
 import type { ResourceState } from "./use-desktop-session";
 
-export type Activity = "assist" | "docker" | "files" | "git" | "learning" | "search" | "tasks";
+export type Activity = "assist" | "docker" | "files" | "git" | "learning" | "search" | "settings" | "tasks";
 
 export function DesktopSidePanel({
   activity,
@@ -83,6 +83,7 @@ function EmptyPanel({ activity }: { activity: Activity }) {
     git: "Open a Git repository to review changes.",
     learning: "Review project facts before the coding agent uses them.",
     search: "Search every text file in this workspace.",
+    settings: "Configure agent, appearance, and advanced options.",
     tasks: "Local tasks remain available offline and sync to DevKit."
   };
   return (

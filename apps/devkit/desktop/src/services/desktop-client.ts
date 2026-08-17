@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AgentAccess,
+  AgentConfig,
   AgentMessage,
   AgentRuntimeStatus,
   AgentTask,
@@ -215,6 +216,14 @@ export class DesktopClient {
 
   async sync(apiUrl: string, accessToken: string) {
     return invoke<SyncResult>("sync_devkit", { accessToken, apiUrl });
+  }
+
+  async getAgentConfig() {
+    return invoke<AgentConfig>("get_agent_config");
+  }
+
+  async saveAgentConfig(config: AgentConfig) {
+    return invoke<AgentConfig>("save_agent_config", { config });
   }
 }
 

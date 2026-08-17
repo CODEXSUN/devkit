@@ -5,6 +5,7 @@ import {
   PanelBottom,
   Search,
   Settings,
+  SlidersHorizontal,
   X
 } from "lucide-react";
 import { useEffect } from "react";
@@ -14,6 +15,7 @@ type Theme = "dark" | "light" | "system";
 export function AppDrawer({
   onClose,
   onOpenCommands,
+  onOpenSettings,
   onOpenUpdates,
   onOpenWorkspace,
   onThemeChange,
@@ -24,6 +26,7 @@ export function AppDrawer({
 }: {
   onClose: () => void;
   onOpenCommands: () => void;
+  onOpenSettings: () => void;
   onOpenUpdates: () => void;
   onOpenWorkspace: () => void;
   onThemeChange: (theme: Theme) => void;
@@ -46,6 +49,7 @@ export function AppDrawer({
   const actions = [
     { icon: FolderOpen, label: "Open workspace", onSelect: onOpenWorkspace },
     { icon: Search, label: "Command palette", onSelect: onOpenCommands },
+    { icon: SlidersHorizontal, label: "Settings", onSelect: onOpenSettings },
     {
       icon: PanelBottom,
       label: terminalOpen ? "Hide terminal" : "Show terminal",
