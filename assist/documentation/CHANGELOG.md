@@ -1,8 +1,8 @@
 # Changelog
 
-Current version: 1.0.64
-Release tag: v-1.0.64
-Changelog label: v 1.0.64
+Current version: 1.0.65
+Release tag: v-1.0.65
+Changelog label: v 1.0.65
 
 ### [Session] 2026-08-16 - Persistent Project Agent action history
 
@@ -492,6 +492,36 @@ Changelog label: v 1.0.64
 - Passed DevKit API and web type checks, lint checks, and builds.
 - Passed the module boundary check.
 - Verified imported content, hidden manifest links, exports, and duplicate rejection with an isolated repository test.
+
+## v-1.0.65
+
+### [v 1.0.65] 2026-08-17 9:39 am - CodeLogix lazy startup
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.65.
+- Rendered the CodeLogix chat shell before the app restores a recent workspace.
+- Started Codex only after the first prompt or saved-task selection.
+- Loaded chat history after the first paint and opened SQLite only when stored data is requested.
+- Loaded Explorer, Git, Docker, terminal, updater, and system resources only when their views need them.
+- Loaded Monaco only after the developer selects a file.
+- Hid background Git and system command windows on Windows.
+- Made dark mode the default for new installs and applied a neutral developer color palette.
+- Split the desktop side panel into a separate lazy bundle.
+- Added detailed GitHub Actions progress to the desktop release command.
+- Ignored local Tauri state and performance profile files.
+
+#### Verification
+
+- Passed the desktop TypeScript check, ESLint check, 29 Vitest tests, and production build.
+- Passed Rust formatting and compilation checks.
+- Verified the native chat-first startup, deferred history, lazy Explorer, and on-demand Monaco behavior.
+- Confirmed the idle desktop process did not start a Codex child process.
+- Measured a 399 ms development-shell LCP with zero layout shift.
 
 ## v-1.0.64
 

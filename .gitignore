@@ -150,6 +150,7 @@ vite.config.ts.timestamp-*
 
 # Local IDE and agent state
 /.idea/
+/.tauri/
 /.agents/
 /agents/
 /.agent/
@@ -172,6 +173,10 @@ vite.config.ts.timestamp-*
 **/playwright-report/
 **/test-results/
 **/.vitest/
+*.cpuprofile
+*.heapsnapshot
+*.trace.json
+*.trace.json.gz
 
 # Local databases, dumps, and runtime snapshots
 *.db
