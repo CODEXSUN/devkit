@@ -109,8 +109,9 @@ export function AgentWorkspace({
             <Bot size={17} /> Coding agent
           </span>
           <small className={`agent-state ${session.runtime}`}>
-            {session.runtime === "ready" ? <Check size={12} /> : <LoaderCircle size={12} />}
-            {session.runtime === "ready" ? "Codex connected" : session.runtime}
+            {session.runtime === "ready" ? <Check size={12} /> : null}
+            {session.runtime === "connecting" ? <LoaderCircle size={12} /> : null}
+            {runtimeLabel(session.runtime)}
           </small>
         </header>
         <div className="agent-transcript-shell">
@@ -223,7 +224,7 @@ export function AgentWorkspace({
               </button>
             ) : (
               <button
-                disabled={!session.composer.trim() || !session.threadId || session.busy}
+                disabled={!session.composer.trim() || session.busy}
                 onClick={() => void session.send()}
                 type="button"
               >
@@ -259,4 +260,11 @@ function relativeTime(value: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function runtimeLabel(runtime: "idle" | "connecting" | "ready" | "unavailable") {
+  if (runtime === "idle") return "Starts on first prompt";
+  if (runtime === "connecting") return "Connecting Codex";
+  if (runtime === "ready") return "Codex connected";
+  return "Codex unavailable";
 }

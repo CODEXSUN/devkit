@@ -138,6 +138,10 @@ Start the reviewed release:
 npm.cmd run github:release
 ```
 
+The release watcher shows each active GitHub job step. It also prints elapsed time every minute.
+Use the active job link to inspect live runner logs. The command stops when the workflow publishes
+all required assets or reaches its configured timeout.
+
 The command checks the clean and pushed `main` branch. It runs the version, dependency, and desktop
 checks. After operator approval, it creates and pushes `desktop-v<version>`.
 

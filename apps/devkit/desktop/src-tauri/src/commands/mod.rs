@@ -15,6 +15,7 @@ pub mod terminal;
 mod workspace_policy;
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use tauri::State;
 
@@ -47,4 +48,14 @@ fn display_name(path: &Path) -> String {
         .and_then(|value| value.to_str())
         .unwrap_or("Workspace")
         .to_owned()
+}
+
+fn background_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    command
 }

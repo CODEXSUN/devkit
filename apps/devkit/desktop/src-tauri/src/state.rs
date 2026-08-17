@@ -5,10 +5,12 @@ use std::process::{Child, ChildStdin};
 use std::sync::Mutex;
 
 use crate::database::DesktopDatabase;
+use crate::error::{DesktopError, DesktopResult};
 
 pub struct DesktopState {
     pub agent: Mutex<Option<AgentRuntime>>,
-    pub database: Mutex<DesktopDatabase>,
+    database: Mutex<Option<DesktopDatabase>>,
+    database_path: PathBuf,
     pub workspace: Mutex<Option<PathBuf>>,
     pub terminals: Mutex<HashMap<String, Box<dyn Write + Send>>>,
 }
@@ -44,12 +46,27 @@ impl Drop for AgentRuntime {
 }
 
 impl DesktopState {
-    pub fn new(database: DesktopDatabase) -> Self {
+    pub fn new(database_path: PathBuf) -> Self {
         Self {
             agent: Mutex::new(None),
-            database: Mutex::new(database),
+            database: Mutex::new(None),
+            database_path,
             workspace: Mutex::new(None),
             terminals: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn with_database<T>(
+        &self,
+        operation: impl FnOnce(&mut DesktopDatabase) -> DesktopResult<T>,
+    ) -> DesktopResult<T> {
+        let mut database = self
+            .database
+            .lock()
+            .map_err(|_| DesktopError::Policy("Desktop database is unavailable.".into()))?;
+        if database.is_none() {
+            *database = Some(DesktopDatabase::open(self.database_path.clone())?);
+        }
+        operation(database.as_mut().expect("database initialized"))
     }
 }

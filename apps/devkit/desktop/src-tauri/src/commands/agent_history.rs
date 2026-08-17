@@ -9,11 +9,7 @@ use super::workspace_root;
 #[tauri::command]
 pub fn list_agent_tasks(state: State<'_, DesktopState>) -> DesktopResult<Vec<AgentTask>> {
     let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .list_agent_tasks(&workspace)
+    state.with_database(|database| database.list_agent_tasks(&workspace))
 }
 
 #[tauri::command]
@@ -34,11 +30,7 @@ pub fn save_agent_task(
         return Err(DesktopError::Policy("Unknown agent access mode.".into()));
     }
     let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .save_agent_task(&workspace, thread_id, title, &access)
+    state.with_database(|database| database.save_agent_task(&workspace, thread_id, title, &access))
 }
 
 #[tauri::command]
@@ -46,11 +38,7 @@ pub fn list_agent_messages(
     task_id: i64,
     state: State<'_, DesktopState>,
 ) -> DesktopResult<Vec<AgentMessage>> {
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .list_agent_messages(task_id)
+    state.with_database(|database| database.list_agent_messages(task_id))
 }
 
 #[tauri::command]
@@ -71,11 +59,7 @@ pub fn save_agent_message(
             "Agent messages are too large to save.".into(),
         ));
     }
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .save_agent_message(task_id, id, &role, content)
+    state.with_database(|database| database.save_agent_message(task_id, id, &role, content))
 }
 
 #[tauri::command]
@@ -85,11 +69,7 @@ pub fn delete_agent_message(
     state: State<'_, DesktopState>,
 ) -> DesktopResult<bool> {
     let id = required(&id, "Message identifier")?;
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .delete_agent_message(task_id, id)
+    state.with_database(|database| database.delete_agent_message(task_id, id))
 }
 
 fn required<'a>(value: &'a str, label: &str) -> DesktopResult<&'a str> {
@@ -98,8 +78,4 @@ fn required<'a>(value: &'a str, label: &str) -> DesktopResult<&'a str> {
         return Err(DesktopError::Policy(format!("{label} is required.")));
     }
     Ok(value)
-}
-
-fn unavailable() -> DesktopError {
-    DesktopError::Policy("Desktop agent history is unavailable.".into())
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   Blocks,
   Bot,
@@ -25,9 +25,9 @@ import {
   VersionUpdateButton
 } from "../updates/update-center";
 import { useDesktopUpdater } from "../updates/use-desktop-updater";
-import { DesktopSidePanel } from "./desktop-side-panel";
 import { useDesktopSession } from "./use-desktop-session";
 import { useDesktopUiStore } from "./use-desktop-ui-store";
+import { resourcesForActivity } from "./startup-scheduler";
 
 type Theme = "dark" | "light" | "system";
 
@@ -41,6 +41,9 @@ const GitDiffWorkspace = lazy(() =>
 );
 const TerminalPanel = lazy(() =>
   import("../workspaces/terminal-panel").then((module) => ({ default: module.TerminalPanel }))
+);
+const DesktopSidePanel = lazy(() =>
+  import("./desktop-side-panel").then((module) => ({ default: module.DesktopSidePanel }))
 );
 
 const activities = [
@@ -58,7 +61,7 @@ export function DesktopApp() {
   const { togglePalette, toggleTerminal } = ui;
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("devkit-theme");
-    return saved === "dark" || saved === "light" ? saved : "system";
+    return saved === "dark" || saved === "light" || saved === "system" ? saved : "dark";
   });
   const [systemDark, setSystemDark] = useState(
     () => matchMedia("(prefers-color-scheme: dark)").matches
@@ -68,7 +71,17 @@ export function DesktopApp() {
   const [editorStarted, setEditorStarted] = useState(false);
   const updater = useDesktopUpdater();
   const session = useDesktopSession();
-  const { changes, files, system, workspace } = session;
+  const {
+    changes,
+    changesState,
+    files,
+    filesState,
+    loadFiles,
+    loadSystem,
+    refreshChanges,
+    system,
+    workspace
+  } = session;
   const selectedChange = changes.find((change) => change.path === selectedPath);
 
   useEffect(() => {
@@ -96,9 +109,17 @@ export function DesktopApp() {
     }
   }, [changes, selectedChange, ui.activity]);
 
-  useLayoutEffect(() => {
-    if (ui.activity !== "assist") setEditorStarted(true);
-  }, [ui.activity]);
+  useEffect(() => {
+    if (selectedPath) setEditorStarted(true);
+  }, [selectedPath]);
+
+  useEffect(() => {
+    if (!workspace) return;
+    const resources = resourcesForActivity(ui.activity);
+    if (resources.files && filesState === "idle") void loadFiles();
+    if (resources.changes && changesState === "idle") void refreshChanges();
+    if (resources.system && !system) void loadSystem();
+  }, [changesState, filesState, loadFiles, loadSystem, refreshChanges, system, ui.activity, workspace]);
 
   useEffect(() => {
     function keyboard(event: KeyboardEvent) {
@@ -239,19 +260,21 @@ export function DesktopApp() {
         {ui.activity !== "assist" ? (
           <aside className="side-panel">
             <div className="panel-heading">{panelTitle}</div>
-            <DesktopSidePanel
-              activity={ui.activity}
-              changes={changes}
-              changesState={session.changesState}
-              files={files}
-              filesState={session.filesState}
-              onRefreshChanges={session.refreshChanges}
-              onSelectChange={(change) => setSelectedPath(change.path)}
-              onSelectFile={setSelectedPath}
-              selectedPath={selectedPath}
-              system={system}
-              workspace={workspace}
-            />
+            <Suspense fallback={<div className="panel-progress">Loading view...</div>}>
+              <DesktopSidePanel
+                activity={ui.activity}
+                changes={changes}
+                changesState={session.changesState}
+                files={files}
+                filesState={session.filesState}
+                onRefreshChanges={session.refreshChanges}
+                onSelectChange={(change) => setSelectedPath(change.path)}
+                onSelectFile={setSelectedPath}
+                selectedPath={selectedPath}
+                system={system}
+                workspace={workspace}
+              />
+            </Suspense>
           </aside>
         ) : null}
         <main

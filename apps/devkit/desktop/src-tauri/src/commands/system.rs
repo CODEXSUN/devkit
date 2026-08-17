@@ -1,6 +1,6 @@
-use std::process::Command;
-
 use serde::Serialize;
+
+use super::background_command;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,7 @@ pub fn system_status() -> SystemStatus {
 }
 
 fn available(command: &str) -> bool {
-    Command::new(command)
+    background_command(command)
         .arg("--version")
         .output()
         .is_ok_and(|value| value.status.success())

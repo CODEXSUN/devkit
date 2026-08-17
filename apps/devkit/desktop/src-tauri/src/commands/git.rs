@@ -7,7 +7,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::commands::workspace_policy::is_generated_untracked_path;
-use crate::commands::workspace_root;
+use crate::commands::{background_command, workspace_root};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
@@ -42,7 +42,7 @@ pub fn git_status(state: State<'_, DesktopState>) -> DesktopResult<Vec<GitChange
 }
 
 fn git_status_for(root: &Path) -> DesktopResult<Vec<GitChange>> {
-    let output = Command::new("git")
+    let output = background_command("git")
         .args(["status", "--short", "-z", "--untracked-files=all"])
         .current_dir(root)
         .output()?;
@@ -107,7 +107,7 @@ pub fn git_change_fingerprint(state: State<'_, DesktopState>) -> DesktopResult<S
 fn change_fingerprint_for(root: &Path) -> DesktopResult<String> {
     let changes = git_status_for(&root)?;
     let mut hasher = DefaultHasher::new();
-    let mut tracked_diff = Command::new("git");
+    let mut tracked_diff = background_command("git");
     tracked_diff.args(["diff", "--binary", "HEAD", "--"]);
     let output = tracked_diff.current_dir(&root).output()?;
     if output.status.success() {
@@ -134,7 +134,10 @@ fn hash_diff_without_head(root: &Path, hasher: &mut DefaultHasher) -> DesktopRes
         ["diff", "--binary", "--"].as_slice(),
         ["diff", "--cached", "--binary", "--"].as_slice(),
     ] {
-        let output = Command::new("git").args(args).current_dir(root).output()?;
+        let output = background_command("git")
+            .args(args)
+            .current_dir(root)
+            .output()?;
         if !output.status.success() {
             return Err(DesktopError::Policy("Git diff failed.".into()));
         }
@@ -157,7 +160,7 @@ pub fn git_diff(path: Option<String>, state: State<'_, DesktopState>) -> Desktop
             ));
         }
     }
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["diff", "HEAD", "--"]);
     if let Some(path) = path {
         command.arg(path);
@@ -185,7 +188,7 @@ pub fn git_file_diff(
 }
 
 fn git_head_file(root: &Path, path: &str) -> DesktopResult<Option<String>> {
-    let output = Command::new("git")
+    let output = background_command("git")
         .arg("show")
         .arg(format!("HEAD:{path}"))
         .current_dir(root)
@@ -227,7 +230,7 @@ pub fn git_stage(
     }
     let root = workspace_root(&state)?;
     require_reviewed_fingerprint(&root, &expected_fingerprint)?;
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["add", "--"]).args(paths);
     checked_output(command.current_dir(root), "Git stage failed.").map(|_| ())
 }
@@ -238,7 +241,7 @@ pub fn git_unstage(paths: Vec<String>, state: State<'_, DesktopState>) -> Deskto
         return Err(DesktopError::Policy("Select at least one file.".into()));
     }
     let root = workspace_root(&state)?;
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["restore", "--staged", "--"]).args(paths);
     checked_output(command.current_dir(root), "Git unstage failed.").map(|_| ())
 }
@@ -254,7 +257,7 @@ pub fn git_commit(
     }
     let root = workspace_root(&state)?;
     require_reviewed_fingerprint(&root, &expected_fingerprint)?;
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["commit", "-m", message.trim()]);
     checked_output(command.current_dir(root), "Git commit failed.")
 }
@@ -271,7 +274,7 @@ fn require_reviewed_fingerprint(root: &Path, expected: &str) -> DesktopResult<()
 #[tauri::command]
 pub fn git_worktrees(state: State<'_, DesktopState>) -> DesktopResult<Vec<GitWorktree>> {
     let root = workspace_root(&state)?;
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["worktree", "list", "--porcelain"]);
     let output = checked_output(command.current_dir(root), "Git worktree lookup failed.")?;
     let mut worktrees = Vec::new();
@@ -313,7 +316,7 @@ pub fn git_create_worktree(
         ));
     }
     let branch = format!("devkit/{slug}");
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command
         .args(["worktree", "add", "-b", &branch])
         .arg(&target);
@@ -343,20 +346,20 @@ pub fn git_remove_worktree(path: String, state: State<'_, DesktopState>) -> Desk
             "The directory is not a registered worktree.".into(),
         ));
     }
-    let mut status = Command::new("git");
+    let mut status = background_command("git");
     status.args(["status", "--porcelain", "--untracked-files=all"]);
     if !checked_output(status.current_dir(&target), "Git status failed.")?.is_empty() {
         return Err(DesktopError::Policy(
             "The worktree has uncommitted changes and was not removed.".into(),
         ));
     }
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["worktree", "remove"]).arg(&target);
     checked_output(command.current_dir(root), "Git worktree removal failed.").map(|_| ())
 }
 
 pub fn current_branch(root: &Path) -> DesktopResult<String> {
-    let output = Command::new("git")
+    let output = background_command("git")
         .args(["branch", "--show-current"])
         .current_dir(root)
         .output()?;
@@ -395,13 +398,13 @@ fn worktree_slug(name: &str) -> DesktopResult<String> {
 }
 
 fn git_head(root: &Path) -> DesktopResult<String> {
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["rev-parse", "--short=8", "HEAD"]);
     checked_output(command.current_dir(root), "Git revision lookup failed.")
 }
 
 fn registered_worktree_paths(root: &Path) -> DesktopResult<Vec<std::path::PathBuf>> {
-    let mut command = Command::new("git");
+    let mut command = background_command("git");
     command.args(["worktree", "list", "--porcelain"]);
     Ok(
         checked_output(command.current_dir(root), "Git worktree lookup failed.")?

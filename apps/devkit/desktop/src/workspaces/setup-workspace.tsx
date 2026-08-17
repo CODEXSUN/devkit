@@ -49,8 +49,8 @@ export function SetupWorkspace({
           label="Coding agent"
           value={runtimeLabel(agentRuntimeState)}
         />
-        <Status icon={GitBranch} label="Git" value={system?.git ? "Ready" : "Checking"} />
-        <Status icon={HardDrive} label="Local SQLite" value="Ready" />
+        <Status icon={GitBranch} label="Git" value={system?.git ? "Ready" : "Loads with workspace"} />
+        <Status icon={HardDrive} label="Local SQLite" value="Loads with chat history" />
         <Status icon={ShieldCheck} label="Execution policy" value="Workspace scoped" />
       </aside>
     </main>
@@ -78,6 +78,7 @@ function Status({
 }
 
 function runtimeLabel(state: AgentRuntimeState) {
+  if (state === "idle") return "Starts with your first prompt";
   if (state === "ready") return "Ready";
   if (state === "unavailable") return "Needs attention";
   return "Starting";

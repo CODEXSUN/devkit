@@ -18,6 +18,7 @@ import {
 } from "./agent-protocol";
 import { AgentTurnWatchdog } from "./agent-turn-watchdog";
 import { buildAgentPrompt, loadBoundedFileContext } from "./agent-context";
+import { afterFirstPaint } from "../shell/startup-scheduler";
 
 export type ChatMessage = {
   id: string;
@@ -47,15 +48,17 @@ export function useAgentSession({
   const [running, setRunning] = useState(false);
   const [stalled, setStalled] = useState(false);
   const [submissionPhase, setSubmissionPhase] = useState<SubmissionPhase>("idle");
-  const [runtime, setRuntime] = useState<"connecting" | "ready" | "unavailable">(
-    "connecting"
-  );
+  const [runtime, setRuntime] = useState<"idle" | "connecting" | "ready" | "unavailable">("idle");
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [threadId, setThreadId] = useState<string>();
   const [turnId, setTurnId] = useState<string>();
   const activeTaskIdRef = useRef<number | undefined>(undefined);
   const threadIdRef = useRef<string | undefined>(undefined);
   const turnIdRef = useRef<string | undefined>(undefined);
+  const runtimeRequestRef = useRef<Promise<void> | undefined>(undefined);
+  const threadRequestRef = useRef<Promise<string> | undefined>(undefined);
+  const resolveThreadRef = useRef<((threadId: string) => void) | undefined>(undefined);
+  const threadTimeoutRef = useRef<number | undefined>(undefined);
   const transcript = useRef<HTMLDivElement>(null);
   const watchdogRef = useRef<AgentTurnWatchdog | undefined>(undefined);
   const busy = running || submissionPhase !== "idle";
@@ -79,6 +82,7 @@ export function useAgentSession({
 
   useEffect(() => {
     let disposed = false;
+    let cancelHistoryLoad: (() => void) | undefined;
     let stopEvents: (() => void) | undefined;
     let stopErrors: (() => void) | undefined;
     void Promise.all([
@@ -90,27 +94,29 @@ export function useAgentSession({
         const message = agentErrorFrom(event.payload);
         if (message) setError(message);
       })
-    ]).then(async ([events, errors]) => {
+    ]).then(([events, errors]) => {
+      if (disposed) {
+        events();
+        errors();
+        return;
+      }
       stopEvents = events;
       stopErrors = errors;
-      try {
-        await desktopClient.startAgentRuntime();
-        if (disposed) return;
-        setRuntime("ready");
-        const savedTasks = await desktopClient.listAgentTasks();
-        if (disposed) return;
-        setTasks(savedTasks);
-        if (savedTasks[0]) await openTask(savedTasks[0]);
-        else await desktopClient.startAgentThread();
-      } catch (reason) {
-        if (!disposed) {
-          setRuntime("unavailable");
-          setError(String(reason));
-        }
-      }
+      cancelHistoryLoad = afterFirstPaint(() => {
+        void desktopClient
+          .listAgentTasks()
+          .then((savedTasks) => {
+            if (!disposed) setTasks(savedTasks);
+          })
+          .catch((reason) => {
+            if (!disposed) setError(`Chat history is unavailable. ${String(reason)}`);
+          });
+      });
     });
     return () => {
       disposed = true;
+      cancelHistoryLoad?.();
+      window.clearTimeout(threadTimeoutRef.current);
       watchdogRef.current?.stop();
       stopEvents?.();
       stopErrors?.();
@@ -127,6 +133,11 @@ export function useAgentSession({
     if (nextThread) {
       threadIdRef.current = nextThread;
       setThreadId(nextThread);
+      resolveThreadRef.current?.(nextThread);
+      resolveThreadRef.current = undefined;
+      threadRequestRef.current = undefined;
+      window.clearTimeout(threadTimeoutRef.current);
+      threadTimeoutRef.current = undefined;
     }
     if (message.method === "turn/started") {
       const nextTurnId = textAt(message, "params", "turn", "id");
@@ -178,7 +189,7 @@ export function useAgentSession({
 
   async function send() {
     const prompt = composer.trim();
-    if (!prompt || !threadId || busy) return;
+    if (!prompt || busy) return;
     setComposer("");
     setError(undefined);
     setRunItems([]);
@@ -187,11 +198,12 @@ export function useAgentSession({
     let savedMessage: { id: string; taskId: number } | undefined;
     try {
       setSubmissionPhase("preparing");
+      const currentThreadId = await ensureThread();
       const [learningContext, fileContext] = await Promise.all([
         desktopClient.projectLearningContext(),
         loadBoundedFileContext(contextPaths, (path) => desktopClient.readFile(path))
       ]);
-      const task = await ensureTask(threadId, prompt);
+      const task = await ensureTask(currentThreadId, prompt);
       const persistedMessage = await desktopClient.saveAgentMessage(
         task.id,
         message.id,
@@ -203,7 +215,7 @@ export function useAgentSession({
       setRunning(true);
       setSubmissionPhase("sending");
       await desktopClient.sendAgentTurn(
-        threadId,
+        currentThreadId,
         buildAgentPrompt(prompt, learningContext, fileContext),
         access
       );
@@ -228,7 +240,7 @@ export function useAgentSession({
     setActiveTask(undefined);
     resetConversation();
     try {
-      await desktopClient.startAgentThread();
+      await ensureThread();
     } catch (reason) {
       setError(String(reason));
     }
@@ -244,8 +256,11 @@ export function useAgentSession({
     setAccess(task.access);
     setActiveTask(task.id);
     try {
+      await ensureRuntime();
       const savedMessages = await desktopClient.listAgentMessages(task.id);
       setMessages(savedMessages.map(toChatMessage));
+      threadIdRef.current = task.threadId;
+      setThreadId(task.threadId);
       await desktopClient.resumeAgentThread(task.threadId);
     } catch (reason) {
       setError(`This saved task could not reconnect to Codex. ${String(reason)}`);
@@ -256,6 +271,55 @@ export function useAgentSession({
     if (!approval) return;
     await desktopClient.answerAgentApproval(approval.id, decision);
     setApproval(undefined);
+  }
+
+  async function ensureRuntime() {
+    if (runtime === "ready") return;
+    if (runtimeRequestRef.current) return runtimeRequestRef.current;
+    setRuntime("connecting");
+    const request = desktopClient
+      .startAgentRuntime()
+      .then(() => setRuntime("ready"))
+      .catch((reason) => {
+        setRuntime("unavailable");
+        throw reason;
+      })
+      .finally(() => {
+        runtimeRequestRef.current = undefined;
+      });
+    runtimeRequestRef.current = request;
+    return request;
+  }
+
+  async function ensureThread() {
+    if (threadIdRef.current) return threadIdRef.current;
+    await ensureRuntime();
+    if (threadRequestRef.current) return threadRequestRef.current;
+    const request = new Promise<string>((resolve, reject) => {
+      resolveThreadRef.current = resolve;
+      threadTimeoutRef.current = window.setTimeout(() => {
+        resolveThreadRef.current = undefined;
+        threadRequestRef.current = undefined;
+        threadTimeoutRef.current = undefined;
+        reject(new Error("Codex did not create a thread within 15 seconds."));
+      }, 15_000);
+      resolveThreadRef.current = (id) => {
+        window.clearTimeout(threadTimeoutRef.current);
+        threadTimeoutRef.current = undefined;
+        resolve(id);
+      };
+    });
+    threadRequestRef.current = request;
+    try {
+      await desktopClient.startAgentThread();
+      return await request;
+    } catch (reason) {
+      window.clearTimeout(threadTimeoutRef.current);
+      threadTimeoutRef.current = undefined;
+      resolveThreadRef.current = undefined;
+      threadRequestRef.current = undefined;
+      throw reason;
+    }
   }
 
   async function interrupt() {
@@ -331,6 +395,7 @@ export function useAgentSession({
     setRunItems([]);
     setDiff("");
     setThreadId(undefined);
+    threadIdRef.current = undefined;
     setError(undefined);
   }
 

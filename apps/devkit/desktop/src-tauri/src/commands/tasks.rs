@@ -6,11 +6,7 @@ use crate::state::DesktopState;
 
 #[tauri::command]
 pub fn list_local_tasks(state: State<'_, DesktopState>) -> DesktopResult<Vec<LocalTask>> {
-    state
-        .database
-        .lock()
-        .map_err(|_| DesktopError::Policy("Desktop database is unavailable.".into()))?
-        .list_tasks()
+    state.with_database(|database| database.list_tasks())
 }
 
 #[tauri::command]
@@ -21,9 +17,5 @@ pub fn save_local_task(title: String, state: State<'_, DesktopState>) -> Desktop
             "Task titles must contain 1 to 180 characters.".into(),
         ));
     }
-    state
-        .database
-        .lock()
-        .map_err(|_| DesktopError::Policy("Desktop database is unavailable.".into()))?
-        .save_task(title)
+    state.with_database(|database| database.save_task(title))
 }

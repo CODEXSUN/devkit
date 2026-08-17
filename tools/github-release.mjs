@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { WorkflowProgressReporter } from "./github-release-progress.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const repository = "CODEXSUN/devkit";
@@ -142,7 +143,7 @@ export class GitHubReleasePublisher {
 
   async waitForWorkflow(head) {
     const deadline = Date.now() + this.timeoutMinutes * 60_000;
-    let lastStatus = "";
+    const reporter = new WorkflowProgressReporter();
     while (Date.now() < deadline) {
       const response = await githubJson(
         `/actions/workflows/${workflow}/runs?event=push&per_page=30`
@@ -151,9 +152,8 @@ export class GitHubReleasePublisher {
         (candidate) => candidate.head_sha === head && candidate.head_branch === this.tag
       );
       if (run) {
-        const status = run.conclusion ?? run.status;
-        if (status !== lastStatus) console.log(`Desktop release workflow: ${status}`);
-        lastStatus = status;
+        const jobs = await githubJson(`/actions/runs/${run.id}/jobs?per_page=100`);
+        reporter.report(run, jobs);
         if (run.status === "completed" && run.conclusion === "success") return run;
         if (run.status === "completed") {
           throw new Error(`Desktop release workflow failed: ${run.html_url}`);
@@ -161,7 +161,7 @@ export class GitHubReleasePublisher {
       }
       await delay(apiPollInterval(15_000, 60_000));
     }
-    throw new Error(`Timed out waiting for the desktop release workflow: ${actionsUrl()}`);
+    throw new Error(reporter.timeoutMessage(actionsUrl()));
   }
 
   async waitForPublishedRelease() {

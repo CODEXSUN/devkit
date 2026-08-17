@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
+import { afterFirstPaint } from "./startup-scheduler";
 
 export type ResourceState = "idle" | "loading" | "ready" | "unavailable";
-export type AgentRuntimeState = "connecting" | "ready" | "unavailable";
+export type AgentRuntimeState = "idle" | "connecting" | "ready" | "unavailable";
 
 export function useDesktopSession() {
-  const [agentRuntimeState, setAgentRuntimeState] = useState<AgentRuntimeState>("connecting");
+  const [agentRuntimeState] = useState<AgentRuntimeState>("idle");
   const [changes, setChanges] = useState<GitChange[]>([]);
   const [changesState, setChangesState] = useState<ResourceState>("idle");
   const [error, setError] = useState<string>();
@@ -28,26 +29,25 @@ export function useDesktopSession() {
     }
   }, []);
 
-  const loadWorkspaceResources = useCallback(async (generation: number) => {
+  const loadFiles = useCallback(async () => {
+    const generation = requestGeneration.current;
     setFilesState("loading");
-    setChangesState("loading");
-    const [nextFiles, nextChanges] = await Promise.allSettled([
-      desktopClient.listFiles(),
-      desktopClient.gitStatus()
-    ]);
-    if (requestGeneration.current !== generation) return;
-
-    if (nextFiles.status === "fulfilled") {
-      setFiles(nextFiles.value);
+    try {
+      const nextFiles = await desktopClient.listFiles();
+      if (requestGeneration.current !== generation) return;
+      setFiles(nextFiles);
       setFilesState("ready");
-    } else {
+    } catch {
+      if (requestGeneration.current !== generation) return;
       setFilesState("unavailable");
     }
-    if (nextChanges.status === "fulfilled") {
-      setChanges(nextChanges.value);
-      setChangesState("ready");
-    } else {
-      setChangesState("unavailable");
+  }, []);
+
+  const loadSystem = useCallback(async () => {
+    try {
+      setSystem(await desktopClient.systemStatus());
+    } catch {
+      setSystem(undefined);
     }
   }, []);
 
@@ -62,9 +62,11 @@ export function useDesktopSession() {
         if (requestGeneration.current !== generation) return;
         setWorkspace(next);
         setFiles([]);
+        setFilesState("idle");
         setChanges([]);
+        setChangesState("idle");
+        setSystem(undefined);
         localStorage.setItem("codelogix-workspace", next.path);
-        void loadWorkspaceResources(generation);
       } catch (reason) {
         if (path) localStorage.removeItem("codelogix-workspace");
         setError(reason instanceof Error ? reason.message : String(reason));
@@ -72,20 +74,13 @@ export function useDesktopSession() {
         if (requestGeneration.current === generation) setOpening(false);
       }
     },
-    [loadWorkspaceResources]
+    []
   );
 
   useEffect(() => {
-    void desktopClient
-      .startAgentRuntime()
-      .then(() => setAgentRuntimeState("ready"))
-      .catch(() => setAgentRuntimeState("unavailable"));
-    void desktopClient
-      .systemStatus()
-      .then(setSystem)
-      .catch(() => undefined);
     const recentWorkspace = localStorage.getItem("codelogix-workspace");
-    if (recentWorkspace) void openWorkspace(recentWorkspace);
+    if (!recentWorkspace) return;
+    return afterFirstPaint(() => void openWorkspace(recentWorkspace));
   }, [openWorkspace]);
 
   return {
@@ -95,6 +90,8 @@ export function useDesktopSession() {
     error,
     files,
     filesState,
+    loadFiles,
+    loadSystem,
     openWorkspace,
     opening,
     refreshChanges,

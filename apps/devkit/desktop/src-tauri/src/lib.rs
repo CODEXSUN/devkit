@@ -21,8 +21,7 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
-            let database = database::DesktopDatabase::open(data_dir.join("desktop.db"))?;
-            app.manage(DesktopState::new(database));
+            app.manage(DesktopState::new(data_dir.join("desktop.db")));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

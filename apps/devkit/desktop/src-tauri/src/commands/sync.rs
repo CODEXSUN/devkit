@@ -29,11 +29,7 @@ pub async fn sync_devkit(
             "DevKit sync requires HTTPS or local development.".into(),
         ));
     }
-    let pending = state
-        .database
-        .lock()
-        .map_err(|_| DesktopError::Policy("Desktop database is unavailable.".into()))?
-        .pending_sync_count()?;
+    let pending = state.with_database(|database| database.pending_sync_count())?;
     let response = reqwest::Client::new()
         .post(format!(
             "{}/api/devkit/sync/desktop/v1/batch",

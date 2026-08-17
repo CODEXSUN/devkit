@@ -821,19 +821,19 @@
 
 :root[data-theme="dark"] .agent-workspace,
 :root[data-theme="dark"] .agent-chat {
-  background: #171515;
+  background: #181818;
 }
 :root[data-theme="dark"] .agent-history,
 :root[data-theme="dark"] .agent-environment {
-  border-color: #373232;
-  background: #211e1e;
+  border-color: #303030;
+  background: #1f1f1f;
 }
 :root[data-theme="dark"] .new-agent-chat,
 :root[data-theme="dark"] .agent-welcome button,
 :root[data-theme="dark"] .agent-composer {
-  border-color: #474141;
-  background: #282424;
-  color: #eeeaea;
+  border-color: #3b3b3b;
+  background: #242424;
+  color: #e6e6e6;
 }
 :root[data-theme="dark"] .agent-chat-header,
 :root[data-theme="dark"] .agent-welcome h1,
@@ -841,88 +841,88 @@
 :root[data-theme="dark"] .agent-response,
 :root[data-theme="dark"] .agent-project strong,
 :root[data-theme="dark"] .environment-row strong {
-  color: #eeeaea;
+  color: #e6e6e6;
 }
 :root[data-theme="dark"] .agent-chat-header,
 :root[data-theme="dark"] .agent-environment section {
-  border-color: #373232;
+  border-color: #303030;
 }
 :root[data-theme="dark"] .history-row.active,
 :root[data-theme="dark"] .history-row:hover {
-  background: #332e2e;
+  background: #292929;
 }
 :root[data-theme="dark"] .agent-composer textarea {
-  color: #eeeaea;
+  color: #e6e6e6;
 }
 :root[data-theme="dark"] .agent-composer textarea::placeholder {
-  color: #aaa3a3;
+  color: #9f9f9f;
   opacity: 1;
 }
 :root[data-theme="dark"] .agent-composer .attach-context,
 :root[data-theme="dark"] .agent-composer label,
 :root[data-theme="dark"] .agent-composer select,
 :root[data-theme="dark"] .agent-submission-state {
-  color: #c7c0c0;
+  color: #bdbdbd;
 }
 :root[data-theme="dark"] .agent-message.user p,
 :root[data-theme="dark"] .run-summary:hover {
-  background: #302c2c;
+  background: #282828;
 }
 :root[data-theme="dark"] .agent-message-actions {
-  color: #aaa3a3;
+  color: #9f9f9f;
 }
 :root[data-theme="dark"] .conversation-rail-track {
   background: repeating-linear-gradient(to bottom, #777171 0 2px, transparent 2px 8px);
 }
 :root[data-theme="dark"] .agent-response code {
-  background: #302c2c;
-  color: #f0ecec;
+  background: #292929;
+  color: #ededed;
 }
 :root[data-theme="dark"] .agent-response pre,
 :root[data-theme="dark"] .agent-response th {
-  border-color: #454040;
-  background: #211e1e;
+  border-color: #3b3b3b;
+  background: #1f1f1f;
 }
 :root[data-theme="dark"] .agent-response pre code {
-  color: #eeeaea;
+  color: #e6e6e6;
 }
 :root[data-theme="dark"] .agent-response th,
 :root[data-theme="dark"] .agent-response td,
 :root[data-theme="dark"] .agent-response hr {
-  border-color: #454040;
+  border-color: #3b3b3b;
 }
 :root[data-theme="dark"] .agent-response blockquote {
-  border-color: #514a4a;
-  color: #b3adad;
+  border-color: #484848;
+  color: #b6b6b6;
 }
 :root[data-theme="dark"] .agent-response a {
   color: #79b5f5;
 }
 :root[data-theme="dark"] .run-item::before {
-  border-color: #171515;
+  border-color: #181818;
 }
 :root[data-theme="dark"] .run-list::before {
   background: repeating-linear-gradient(to bottom, #514a4a 0 4px, transparent 4px 9px);
 }
 :root[data-theme="dark"] .run-show-more {
-  background: #171515;
-  color: #aaa3a3;
+  background: #181818;
+  color: #9f9f9f;
 }
 :root[data-theme="dark"] .agent-context-list > span {
-  border-color: #474141;
-  background: #332e2e;
-  color: #d4cece;
+  border-color: #3b3b3b;
+  background: #292929;
+  color: #d1d1d1;
 }
 :root[data-theme="dark"] .agent-context-list button:hover,
 :root[data-theme="dark"] .agent-composer .attach-context:hover:not(:disabled),
 :root[data-theme="dark"] .agent-message-actions button:hover {
-  background: #403939;
+  background: #353535;
 }
 :root[data-theme="dark"] .agent-message-actions button:hover {
-  color: #eeeaea;
+  color: #e6e6e6;
 }
 :root[data-theme="dark"] .agent-environment pre {
-  background: #181616;
+  background: #151515;
 }
 :root[data-theme="dark"] .agent-stalled {
   border-color: #665a3c;

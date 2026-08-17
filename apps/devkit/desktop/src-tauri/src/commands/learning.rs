@@ -6,7 +6,7 @@ use tauri::State;
 use crate::database::{
     DetectedLearning, ProjectLearning, ProjectLearningSettings, ProjectLearningSummary,
 };
-use crate::error::{DesktopError, DesktopResult};
+use crate::error::DesktopResult;
 use crate::state::DesktopState;
 
 use super::workspace_root;
@@ -16,11 +16,7 @@ pub fn project_learning_summary(
     state: State<'_, DesktopState>,
 ) -> DesktopResult<ProjectLearningSummary> {
     let workspace = workspace_key(&state)?;
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .project_learning_summary(&workspace)
+    state.with_database(|database| database.project_learning_summary(&workspace))
 }
 
 #[tauri::command]
@@ -34,9 +30,10 @@ pub fn scan_project_learning(
         .iter()
         .map(LearningCandidate::as_detected)
         .collect::<Vec<_>>();
-    let mut database = state.database.lock().map_err(|_| unavailable())?;
-    database.replace_detected_learnings(&workspace, &detected)?;
-    database.project_learning_summary(&workspace)
+    state.with_database(|database| {
+        database.replace_detected_learnings(&workspace, &detected)?;
+        database.project_learning_summary(&workspace)
+    })
 }
 
 #[tauri::command]
@@ -46,11 +43,9 @@ pub fn save_project_learning_settings(
     state: State<'_, DesktopState>,
 ) -> DesktopResult<ProjectLearningSettings> {
     let workspace = workspace_key(&state)?;
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .save_project_learning_settings(&workspace, enabled, auto_scan)
+    state.with_database(|database| {
+        database.save_project_learning_settings(&workspace, enabled, auto_scan)
+    })
 }
 
 #[tauri::command]
@@ -60,21 +55,14 @@ pub fn review_project_learning(
     state: State<'_, DesktopState>,
 ) -> DesktopResult<ProjectLearning> {
     let workspace = workspace_key(&state)?;
-    state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .review_project_learning(&workspace, id, &status)
+    state.with_database(|database| database.review_project_learning(&workspace, id, &status))
 }
 
 #[tauri::command]
 pub fn project_learning_context(state: State<'_, DesktopState>) -> DesktopResult<String> {
     let workspace = workspace_key(&state)?;
-    let items = state
-        .database
-        .lock()
-        .map_err(|_| unavailable())?
-        .approved_project_learning_context(&workspace)?;
+    let items =
+        state.with_database(|database| database.approved_project_learning_context(&workspace))?;
     Ok(format_context(&items))
 }
 
@@ -253,10 +241,6 @@ fn format_context(items: &[ProjectLearning]) -> String {
 
 fn workspace_key(state: &State<'_, DesktopState>) -> DesktopResult<String> {
     Ok(workspace_root(state)?.to_string_lossy().into_owned())
-}
-
-fn unavailable() -> DesktopError {
-    DesktopError::Policy("Project learning is unavailable.".into())
 }
 
 #[cfg(test)]
