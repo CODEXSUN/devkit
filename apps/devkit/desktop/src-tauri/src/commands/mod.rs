@@ -14,6 +14,7 @@ pub mod tasks;
 pub mod terminal;
 mod workspace_policy;
 
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -50,7 +51,7 @@ fn display_name(path: &Path) -> String {
         .to_owned()
 }
 
-fn background_command(program: &str) -> Command {
+pub(crate) fn background_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
     #[cfg(windows)]
     {

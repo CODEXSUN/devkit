@@ -1,9 +1,7 @@
-use std::process::Command;
-
 use serde::Serialize;
 use tauri::State;
 
-use crate::commands::workspace_root;
+use crate::commands::{background_command, workspace_root};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
@@ -29,7 +27,7 @@ pub async fn run_workspace_command(
         )));
     }
     let root = workspace_root(&state)?;
-    let output = Command::new(command)
+    let output = background_command(&command)
         .args(args)
         .current_dir(root)
         .output()?;

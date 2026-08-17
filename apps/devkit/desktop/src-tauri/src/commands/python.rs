@@ -1,10 +1,8 @@
-use std::path::{Path, PathBuf};
-use std::process::Command;
-
 use serde::Serialize;
+use std::path::{Path, PathBuf};
 use tauri::State;
 
-use crate::commands::workspace_root;
+use crate::commands::{background_command, workspace_root};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
@@ -47,7 +45,13 @@ pub async fn create_python_environment(
             "The workspace already contains a .venv directory.".into(),
         ));
     }
-    let output = tokio::process::Command::new("python")
+    let mut command = tokio::process::Command::new("python");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.as_std_mut().creation_flags(0x08000000);
+    }
+    let output = command
         .args(["-m", "venv", ".venv"])
         .current_dir(&root)
         .output()
@@ -98,7 +102,7 @@ fn virtual_python_path(root: &Path) -> PathBuf {
 
 fn command_path(command: &str) -> Option<PathBuf> {
     let lookup = if cfg!(windows) { "where" } else { "which" };
-    let output = Command::new(lookup).arg(command).output().ok()?;
+    let output = background_command(lookup).arg(command).output().ok()?;
     output
         .status
         .success()
@@ -112,7 +116,7 @@ fn command_path(command: &str) -> Option<PathBuf> {
 }
 
 fn command_version(command: &Path) -> Option<String> {
-    let output = Command::new(command).arg("--version").output().ok()?;
+    let output = background_command(command).arg("--version").output().ok()?;
     output.status.success().then(|| {
         let value = if output.stdout.is_empty() {
             &output.stderr
