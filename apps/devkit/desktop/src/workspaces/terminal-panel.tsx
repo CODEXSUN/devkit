@@ -1,7 +1,7 @@
 import "@xterm/xterm/css/xterm.css";
 import { listen } from "@tauri-apps/api/event";
 import { Terminal as Xterm } from "@xterm/xterm";
-import { ChevronDown, Eraser, TerminalSquare } from "lucide-react";
+import { ChevronDown, Eraser, Loader2, TerminalSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TerminalOutput, TerminalShell, Workspace } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
@@ -18,10 +18,12 @@ export function TerminalPanel({
   const session = useRef<string | undefined>(undefined);
   const [error, setError] = useState<string>();
   const [shell, setShell] = useState<TerminalShell>("powershell");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!host.current) return;
     setError(undefined);
+    setReady(false);
     const xterm = new Xterm({
       convertEol: true,
       cursorBlink: true,
@@ -58,10 +60,12 @@ export function TerminalPanel({
         if (disposed) return void desktopClient.closeTerminal(id);
         session.current = id;
         xterm.onData((data) => void desktopClient.writeTerminal(id, data));
+        if (!disposed) setReady(true);
       })
       .catch((reason) => {
         setError(String(reason));
         xterm.writeln("Terminal could not start.");
+        if (!disposed) setReady(true);
       });
     return () => {
       disposed = true;
@@ -80,6 +84,7 @@ export function TerminalPanel({
             aria-label="Terminal shell"
             onChange={(event) => setShell(event.target.value as TerminalShell)}
             value={shell}
+            disabled={!ready}
           >
             <option value="powershell">PowerShell</option>
             <option value="gitBash">Git Bash</option>
@@ -90,12 +95,18 @@ export function TerminalPanel({
           <span className="terminal-error" title={error}>
             {error}
           </span>
+        ) : !ready ? (
+          <span className="terminal-loading-inline" role="status" aria-live="polite">
+            <Loader2 size={14} className="spin" />
+            <span>Starting terminal...</span>
+          </span>
         ) : null}
         <button
           aria-label="Clear terminal"
           onClick={() => terminal.current?.clear()}
           title="Clear terminal"
           type="button"
+          disabled={!ready}
         >
           <Eraser size={13} />
         </button>
