@@ -1,8 +1,40 @@
 # Changelog
 
-Current version: 1.0.65
-Release tag: v-1.0.65
-Changelog label: v 1.0.65
+Current version: 1.0.66
+Release tag: v-1.0.66
+Changelog label: v 1.0.66
+
+### [Session] 2026-08-17 - Multi-provider Agent settings and terminal flicker fix
+
+#### Database Changes
+
+- Database update: Yes.
+- Added desktop SQLite migration `0004_settings.sql` for agent configuration.
+- Extended `desktop_settings` table with provider-specific keys (enabled, is_default, api_key, base_url, model).
+
+#### App Codebase Changes
+
+- **Settings Panel - Agent & Model tab redesign:**
+  - Visual provider selector with icons for Codex, OpenRouter, OpenCode, Claude, Ollama.
+  - Per-provider configuration cards with enable/disable toggle, API key input, base URL (Ollama), model dropdown.
+  - Default provider selection with exactly-one validation.
+  - Model lists per provider: Codex (GPT-4o family), OpenRouter (100+ models), OpenCode, Claude (3.5 Sonnet, Opus, Haiku), Ollama (llama3.1, codellama, qwen2.5-coder, deepseek-coder).
+  - Provider credentials stored locally in desktop SQLite, never sent to servers.
+- **Terminal flicker fix:**
+  - Terminal now handles its own loading state inline in the tab bar.
+  - Removed outer Suspense fallback that caused flash between loading → empty → connected.
+  - xterm host pre-renders immediately; shell selector and clear button disabled until pty connects.
+- **Updated types:**
+  - `AgentConfig` now includes `defaultProvider` and `providers` map with `ProviderConfig`.
+  - TypeScript types updated for exact optional properties.
+
+#### Verification
+
+- Passed desktop TypeScript check, ESLint check, Vitest tests, and production build.
+- Passed Rust compilation checks.
+- Verified provider cards render correctly in light/dark themes.
+- Verified terminal shows inline spinner during pty connection without layout shift.
+- Verified validation: default provider must be enabled, exactly one default, API keys required for cloud providers.
 
 ### [Session] 2026-08-16 - Persistent Project Agent action history
 

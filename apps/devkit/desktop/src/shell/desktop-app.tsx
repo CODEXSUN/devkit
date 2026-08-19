@@ -236,7 +236,7 @@ export function DesktopApp() {
           <UpdateButton onOpen={() => ui.setUpdateOpen(true)} update={updater} />
         </div>
       </header>
-      <div className={ui.activity === "assist" ? "ide-body agent-active" : "ide-body"}>
+      <div className={ui.activity === "assist" || ui.activity === "settings" ? "ide-body agent-active" : "ide-body"}>
         <nav className="activity-bar" aria-label="IDE activities">
           <div>
             {activities.map((item) => (
@@ -260,7 +260,7 @@ export function DesktopApp() {
             <Settings size={21} />
           </button>
         </nav>
-        {ui.activity !== "assist" ? (
+        {ui.activity !== "assist" && ui.activity !== "settings" ? (
           <aside className="side-panel">
             <div className="panel-heading">{panelTitle}</div>
             <Suspense fallback={<div className="panel-progress">Loading view...</div>}>
@@ -270,6 +270,14 @@ export function DesktopApp() {
                 changesState={session.changesState}
                 files={files}
                 filesState={session.filesState}
+                onAddContext={(path) =>
+                  setAgentContextPaths((current) =>
+                    current.includes(path) || current.length >= MAX_AGENT_CONTEXT_FILES
+                      ? current
+                      : [...current, path]
+                  )
+                }
+                onOpenWorkspace={() => void session.openWorkspace()}
                 onRefreshChanges={session.refreshChanges}
                 onSelectChange={(change) => setSelectedPath(change.path)}
                 onSelectFile={setSelectedPath}
@@ -319,7 +327,11 @@ export function DesktopApp() {
           {editorStarted ? (
             <div
               className="workspace-surface"
-              hidden={ui.activity === "assist" || (ui.activity === "git" && Boolean(selectedChange))}
+              hidden={
+                ui.activity === "assist" ||
+                ui.activity === "settings" ||
+                (ui.activity === "git" && Boolean(selectedChange))
+              }
             >
               <Suspense fallback={<div className="workspace-loading">Loading editor...</div>}>
                 <EditorWorkspace

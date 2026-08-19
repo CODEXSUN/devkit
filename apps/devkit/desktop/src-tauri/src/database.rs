@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use rusqlite::{params, Connection};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::DesktopResult;
 
@@ -13,11 +14,36 @@ pub use learning::{
     DetectedLearning, ProjectLearning, ProjectLearningSettings, ProjectLearningSummary,
 };
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfig {
+    pub enabled: bool,
+    pub is_default: bool,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub model: Option<String>,
+    pub temperature: Option<f64>,
+    pub system_prompt: Option<String>,
+}
+
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            is_default: false,
+            api_key: None,
+            base_url: None,
+            model: None,
+            temperature: None,
+            system_prompt: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentConfig {
     pub codex_path: Option<String>,
-    pub model: Option<String>,
     pub default_access: String,
     pub auto_start: bool,
     pub approval_policy: String,
@@ -25,13 +51,21 @@ pub struct AgentConfig {
     pub network_access: bool,
     pub max_turns: i64,
     pub idle_timeout: i64,
+    pub default_provider: String,
+    pub providers: HashMap<String, ProviderConfig>,
 }
 
 impl Default for AgentConfig {
     fn default() -> Self {
+        let mut providers = HashMap::new();
+        providers.insert("codex".into(), ProviderConfig { enabled: true, is_default: true, ..Default::default() });
+        providers.insert("openrouter".into(), ProviderConfig::default());
+        providers.insert("opencode".into(), ProviderConfig::default());
+        providers.insert("claude".into(), ProviderConfig::default());
+        providers.insert("gemini".into(), ProviderConfig { enabled: false, base_url: Some("https://generativelanguage.googleapis.com/v1beta".into()), model: Some("gemini-2.0-flash".into()), ..Default::default() });
+        providers.insert("ollama".into(), ProviderConfig { enabled: true, base_url: Some("http://localhost:11434".into()), ..Default::default() });
         Self {
             codex_path: None,
-            model: None,
             default_access: "workspaceWrite".into(),
             auto_start: false,
             approval_policy: "on-request".into(),
@@ -39,6 +73,8 @@ impl Default for AgentConfig {
             network_access: false,
             max_turns: 50,
             idle_timeout: 180,
+            default_provider: "codex".into(),
+            providers,
         }
     }
 }
@@ -229,7 +265,6 @@ impl DesktopDatabase {
             let (key, value) = row?;
             match key.as_str() {
                 "agent.codex_path" => config.codex_path = if value.is_empty() { None } else { Some(value) },
-                "agent.model" => config.model = if value.is_empty() { None } else { Some(value) },
                 "agent.default_access" => config.default_access = value,
                 "agent.auto_start" => config.auto_start = value == "true",
                 "agent.approval_policy" => config.approval_policy = value,
@@ -237,6 +272,25 @@ impl DesktopDatabase {
                 "agent.network_access" => config.network_access = value == "true",
                 "agent.max_turns" => config.max_turns = value.parse().unwrap_or(50),
                 "agent.idle_timeout" => config.idle_timeout = value.parse().unwrap_or(180),
+                "agent.default_provider" => config.default_provider = value,
+                _ if key.starts_with("agent.providers.") => {
+                    let parts: Vec<&str> = key.split('.').collect();
+                    if parts.len() == 4 {
+                        let provider = parts[2];
+                        let field = parts[3];
+                        let provider_config = config.providers.entry(provider.into()).or_default();
+                        match field {
+                            "enabled" => provider_config.enabled = value == "true",
+                            "is_default" => provider_config.is_default = value == "true",
+                            "api_key" => provider_config.api_key = if value.is_empty() { None } else { Some(value) },
+                            "base_url" => provider_config.base_url = if value.is_empty() { None } else { Some(value) },
+                            "model" => provider_config.model = if value.is_empty() { None } else { Some(value) },
+                            "temperature" => provider_config.temperature = value.parse().ok(),
+                            "system_prompt" => provider_config.system_prompt = if value.is_empty() { None } else { Some(value) },
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -247,7 +301,6 @@ impl DesktopDatabase {
         let transaction = self.connection.transaction()?;
         let settings = [
             ("agent.codex_path", config.codex_path.clone().unwrap_or_default()),
-            ("agent.model", config.model.clone().unwrap_or_default()),
             ("agent.default_access", config.default_access.clone()),
             ("agent.auto_start", config.auto_start.to_string()),
             ("agent.approval_policy", config.approval_policy.clone()),
@@ -255,6 +308,7 @@ impl DesktopDatabase {
             ("agent.network_access", config.network_access.to_string()),
             ("agent.max_turns", config.max_turns.to_string()),
             ("agent.idle_timeout", config.idle_timeout.to_string()),
+            ("agent.default_provider", config.default_provider.clone()),
         ];
         for (key, value) in settings {
             transaction.execute(
@@ -262,6 +316,25 @@ impl DesktopDatabase {
                  ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
                 params![key, value],
             )?;
+        }
+        for (provider, provider_config) in &config.providers {
+            let prefix = format!("agent.providers.{provider}.");
+            let provider_settings = [
+                (format!("{prefix}enabled"), provider_config.enabled.to_string()),
+                (format!("{prefix}is_default"), provider_config.is_default.to_string()),
+                (format!("{prefix}api_key"), provider_config.api_key.clone().unwrap_or_default()),
+                (format!("{prefix}base_url"), provider_config.base_url.clone().unwrap_or_default()),
+                (format!("{prefix}model"), provider_config.model.clone().unwrap_or_default()),
+                (format!("{prefix}temperature"), provider_config.temperature.map(|t| t.to_string()).unwrap_or_default()),
+                (format!("{prefix}system_prompt"), provider_config.system_prompt.clone().unwrap_or_default()),
+            ];
+            for (key, value) in provider_settings {
+                transaction.execute(
+                    "INSERT INTO desktop_settings (key, value) VALUES (?1, ?2)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+                    params![key, value],
+                )?;
+            }
         }
         transaction.commit()?;
         Ok(config.clone())

@@ -118,9 +118,21 @@ export type AgentProtocolMessage = {
   error?: { message?: string };
 };
 
+export type AgentProvider = "codex" | "openrouter" | "opencode" | "claude" | "ollama" | "gemini";
+
+export type ProviderConfig = {
+  enabled: boolean;
+  isDefault: boolean;
+  apiKey?: string | undefined;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
+  temperature?: number | undefined;
+  maxTokens?: number | undefined;
+  systemPrompt?: string | undefined;
+};
+
 export type AgentConfig = {
   codexPath?: string;
-  model?: string;
   defaultAccess: "readOnly" | "workspaceWrite";
   autoStart: boolean;
   approvalPolicy: "on-request" | "never" | "always";
@@ -128,4 +140,7 @@ export type AgentConfig = {
   networkAccess: boolean;
   maxTurns: number;
   idleTimeout: number;
+  useKeychainEncryption?: boolean;
+  defaultProvider: AgentProvider;
+  providers: Record<AgentProvider, ProviderConfig>;
 };

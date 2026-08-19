@@ -24,19 +24,44 @@ use tauri::State;
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
-fn workspace_root(state: &State<'_, DesktopState>) -> DesktopResult<PathBuf> {
-    state
+pub(crate) fn sanitize_path(path: impl AsRef<Path>) -> PathBuf {
+    let p = path.as_ref();
+    let s = p.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        p.to_path_buf()
+    }
+}
+
+pub(crate) fn workspace_root(state: &State<'_, DesktopState>) -> DesktopResult<PathBuf> {
+    let raw = state
         .workspace
         .lock()
         .map_err(|_| DesktopError::Policy("Workspace state is unavailable.".into()))?
         .clone()
-        .ok_or_else(|| DesktopError::Policy("Open a workspace first.".into()))
+        .ok_or_else(|| DesktopError::Policy("Open a workspace first.".into()))?;
+    Ok(sanitize_path(raw))
 }
 
-fn workspace_path(state: &State<'_, DesktopState>, input: &str) -> DesktopResult<PathBuf> {
+pub(crate) fn workspace_path(state: &State<'_, DesktopState>, input: &str) -> DesktopResult<PathBuf> {
     let root = workspace_root(state)?;
-    let candidate = root.join(input);
-    let resolved = candidate.canonicalize()?;
+    let clean_input = input.trim();
+    if clean_input.is_empty() || clean_input == "." {
+        return Ok(root);
+    }
+    let input_path = Path::new(clean_input);
+    let candidate = if input_path.is_absolute() {
+        sanitize_path(input_path)
+    } else {
+        root.join(input_path)
+    };
+
+    let resolved = candidate
+        .canonicalize()
+        .map(sanitize_path)
+        .unwrap_or_else(|_| sanitize_path(&candidate));
+
     if !resolved.starts_with(&root) {
         return Err(DesktopError::Policy(
             "The path is outside the open workspace.".into(),
@@ -45,7 +70,7 @@ fn workspace_path(state: &State<'_, DesktopState>, input: &str) -> DesktopResult
     Ok(resolved)
 }
 
-fn display_name(path: &Path) -> String {
+pub(crate) fn display_name(path: &Path) -> String {
     path.file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("Workspace")

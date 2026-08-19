@@ -1,10 +1,11 @@
 use std::fs;
+use std::path::PathBuf;
 
 use serde::Serialize;
 use tauri::State;
 
 use crate::commands::workspace_policy::is_hidden_workspace_entry;
-use crate::commands::{display_name, workspace_path, workspace_root};
+use crate::commands::{display_name, sanitize_path, workspace_path, workspace_root};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
@@ -29,12 +30,16 @@ pub fn open_workspace(
     path: Option<String>,
     state: State<'_, DesktopState>,
 ) -> DesktopResult<Workspace> {
-    let selected = std::env::var_os("CODELOGIX_WORKSPACE")
+    let raw_path = path.filter(|p| !p.trim().is_empty());
+    let selected: PathBuf = std::env::var_os("CODELOGIX_WORKSPACE")
         .map(Into::into)
-        .or_else(|| path.map(Into::into))
+        .or_else(|| raw_path.map(Into::into))
         .or_else(|| rfd::FileDialog::new().pick_folder())
         .ok_or_else(|| DesktopError::Policy("Workspace selection was canceled.".into()))?;
-    let root = selected.canonicalize()?;
+    let root = selected
+        .canonicalize()
+        .map(sanitize_path)
+        .unwrap_or_else(|_| sanitize_path(&selected));
     if !root.is_dir() {
         return Err(DesktopError::Policy(
             "The workspace must be a directory.".into(),
@@ -61,7 +66,7 @@ pub fn list_files(path: String, state: State<'_, DesktopState>) -> DesktopResult
         .filter_map(Result::ok)
         .filter(|entry| !is_hidden_workspace_entry(&entry.file_name().to_string_lossy()))
         .map(|entry| {
-            let absolute = entry.path();
+            let absolute = sanitize_path(entry.path());
             let relative = absolute
                 .strip_prefix(&root)
                 .unwrap_or(&absolute)

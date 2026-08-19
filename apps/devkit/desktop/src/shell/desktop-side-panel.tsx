@@ -1,4 +1,4 @@
-import { ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, Folder, FolderPlus, SlidersHorizontal } from "lucide-react";
 import type { FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
 import { FileTree } from "../workspaces/file-tree";
 import { GitPanel } from "../workspaces/git-panel";
@@ -16,6 +16,8 @@ export function DesktopSidePanel({
   changesState,
   files,
   filesState,
+  onAddContext,
+  onOpenWorkspace,
   onRefreshChanges,
   onSelectChange,
   onSelectFile,
@@ -28,6 +30,8 @@ export function DesktopSidePanel({
   changesState: ResourceState;
   files: FileEntry[];
   filesState: ResourceState;
+  onAddContext?: ((path: string) => void) | undefined;
+  onOpenWorkspace?: (() => void) | undefined;
   onRefreshChanges: () => Promise<void>;
   onSelectChange: (change: GitChange) => void;
   onSelectFile: (path: string) => void;
@@ -58,10 +62,30 @@ export function DesktopSidePanel({
   if (filesState === "unavailable") return <PanelProgress label="Files are unavailable" />;
   return (
     <div className="tree">
-      <div className="tree-section">
-        <ChevronRight size={14} /> {workspace.name}
+      <div className="tree-header-actions">
+        <div className="tree-section" title={workspace.path}>
+          <Folder size={14} className="tree-folder-icon" />
+          <span className="tree-workspace-title">{workspace.name}</span>
+        </div>
+        {onOpenWorkspace && (
+          <button
+            type="button"
+            className="tree-switch-btn"
+            onClick={() => onOpenWorkspace()}
+            title="Open or switch workspace folder"
+          >
+            <FolderPlus size={13} />
+            <span>Switch</span>
+          </button>
+        )}
       </div>
-      <FileTree entries={files} onSelect={onSelectFile} selectedPath={selectedPath} />
+      <FileTree
+        entries={files}
+        onSelect={onSelectFile}
+        onAddContext={onAddContext}
+        onOpenWorkspace={onOpenWorkspace}
+        selectedPath={selectedPath}
+      />
     </div>
   );
 }

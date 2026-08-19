@@ -52,6 +52,38 @@ export function textAt(value: unknown, ...path: string[]) {
   return typeof current === "string" ? current : undefined;
 }
 
+export function extractTextFromAny(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map(extractTextFromAny).filter(Boolean).join("");
+  }
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.text === "string") return obj.text;
+    if (typeof obj.delta === "string") return obj.delta;
+    if (typeof obj.content === "string") return obj.content;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.value === "string") return obj.value;
+    if (obj.text) return extractTextFromAny(obj.text);
+    if (obj.delta) return extractTextFromAny(obj.delta);
+    if (obj.content) return extractTextFromAny(obj.content);
+    if (obj.message) return extractTextFromAny(obj.message);
+  }
+  return "";
+}
+
+export function extractTextAt(value: unknown, ...path: string[]): string {
+  let current: unknown = value;
+  for (const key of path) {
+    current =
+      typeof current === "object" && current !== null
+        ? (current as Record<string, unknown>)[key]
+        : undefined;
+  }
+  return extractTextFromAny(current);
+}
+
 export function runItemFrom(message: AgentProtocolMessage): RunItem | undefined {
   const item = valueAt(message, "params", "item");
   if (!item) return undefined;

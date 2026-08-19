@@ -218,13 +218,53 @@ export class DesktopClient {
     return invoke<SyncResult>("sync_devkit", { accessToken, apiUrl });
   }
 
-  async getAgentConfig() {
-    return invoke<AgentConfig>("get_agent_config");
+  async getAgentConfig(): Promise<AgentConfig> {
+    try {
+      const res = await invoke<AgentConfig | { config: AgentConfig }>("get_agent_config");
+      if (res && typeof res === "object" && "config" in res && res.config) {
+        return res.config;
+      }
+      return res as AgentConfig;
+    } catch (error) {
+      console.warn("[desktopClient] get_agent_config IPC unavailable, using fallback scaffolding:", error);
+      return getFallbackAgentConfig();
+    }
   }
 
-  async saveAgentConfig(config: AgentConfig) {
-    return invoke<AgentConfig>("save_agent_config", { config });
+  async saveAgentConfig(config: AgentConfig): Promise<AgentConfig> {
+    try {
+      const res = await invoke<AgentConfig | { config: AgentConfig }>("save_agent_config", { config });
+      if (res && typeof res === "object" && "config" in res && res.config) {
+        return res.config;
+      }
+      return res as AgentConfig;
+    } catch (error) {
+      console.warn("[desktopClient] save_agent_config IPC unavailable, returning saved scaffolding config:", error);
+      return config;
+    }
   }
+}
+
+export function getFallbackAgentConfig(): AgentConfig {
+  return {
+    codexPath: "",
+    defaultAccess: "workspaceWrite",
+    autoStart: false,
+    approvalPolicy: "on-request",
+    sandboxType: "workspace-write",
+    networkAccess: false,
+    maxTurns: 50,
+    idleTimeout: 180,
+    defaultProvider: "codex",
+    providers: {
+      codex: { enabled: true, isDefault: true },
+      openrouter: { enabled: false, isDefault: false },
+      opencode: { enabled: false, isDefault: false },
+      claude: { enabled: false, isDefault: false },
+      gemini: { enabled: false, isDefault: false, baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-2.0-flash" },
+      ollama: { enabled: true, isDefault: false, baseUrl: "http://localhost:11434" },
+    },
+  };
 }
 
 export const desktopClient = new DesktopClient();
