@@ -1,5 +1,5 @@
 import { WorkspaceStatusBadge, WorkspaceTable } from "@codexsun/ui";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { LegacyColumnDef as ColumnDef } from "@tanstack/react-table/legacy";
 import { ExternalLink, FolderGit2 } from "lucide-react";
 import type { GithubProjectState } from "./github-dashboard.types";
 

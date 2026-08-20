@@ -2,7 +2,8 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 const STANDARD_CHUNK_LIMIT = 500_000;
-const MONACO_CHUNK_LIMIT = 2_400_000;
+// Monaco 0.56's editor API is 2.67 MB before gzip. Language support remains split from this lazy core.
+const MONACO_CHUNK_LIMIT = 2_800_000;
 
 export default defineConfig({
   build: {

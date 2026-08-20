@@ -1,8 +1,31 @@
 # Changelog
 
-Current version: 1.0.66
-Release tag: v-1.0.66
-Changelog label: v 1.0.66
+Current version: 1.0.67
+Release tag: v-1.0.67
+Changelog label: v 1.0.67
+
+## v-1.0.67
+
+### [v 1.0.67] 2026-08-20 - CodeIt chat workspace polish
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped the repository version to 1.0.67.
+- Added the CodeIt footer status bar with version, workspace, runtime, context, and sandbox status.
+- Moved workspace breadcrumbs into the top bar and aligned them with the chat workspace.
+- Simplified the top bar and moved the active model badge to the right side.
+- Kept agent activity visible while a response runs.
+- Showed message copy actions only on hover or keyboard focus.
+- Added muted separators below the top bar and agent message metadata.
+
+#### Verification
+
+- Passed `npm run check --workspace @codeit/desktop` after each CodeIt UI update.
+- Passed `git diff --check`.
 
 ### [Session] 2026-08-17 - Multi-provider Agent settings and terminal flicker fix
 

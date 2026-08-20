@@ -1,6 +1,6 @@
 {
   "name": "@devkit/platform-web",
-  "version": "1.0.65",
+  "version": "1.0.67",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,11 +17,11 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@tanstack/react-query": "^5.101.4",
-    "@tanstack/react-router": "^1.170.18",
-    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-router": "^1.170.31",
+    "@tanstack/react-table": "^9.1.2",
     "date-fns": "^4.4.0",
-    "framer-motion": "^12.43.0",
-    "lucide-react": "^1.28.0",
+    "framer-motion": "^13.1.0",
+    "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",

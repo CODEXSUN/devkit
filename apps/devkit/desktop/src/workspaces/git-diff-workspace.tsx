@@ -1,7 +1,7 @@
 import { DiffEditor } from "@monaco-editor/react";
 import { Columns2, GitCompare, LoaderCircle, Rows3 } from "lucide-react";
 import { useEffect, useState } from "react";
-import "../editor/monaco-config";
+import { loadMonacoLanguages } from "../editor/monaco-config";
 import type { GitChange, GitFileDiff } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 
@@ -14,7 +14,16 @@ export function GitDiffWorkspace({
 }) {
   const [diff, setDiff] = useState<GitFileDiff>();
   const [error, setError] = useState<string>();
+  const [monacoReady, setMonacoReady] = useState(false);
   const [split, setSplit] = useState(true);
+
+  useEffect(() => {
+    let current = true;
+    void loadMonacoLanguages().then(() => current && setMonacoReady(true));
+    return () => {
+      current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let current = true;
@@ -52,7 +61,7 @@ export function GitDiffWorkspace({
       </div>
       {error ? (
         <div className="inline-error">{error}</div>
-      ) : !diff ? (
+      ) : !diff || !monacoReady ? (
         <div className="workspace-loading"><LoaderCircle size={18} /> Loading changes...</div>
       ) : diff.binary ? (
         <div className="editor-welcome">

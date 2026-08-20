@@ -1,4 +1,4 @@
-import { ChevronRight, Folder, FolderPlus, SlidersHorizontal } from "lucide-react";
+import { Folder, FolderPlus, SlidersHorizontal } from "lucide-react";
 import type { FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
 import { FileTree } from "../workspaces/file-tree";
 import { GitPanel } from "../workspaces/git-panel";

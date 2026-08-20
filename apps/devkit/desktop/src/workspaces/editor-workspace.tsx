@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { LoaderCircle, Save, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import "../editor/monaco-config";
+import { loadMonacoLanguages } from "../editor/monaco-config";
 import { desktopClient } from "../services/desktop-client";
 
 type Document = { content: string; saved: string; loading: boolean; error: string | undefined };
@@ -16,8 +16,17 @@ export function EditorWorkspace({
   theme: "dark" | "light";
 }) {
   const [documents, setDocuments] = useState<Record<string, Document>>({});
+  const [monacoReady, setMonacoReady] = useState(false);
   const loads = useRef(new Map<string, symbol>());
   const paths = useMemo(() => Object.keys(documents), [documents]);
+
+  useEffect(() => {
+    let current = true;
+    void loadMonacoLanguages().then(() => current && setMonacoReady(true));
+    return () => {
+      current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!path || documents[path] || loads.current.has(path)) return;
@@ -138,7 +147,7 @@ export function EditorWorkspace({
           <Save size={14} /> Save
         </button>
       </header>
-      {document.loading ? (
+      {document.loading || !monacoReady ? (
         <div className="file-loading"><LoaderCircle size={18} /> Reading {fileName(path)}...</div>
       ) : document.error ? (
         <div className="inline-error">{document.error}</div>

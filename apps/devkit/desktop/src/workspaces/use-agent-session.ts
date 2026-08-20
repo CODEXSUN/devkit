@@ -14,7 +14,6 @@ import type { Approval, RunItem } from "./agent-workspace-parts";
 import {
   agentErrorFrom,
   extractTextAt,
-  extractTextFromAny,
   parseAgentProtocolMessage,
   runItemFrom,
   textAt,
@@ -36,7 +35,7 @@ export type SubmissionPhase = "idle" | "preparing" | "sending";
 export function useAgentSession({
   contextPaths,
   onRefreshChanges,
-  workspace
+  workspace: _workspace
 }: {
   contextPaths: string[];
   onRefreshChanges: () => Promise<void>;
@@ -56,7 +55,7 @@ export function useAgentSession({
   const [runtime, setRuntime] = useState<"idle" | "connecting" | "ready" | "unavailable">("idle");
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [threadId, setThreadId] = useState<string>();
-  const [turnId, setTurnId] = useState<string>();
+  const [, setTurnId] = useState<string>();
 
   // Agent Provider Configuration State
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
@@ -106,7 +105,6 @@ export function useAgentSession({
   const activeTaskIdRef = useRef<number | undefined>(undefined);
   const threadIdRef = useRef<string | undefined>(undefined);
   const turnIdRef = useRef<string | undefined>(undefined);
-  const runtimeRequestRef = useRef<Promise<void> | undefined>(undefined);
   const threadRequestRef = useRef<Promise<string> | undefined>(undefined);
   const resolveThreadRef = useRef<((threadId: string) => void) | undefined>(undefined);
   const threadTimeoutRef = useRef<number | undefined>(undefined);
@@ -441,7 +439,7 @@ export function useAgentSession({
       setRuntime("ready");
     } catch (reason) {
       setRuntime("unavailable");
-      throw new Error(`The local agent engine could not start. ${String(reason)}`);
+      throw new Error(`The local agent engine could not start. ${String(reason)}`, { cause: reason });
     }
   }
 

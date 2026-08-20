@@ -19,7 +19,6 @@ import {
   Send,
   Server,
   Shield,
-  ShieldCheck,
   Sparkles,
   TerminalSquare,
   X
@@ -74,7 +73,7 @@ export function AgentWorkspace({
   files,
   filesState,
   onAddContext,
-  onClearContext,
+  onClearContext: _onClearContext,
   onOpenFile,
   onRefreshChanges,
   onRemoveContext,
@@ -393,13 +392,6 @@ export function AgentWorkspace({
 function fileName(path: string) {
   const parts = path.split(/[/\\]/);
   return parts[parts.length - 1] ?? path;
-}
-
-function runtimeLabel(status: "connecting" | "idle" | "ready" | "unavailable") {
-  if (status === "connecting") return "Starting local agent";
-  if (status === "ready") return "Agent ready";
-  if (status === "unavailable") return "Agent unavailable";
-  return "Agent idle";
 }
 
 function relativeTime(dateString: string) {

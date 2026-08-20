@@ -1,17 +1,10 @@
 import { loader } from "@monaco-editor/react";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution";
-import "monaco-editor/esm/vs/basic-languages/python/python.contribution";
-import "monaco-editor/esm/vs/basic-languages/rust/rust.contribution";
-import "monaco-editor/esm/vs/language/css/monaco.contribution";
-import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
-import "monaco-editor/esm/vs/language/html/monaco.contribution";
-import HtmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
-import "monaco-editor/esm/vs/language/json/monaco.contribution";
-import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
-import "monaco-editor/esm/vs/language/typescript/monaco.contribution";
-import TypeScriptWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
+import * as monaco from "monaco-editor/editor/editor.api";
+import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import CssWorker from "monaco-editor/language/css/css.worker?worker";
+import HtmlWorker from "monaco-editor/language/html/html.worker?worker";
+import JsonWorker from "monaco-editor/language/json/json.worker?worker";
+import TypeScriptWorker from "monaco-editor/language/typescript/ts.worker?worker";
 
 type MonacoWorker = new () => Worker;
 
@@ -38,3 +31,16 @@ workerHost.MonacoEnvironment = {
 };
 
 loader.config({ monaco });
+
+let languageLoad: Promise<void> | undefined;
+
+export function loadMonacoLanguages() {
+  languageLoad ??= Promise.all([
+    import("monaco-editor/basic-languages/monaco.contribution"),
+    import("monaco-editor/language/css/monaco.contribution"),
+    import("monaco-editor/language/html/monaco.contribution"),
+    import("monaco-editor/language/json/monaco.contribution"),
+    import("monaco-editor/language/typescript/monaco.contribution")
+  ]).then(() => undefined);
+  return languageLoad;
+}
