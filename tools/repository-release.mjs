@@ -92,10 +92,12 @@ function checkVersions() {
   const failures = [];
 
   for (const file of packageFiles()) {
-    const actual = String(readJson(file).version ?? "");
+    const manifest = readJson(file);
+    const actual = String(manifest.version ?? "");
     if (actual !== expected) {
       failures.push(`${relative(root, file)} is ${actual}; expected ${expected}.`);
     }
+    checkInternalDependencyVersions(failures, file, manifest, expected);
   }
 
   if (existsSync(tauriConfigPath)) {
@@ -319,12 +321,8 @@ function updatePackage(file, currentVersion, nextVersion) {
     "optionalDependencies"
   ]) {
     for (const [name, value] of Object.entries(pkg[field] ?? {})) {
-      if (
-        (name.startsWith("@codexsun/") || name.startsWith("@devkit/")) &&
-        (value === currentVersion || value === `^${currentVersion}`)
-      ) {
-        pkg[field][name] = value.startsWith("^") ? `^${nextVersion}` : nextVersion;
-      }
+      if (!isVersionedInternalDependency(name, value)) continue;
+      pkg[field][name] = value.startsWith("^") ? `^${nextVersion}` : nextVersion;
     }
   }
   writeJson(file, pkg);
@@ -355,12 +353,8 @@ function updateLockfile(currentVersion, nextVersion) {
       "optionalDependencies"
     ]) {
       for (const [name, value] of Object.entries(pkg?.[field] ?? {})) {
-        if (
-          (name.startsWith("@codexsun/") || name.startsWith("@devkit/")) &&
-          (value === currentVersion || value === `^${currentVersion}`)
-        ) {
-          pkg[field][name] = value.startsWith("^") ? `^${nextVersion}` : nextVersion;
-        }
+        if (!isVersionedInternalDependency(name, value)) continue;
+        pkg[field][name] = value.startsWith("^") ? `^${nextVersion}` : nextVersion;
       }
     }
   }
@@ -388,6 +382,32 @@ function checkWorkspaceLockDependencies(failures, lock) {
       }
     }
   }
+}
+
+function checkInternalDependencyVersions(failures, file, manifest, expected) {
+  for (const field of [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies"
+  ]) {
+    for (const [name, value] of Object.entries(manifest[field] ?? {})) {
+      if (!isVersionedInternalDependency(name, value)) continue;
+      const expectedValue = value.startsWith("^") ? `^${expected}` : expected;
+      if (value !== expectedValue) {
+        failures.push(
+          `${relative(root, file)} ${name} is ${value}; expected ${expectedValue}.`
+        );
+      }
+    }
+  }
+}
+
+function isVersionedInternalDependency(name, value) {
+  return (
+    (name.startsWith("@codexsun/") || name.startsWith("@devkit/")) &&
+    /^\^?\d+\.\d+\.\d+$/u.test(value)
+  );
 }
 
 function updateChangelog(nextVersion, title, databaseUpdate) {
