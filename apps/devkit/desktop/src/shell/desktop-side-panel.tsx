@@ -8,7 +8,17 @@ import { SkillsPanel } from "../workspaces/skills-panel";
 import { TasksPanel } from "../workspaces/tasks-panel";
 import type { ResourceState } from "./use-desktop-session";
 
-export type Activity = "assist" | "docker" | "files" | "git" | "learning" | "search" | "settings" | "tasks";
+export type Activity =
+  | "assist"
+  | "docker"
+  | "files"
+  | "git"
+  | "hostinger"
+  | "learning"
+  | "search"
+  | "settings"
+  | "sync"
+  | "tasks";
 
 export function DesktopSidePanel({
   activity,
@@ -105,9 +115,11 @@ function EmptyPanel({ activity }: { activity: Activity }) {
     docker: "Inspect services and run approved Docker operations.",
     files: "Open a workspace to browse files.",
     git: "Open a Git repository to review changes.",
+    hostinger: "Manage Hostinger VPS infrastructure through the connected DevKit server.",
     learning: "Review project facts before the coding agent uses them.",
     search: "Search every text file in this workspace.",
     settings: "Configure agent, appearance, and advanced options.",
+    sync: "Connect this local-first workspace to DevKit Cloud.",
     tasks: "Local tasks remain available offline and sync to DevKit."
   };
   return (

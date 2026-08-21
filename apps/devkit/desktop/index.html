@@ -4,13 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101210" />
-    <title>CodeLogix</title>
+    <title>DevKit</title>
     <script>
       (() => {
         const saved = localStorage.getItem("devkit-theme") || "dark";
-        const theme = saved === "system"
-          ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-          : saved;
+        const theme =
+          saved === "system"
+            ? matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light"
+            : saved;
         document.documentElement.dataset.theme = theme;
       })();
     </script>
@@ -26,7 +29,9 @@
         inset: 0;
         justify-content: center;
         position: fixed;
-        transition: opacity 160ms ease, visibility 160ms ease;
+        transition:
+          opacity 160ms ease,
+          visibility 160ms ease;
         z-index: 9999;
       }
       #startup-loader[data-state="ready"] {
@@ -35,19 +40,27 @@
       }
       .startup-loader__mark {
         align-items: center;
-        background: #2878f0;
-        border-radius: 10px;
-        color: #fff;
+        background: #f2f8f8;
+        border: 3px solid #393637;
+        border-radius: 11px;
+        color: #393637;
         display: flex;
         font-size: 14px;
         font-weight: 750;
         height: 42px;
         justify-content: center;
-        letter-spacing: -0.06em;
+        letter-spacing: -0.08em;
         width: 42px;
       }
-      .startup-loader__title { font-size: 17px; font-weight: 650; }
-      .startup-loader__status { color: #a8b0aa; font-size: 13px; margin-top: -8px; }
+      .startup-loader__title {
+        font-size: 17px;
+        font-weight: 650;
+      }
+      .startup-loader__status {
+        color: #a8b0aa;
+        font-size: 13px;
+        margin-top: -8px;
+      }
       .startup-loader__progress {
         background: #2b302d;
         border-radius: 99px;
@@ -65,22 +78,38 @@
         transform: translateX(-100%);
         width: 60%;
       }
-      [data-theme="light"] #startup-loader { background: #f8f9f8; color: #1c211e; }
-      [data-theme="light"] .startup-loader__status { color: #66716a; }
-      [data-theme="light"] .startup-loader__progress { background: #dce2dd; }
-      @keyframes startup-loader-progress { to { transform: translateX(180%); } }
+      [data-theme="light"] #startup-loader {
+        background: #f8f9f8;
+        color: #1c211e;
+      }
+      [data-theme="light"] .startup-loader__status {
+        color: #66716a;
+      }
+      [data-theme="light"] .startup-loader__progress {
+        background: #dce2dd;
+      }
+      @keyframes startup-loader-progress {
+        to {
+          transform: translateX(180%);
+        }
+      }
       @media (prefers-reduced-motion: reduce) {
-        #startup-loader { transition: none; }
-        .startup-loader__progress::after { animation: none; transform: translateX(35%); }
+        #startup-loader {
+          transition: none;
+        }
+        .startup-loader__progress::after {
+          animation: none;
+          transform: translateX(35%);
+        }
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <div id="startup-loader" role="status" aria-live="polite" aria-label="Starting CodeLogix">
-      <div class="startup-loader__mark" aria-hidden="true">CL</div>
-      <div class="startup-loader__title">CodeLogix</div>
-      <div class="startup-loader__status">Starting secure local runtime</div>
+    <div id="startup-loader" role="status" aria-live="polite" aria-label="Starting DevKit">
+      <div class="startup-loader__mark" aria-hidden="true">C</div>
+      <div class="startup-loader__title">DevKit</div>
+      <div class="startup-loader__status">Opening local workspace</div>
       <div class="startup-loader__progress" aria-hidden="true"></div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

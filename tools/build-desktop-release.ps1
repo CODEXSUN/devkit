@@ -5,8 +5,15 @@ if ($LASTEXITCODE -ne 0) {
   throw "The repository artifact layout check failed with exit code $LASTEXITCODE."
 }
 
-$keyPath = Join-Path $env:USERPROFILE ".tauri\codelogicx-desktop-v2.key"
-$passwordPath = Join-Path $env:USERPROFILE ".tauri\codelogicx-desktop-v2-key-password.clixml"
+$keyPath = Join-Path $env:USERPROFILE ".tauri\devkit-desktop-v2.key"
+$passwordPath = Join-Path $env:USERPROFILE ".tauri\devkit-desktop-v2-key-password.clixml"
+
+if (-not (Test-Path -LiteralPath $keyPath)) {
+  $keyPath = Join-Path $env:USERPROFILE ".tauri\codelogicx-desktop-v2.key"
+}
+if (-not (Test-Path -LiteralPath $passwordPath)) {
+  $passwordPath = Join-Path $env:USERPROFILE ".tauri\codelogicx-desktop-v2-key-password.clixml"
+}
 
 if (-not (Test-Path -LiteralPath $keyPath)) {
   throw "The desktop updater private key is missing: $keyPath"

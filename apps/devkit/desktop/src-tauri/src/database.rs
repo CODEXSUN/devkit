@@ -370,7 +370,7 @@ mod tests {
     #[test]
     fn persists_agent_tasks_and_messages_per_workspace() {
         let path = std::env::temp_dir().join(format!(
-            "codelogix-agent-history-{}.db",
+            "devkit-agent-history-{}.db",
             uuid::Uuid::new_v4()
         ));
         let mut database = DesktopDatabase::open(path.clone()).expect("open test database");

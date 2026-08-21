@@ -66,9 +66,13 @@ export function useDesktopSession() {
         setChanges([]);
         setChangesState("idle");
         setSystem(undefined);
-        localStorage.setItem("codelogix-workspace", next.path);
+        localStorage.setItem("devkit-workspace", next.path);
+        localStorage.removeItem("codelogix-workspace");
       } catch (reason) {
-        if (path) localStorage.removeItem("codelogix-workspace");
+        if (path) {
+          localStorage.removeItem("devkit-workspace");
+          localStorage.removeItem("codelogix-workspace");
+        }
         setError(reason instanceof Error ? reason.message : String(reason));
       } finally {
         if (requestGeneration.current === generation) setOpening(false);
@@ -78,7 +82,7 @@ export function useDesktopSession() {
   );
 
   useEffect(() => {
-    const recentWorkspace = localStorage.getItem("codelogix-workspace");
+    const recentWorkspace = localStorage.getItem("devkit-workspace") ?? localStorage.getItem("codelogix-workspace");
     if (!recentWorkspace) return;
     return afterFirstPaint(() => void openWorkspace(recentWorkspace));
   }, [openWorkspace]);

@@ -106,7 +106,7 @@ export function EditorWorkspace({
     return (
       <section className="editor-welcome">
         <div className="brand-glyph">CL</div>
-        <h1>CodeLogix</h1>
+        <h1>DevKit</h1>
         <p>Open a file from Explorer or Search to start editing.</p>
       </section>
     );

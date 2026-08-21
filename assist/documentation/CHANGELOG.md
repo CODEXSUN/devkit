@@ -1,8 +1,72 @@
 # Changelog
 
-Current version: 1.0.67
-Release tag: v-1.0.67
-Changelog label: v 1.0.67
+Current version: 1.0.70
+Release tag: v-1.0.70
+Changelog label: v 1.0.70
+
+## v-1.0.70
+
+### [v 1.0.70] 2026-08-21 8:49 am - version update
+
+#### Database Changes
+
+- Database update: Yes.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.70.
+
+## v-1.0.69
+
+### [v 1.0.69] 2026-08-21 8:48 am - DevKit canonical logo and installer identity
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.69.
+- Made the supplied platform SVG the canonical DevKit logo asset.
+- Added light, dark, and favicon variants that derive from the canonical mark.
+- Regenerated the desktop native icon set for Windows, macOS, Android, and iOS.
+- Rebuilt the signed DevKit MSI with the new application icon.
+- Updated the GitHub desktop-release workflow to publish DevKit installer assets.
+
+#### Verification
+
+- Passed the DevKit desktop typecheck, lint, 29-test suite, and production build.
+- Passed the platform web production build.
+- Verified the signed MSI package metadata and DevKit executable payload.
+- Passed `npm.cmd run check:versions` and `git diff --check`.
+
+## v-1.0.68
+
+### [v 1.0.68] 2026-08-21 7:37 am - Persistent cloud sync connection
+
+#### Database Changes
+
+- Database update: Yes.
+- Added `last_verified_at` to the persisted cloud sync connection.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.68.
+- Added persistent cloud token records with created, last-used, active, and revoked states.
+- Added cloud token listing and revocation endpoints.
+- Verified a cloud token before the local installation saves its encrypted binding.
+- Added explicit connection verification, disconnect, and reconnect controls.
+- Kept local project data when a user disconnects the cloud binding.
+- Added saved installation, verification, transfer, revision, and error status to the sync page.
+- Separated the cloud token manager from the local connection controls.
+
+#### Verification
+
+- Passed DevKit API and web typechecks, lint checks, and builds.
+- Applied the additive migration to the local `devkit_db` database.
+- Passed the database lifecycle and module boundary checks.
+- Passed `git diff --check`.
+- The full repository check remains blocked by the existing `apps/codeit/desktop/node_modules` directory.
 
 ## v-1.0.67
 

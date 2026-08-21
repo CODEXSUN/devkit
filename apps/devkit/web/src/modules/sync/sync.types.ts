@@ -6,12 +6,22 @@ export type SyncStatus = {
   conflictCount: number;
   instanceId: string;
   lastError: string | null;
+  lastVerifiedAt: string | null;
   lastPulledAt: string | null;
   lastPublishedAt: string | null;
   pendingRecords: number;
   remoteRevision: number;
   role: SyncRole;
-  status: "bound" | "conflict" | "disabled" | "unbound";
+  status: "bound" | "conflict" | "disabled" | "error" | "unbound";
+};
+
+export type SyncTokenSummary = {
+  createdAt: string;
+  createdBy: string;
+  label: string;
+  lastUsedAt: string | null;
+  status: "active" | "revoked";
+  uuid: string;
 };
 
 export type GeneratedSyncToken = {

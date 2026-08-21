@@ -3,7 +3,7 @@ use super::{DesktopDatabase, DetectedLearning};
 #[test]
 fn requires_review_and_marks_missing_evidence_stale() {
     let path = std::env::temp_dir().join(format!(
-        "codelogix-project-learning-{}.db",
+        "devkit-project-learning-{}.db",
         uuid::Uuid::new_v4()
     ));
     let mut database = DesktopDatabase::open(path.clone()).expect("open test database");

@@ -472,6 +472,38 @@
   align-items: center;
 }
 
+.agent-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #302e2e;
+}
+
+.agent-title > svg {
+  color: #2563eb;
+}
+
+.agent-title span {
+  display: grid;
+  gap: 1px;
+}
+
+.agent-title strong {
+  font-size: 13px;
+}
+
+.agent-title small {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 500;
+}
+
 .agent-title-btn {
   display: flex;
   align-items: center;
@@ -1288,6 +1320,7 @@
 }
 :root[data-theme="dark"] .agent-chat-header,
 :root[data-theme="dark"] .agent-welcome h1,
+:root[data-theme="dark"] .agent-title,
 :root[data-theme="dark"] .agent-message > p,
 :root[data-theme="dark"] .agent-response,
 :root[data-theme="dark"] .agent-project strong,
@@ -1308,6 +1341,10 @@
 :root[data-theme="dark"] .agent-composer textarea::placeholder {
   color: #9f9f9f;
   opacity: 1;
+}
+
+:root[data-theme="dark"] .agent-title small {
+  color: #a8b3c7;
 }
 :root[data-theme="dark"] .agent-composer .attach-context,
 :root[data-theme="dark"] .agent-composer label,

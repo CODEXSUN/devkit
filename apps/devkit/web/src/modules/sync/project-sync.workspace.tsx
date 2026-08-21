@@ -21,8 +21,8 @@ export function ProjectSyncSettingsWorkspace() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold">Local-first hybrid sync</h1>
             <WorkspaceStatusBadge
-              label={sync?.bound ? "Cloud connected" : "Local only"}
-              tone={sync?.bound ? "success" : "warning"}
+              label={connectionLabel(sync)}
+              tone={sync?.status === "bound" || sync?.role === "cloud" ? "success" : "warning"}
             />
           </div>
           <p className="max-w-3xl pt-2 text-sm leading-6 text-muted-foreground">
@@ -36,10 +36,26 @@ export function ProjectSyncSettingsWorkspace() {
       </header>
 
       <section className="grid gap-3 py-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Boundary icon={HardDriveIcon} label="Local execution" text="Repositories, Docker, worktrees, builds, tests, and Agent execution stay local." />
-        <Boundary icon={DatabaseIcon} label="Work data" text="Projects, tasks, planning boards, activity, and registry records synchronize." />
-        <Boundary icon={FileTextIcon} label="Documents" text="Registry documentation and project attachments synchronize with checksums." />
-        <Boundary icon={CloudIcon} label="Cloud control" text="The cloud stores revisions, approvals, metadata, and synchronized snapshots." />
+        <Boundary
+          icon={HardDriveIcon}
+          label="Local execution"
+          text="Repositories, Docker, worktrees, builds, tests, and Agent execution stay local."
+        />
+        <Boundary
+          icon={DatabaseIcon}
+          label="Work data"
+          text="Projects, tasks, planning boards, activity, and registry records synchronize."
+        />
+        <Boundary
+          icon={FileTextIcon}
+          label="Documents"
+          text="Registry documentation and project attachments synchronize with checksums."
+        />
+        <Boundary
+          icon={CloudIcon}
+          label="Cloud control"
+          text="The cloud stores revisions, approvals, metadata, and synchronized snapshots."
+        />
       </section>
 
       <SyncOverview />
@@ -61,14 +77,32 @@ export function ProjectSyncSettingsWorkspace() {
 export function ProjectSyncButton() {
   const status = useSyncStatus();
   return (
-    <a className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted" href="/app/devkit/project-sync">
+    <a
+      className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+      href="/app/devkit/project-sync"
+    >
       <CloudIcon className="size-4" />
-      {status.data?.bound ? "Open sync" : "Connect cloud"}
+      {status.data?.status === "bound" ? "Open sync" : "Connect cloud"}
     </a>
   );
 }
 
-function Boundary({ icon: Icon, label, text }: { icon: typeof CloudIcon; label: string; text: string }) {
+function connectionLabel(sync: ReturnType<typeof useSyncStatus>["data"]) {
+  if (sync?.role === "cloud") return "Cloud endpoint";
+  if (sync?.status === "bound") return "Cloud connected";
+  if (sync?.status === "error" || sync?.status === "conflict") return "Needs attention";
+  return "Local only";
+}
+
+function Boundary({
+  icon: Icon,
+  label,
+  text
+}: {
+  icon: typeof CloudIcon;
+  label: string;
+  text: string;
+}) {
   return (
     <article className="rounded-xl border p-4">
       <Icon className="size-5 text-primary" />
@@ -82,7 +116,10 @@ function Policy({ text, title }: { text: string; title: string }) {
   return (
     <article className="flex gap-3 border-t pt-4">
       <ShieldCheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
-      <div><h2 className="text-sm font-semibold">{title}</h2><p className="pt-1 text-sm leading-6 text-muted-foreground">{text}</p></div>
+      <div>
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <p className="pt-1 text-sm leading-6 text-muted-foreground">{text}</p>
+      </div>
     </article>
   );
 }

@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn detects_repository_instruction_file() {
         let root =
-            std::env::temp_dir().join(format!("codelogix-learning-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("devkit-learning-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("AGENTS.md"), "# Rules").unwrap();
         let items = detect_project_learning(&root);

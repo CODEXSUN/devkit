@@ -29,6 +29,13 @@ export async function registerSyncRoutes(app: FastifyInstance) {
       requestId: request.id
     });
   });
+  app.get("/admin/sync/cloud/tokens", async (request) =>
+    ok(await service.cloudTokens(), { requestId: request.id })
+  );
+  app.delete("/admin/sync/cloud/tokens/:uuid", async (request) => {
+    const params = z.object({ uuid: z.string().regex(/^[a-f0-9]{8}$/u) }).parse(request.params);
+    return ok(await service.revokeCloudToken(params.uuid), { requestId: request.id });
+  });
   app.post("/admin/sync/bind", async (request) => {
     const body = z
       .object({ instanceId: z.string().min(2).max(80), token: tokenSchema })
@@ -38,6 +45,12 @@ export async function registerSyncRoutes(app: FastifyInstance) {
       requestId: request.id
     });
   });
+  app.post("/admin/sync/verify", async (request) =>
+    ok(await service.verify(), { requestId: request.id })
+  );
+  app.delete("/admin/sync/bind", async (request) =>
+    ok(await service.disconnect(), { requestId: request.id })
+  );
   app.post("/admin/sync/publish", async (request) =>
     ok(await service.publish(), { requestId: request.id })
   );

@@ -25,7 +25,7 @@ export default defineConfig({
 
 function desktopBundleBudget(): Plugin {
   return {
-    name: "codelogix-desktop-bundle-budget",
+    name: "devkit-desktop-bundle-budget",
     generateBundle(_options, bundle) {
       for (const output of Object.values(bundle)) {
         if (output.type !== "chunk") continue;

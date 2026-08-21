@@ -60,7 +60,7 @@ function detectTargetTriple() {
   };
   const targetTriple = targets[`${process.platform}-${process.arch}`];
   if (!targetTriple) {
-    throw new Error(`Unsupported CodeLogix target: ${process.platform}-${process.arch}`);
+    throw new Error(`Unsupported DevKit target: ${process.platform}-${process.arch}`);
   }
   return targetTriple;
 }

@@ -30,7 +30,7 @@ export function SetupWorkspace({
         <div className="setup-mark">
           <Blocks size={25} />
         </div>
-        <p className="eyebrow">CodeLogix</p>
+        <p className="eyebrow">DevKit</p>
         <h1>Your engineering workspace, on this machine.</h1>
         <p>
           Open a repository to use the coding agent, files, Git, terminals, Docker, and local execution

@@ -1,14 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
-import type {
-  AgentAccess,
-  AgentConfig,
-  AgentMessage,
-  AgentProtocolMessage,
-  AgentProvider,
-  AgentTask,
-  Workspace
-} from "../contracts/desktop";
+import type { AgentAccess, AgentMessage, AgentProtocolMessage, AgentTask } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 import type { Approval, RunItem } from "./agent-workspace-parts";
 import {
@@ -20,9 +12,7 @@ import {
   threadIdFrom
 } from "./agent-protocol";
 import { AgentTurnWatchdog } from "./agent-turn-watchdog";
-import { buildAgentPrompt, loadBoundedFileContext } from "./agent-context";
 import { afterFirstPaint } from "../shell/startup-scheduler";
-import { LangGraphEngine, type LangGraphExecutionState } from "./langgraph-engine";
 
 export type ChatMessage = {
   id: string;
@@ -32,15 +22,7 @@ export type ChatMessage = {
 };
 export type SubmissionPhase = "idle" | "preparing" | "sending";
 
-export function useAgentSession({
-  contextPaths,
-  onRefreshChanges,
-  workspace: _workspace
-}: {
-  contextPaths: string[];
-  onRefreshChanges: () => Promise<void>;
-  workspace: Workspace;
-}) {
+export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => Promise<void> }) {
   const [access, setAccess] = useState<AgentAccess>("workspaceWrite");
   const [activeTaskId, setActiveTaskId] = useState<number>();
   const [approval, setApproval] = useState<Approval>();
@@ -56,51 +38,6 @@ export function useAgentSession({
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [threadId, setThreadId] = useState<string>();
   const [, setTurnId] = useState<string>();
-
-  // Agent Provider Configuration State
-  const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
-
-  const refreshAgentConfig = async () => {
-    try {
-      const cfg = await desktopClient.getAgentConfig();
-      setAgentConfig(cfg);
-    } catch {}
-  };
-
-  useEffect(() => {
-    void refreshAgentConfig();
-  }, []);
-
-  const switchProvider = async (providerId: AgentProvider) => {
-    if (!agentConfig) return;
-    const updatedProviders = { ...agentConfig.providers };
-    (Object.keys(updatedProviders) as AgentProvider[]).forEach((key) => {
-      if (updatedProviders[key]) {
-        updatedProviders[key] = {
-          ...updatedProviders[key],
-          isDefault: key === providerId,
-          enabled: key === providerId ? true : updatedProviders[key].enabled
-        };
-      }
-    });
-    const newConfig: AgentConfig = {
-      ...agentConfig,
-      defaultProvider: providerId,
-      providers: updatedProviders
-    };
-    setAgentConfig(newConfig);
-    threadIdRef.current = undefined;
-    setThreadId(undefined);
-    try {
-      await desktopClient.saveAgentConfig(newConfig);
-      await refreshAgentConfig();
-    } catch {}
-  };
-
-  // LangGraph Orchestration State
-  const [langGraphEnabled, setLangGraphEnabled] = useState(true);
-  const [langGraphState, setLangGraphState] = useState<LangGraphExecutionState | null>(null);
-  const langGraphEngineRef = useRef<LangGraphEngine | null>(null);
 
   const activeTaskIdRef = useRef<number | undefined>(undefined);
   const threadIdRef = useRef<string | undefined>(undefined);
@@ -153,9 +90,7 @@ export function useAgentSession({
       }
       stopEvents = events;
       stopErrors = errors;
-      void ensureRuntime().catch(() => {
-        setRuntime("ready");
-      });
+      void ensureRuntime().catch(() => undefined);
       cancelHistoryLoad = afterFirstPaint(() => {
         void loadTaskHistory();
       });
@@ -193,9 +128,6 @@ export function useAgentSession({
       setRunning(true);
       watchdogRef.current?.start();
 
-      if (langGraphEngineRef.current) {
-        langGraphEngineRef.current.transitionToNode("coder");
-      }
     }
     if (
       message.method === "item/agentMessage/delta" ||
@@ -237,13 +169,6 @@ export function useAgentSession({
     }
     if (message.method === "item/started" || message.method === "item/completed") {
       updateRunItem(message);
-      if (langGraphEngineRef.current && message.method === "item/completed") {
-        const itemType = textAt(message, "params", "item", "type");
-        if (itemType === "commandExecution") {
-          langGraphEngineRef.current.transitionToNode("tester");
-          langGraphEngineRef.current.recordTestResults(true);
-        }
-      }
     }
     if (message.method === "turn/diff/updated") {
       setDiff(textAt(message, "params", "diff") ?? "");
@@ -280,38 +205,9 @@ export function useAgentSession({
         if (activeTaskIdRef.current) {
           void desktopClient.saveAgentMessage(activeTaskIdRef.current, itemId, "agent", turnOutput);
         }
-      } else {
-        setMessages((current) => {
-          const last = current[current.length - 1];
-          if (last?.role === "user") {
-            const activeProvider = agentConfig?.defaultProvider ?? "gemini";
-            const providerName =
-              activeProvider === "gemini"
-                ? "Google Gemini"
-                : activeProvider === "claude"
-                ? "Anthropic Claude"
-                : activeProvider === "codex"
-                ? "OpenAI Codex"
-                : "AI Agent";
-            const modelName =
-              agentConfig?.providers?.[activeProvider as AgentProvider]?.model ?? "gemini-2.0-flash";
-            const intelligentResponse = `Hello! I am ${providerName} (${modelName}). Your request has been processed and verified in your workspace. How can I help you further?`;
-            const itemId = crypto.randomUUID();
-            if (activeTaskIdRef.current) {
-              void desktopClient.saveAgentMessage(activeTaskIdRef.current, itemId, "agent", intelligentResponse);
-            }
-            return [...current, { createdAt: new Date().toISOString(), id: itemId, role: "agent", text: intelligentResponse }];
-          }
-          return current;
-        });
-      }
-
-      if (langGraphEngineRef.current) {
-        langGraphEngineRef.current.completeGraph("All tasks executed and verified successfully.");
       }
 
       void onRefreshChanges();
-      void recheckProjectLearning();
     }
     if (message.error?.message) setError(message.error.message);
   }
@@ -329,18 +225,6 @@ export function useAgentSession({
       setSubmissionPhase("preparing");
       const currentThreadId = await ensureThread();
 
-      // Initialize LangGraph Orchestration Engine
-      if (langGraphEnabled) {
-        const engine = new LangGraphEngine(currentThreadId);
-        langGraphEngineRef.current = engine;
-        engine.subscribe((newState) => setLangGraphState(newState));
-        engine.startGraph(prompt);
-      }
-
-      const [learningContext, fileContext] = await Promise.all([
-        desktopClient.projectLearningContext(),
-        loadBoundedFileContext(contextPaths, (path) => desktopClient.readFile(path))
-      ]);
       const task = await ensureTask(currentThreadId, prompt);
       const persistedMessage = await desktopClient.saveAgentMessage(
         task.id,
@@ -352,11 +236,7 @@ export function useAgentSession({
       setMessages((current) => [...current, toChatMessage(persistedMessage)]);
       setRunning(true);
       setSubmissionPhase("sending");
-      await desktopClient.sendAgentTurn(
-        currentThreadId,
-        buildAgentPrompt(prompt, learningContext, fileContext),
-        access
-      );
+      await desktopClient.sendAgentTurn(currentThreadId, prompt, access);
     } catch (reason) {
       setRunning(false);
       const rollbackError = savedMessage
@@ -377,8 +257,6 @@ export function useAgentSession({
     if (busy) return;
     setActiveTask(undefined);
     resetConversation();
-    setLangGraphState(null);
-    langGraphEngineRef.current = null;
     try {
       await ensureThread();
     } catch (reason) {
@@ -395,8 +273,6 @@ export function useAgentSession({
     setDiff("");
     setAccess(task.access);
     setActiveTask(task.id);
-    setLangGraphState(null);
-    langGraphEngineRef.current = null;
 
     try {
       await ensureRuntime();
@@ -488,14 +364,6 @@ export function useAgentSession({
     }
   }
 
-  async function recheckProjectLearning() {
-    try {
-      await desktopClient.projectLearningSummary();
-    } catch {
-      // Ignore background learning scan errors
-    }
-  }
-
   function setActiveTask(taskId: number | undefined) {
     activeTaskIdRef.current = taskId;
     setActiveTaskId(taskId);
@@ -565,7 +433,6 @@ export function useAgentSession({
   return {
     access,
     activeTaskId,
-    agentConfig,
     approval,
     answerApproval,
     busy,
@@ -573,22 +440,17 @@ export function useAgentSession({
     diff,
     error,
     interrupt,
-    langGraphEnabled,
-    langGraphState,
     messages,
     newChat,
     openTask,
-    refreshAgentConfig,
     runItems,
     running,
     runtime,
     send,
     setAccess,
     setComposer,
-    setLangGraphEnabled,
     stalled,
     submissionPhase,
-    switchProvider,
     tasks,
     threadId,
     transcript

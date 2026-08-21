@@ -18,12 +18,22 @@ export type DevkitSyncStatus = {
   conflictCount: number;
   instanceId: string;
   lastError: string | null;
+  lastVerifiedAt: string | null;
   lastPulledAt: string | null;
   lastPublishedAt: string | null;
   pendingRecords: number;
   remoteRevision: number;
   role: DevkitSyncRole;
-  status: "bound" | "conflict" | "disabled" | "unbound";
+  status: "bound" | "conflict" | "disabled" | "error" | "unbound";
+};
+
+export type DevkitSyncTokenSummary = {
+  createdAt: string;
+  createdBy: string;
+  label: string;
+  lastUsedAt: string | null;
+  status: "active" | "revoked";
+  uuid: string;
 };
 
 export type DevkitSyncResult = {

@@ -63,12 +63,18 @@ export async function migrateSyncModule(database: Kysely<DevkitDatabase>) {
       remote_revision INT UNSIGNED NOT NULL DEFAULT 0,
       status VARCHAR(24) NOT NULL DEFAULT 'bound',
       last_error TEXT NULL,
+      last_verified_at DATETIME NULL,
       last_published_at DATETIME NULL,
       last_pulled_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uq_devkit_sync_connections_server (server_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+
+  await sql`
+    ALTER TABLE devkit_sync_connections
+    ADD COLUMN IF NOT EXISTS last_verified_at DATETIME NULL AFTER last_error
   `.execute(database);
 
   await sql`

@@ -25,7 +25,7 @@ test("requires every public updater asset", () => {
   assert.doesNotThrow(() => assertReleaseAssets(release, version));
   assert.throws(
     () => assertReleaseAssets({ assets: release.assets.slice(1) }, version),
-    /CodeLogix_1\.2\.3_x64_en-US\.msi/u
+    /DevKit_1\.2\.3_x64_en-US\.msi/u
   );
 });
 

@@ -1,4 +1,4 @@
-# CodeLogix
+# DevKit
 
 This workspace owns the standalone React, Tauri, and Rust desktop IDE.
 
@@ -41,7 +41,7 @@ Run `npm.cmd run desktop:build` to create the signed desktop bundle after signin
 - guarded workspace-local `.venv` creation without automatic package downloads;
 - repository and project skill discovery;
 - reviewed project learning with repository evidence, approval, rejection, and stale-fact detection;
-- approved project facts added to agent context without changing the visible user request;
+- project learning remains visible for review and is not automatically appended to Codex coding turns;
 - local SQLite tasks and outbound DevKit synchronization contracts;
 - detected external-editor, File Explorer, and Windows Terminal launching;
 - compact and relaxed workspace density;
@@ -59,6 +59,18 @@ See `assist/documentation/desktop-release.md` for signing, release, update, and 
 The release command collects deployable files under `dist/deploy/desktop/<version>/windows-x64`.
 
 The coding agent bundles the matching native Codex engine and uses the local Codex authentication
-profile. `CODELOGIX_CODEX_BIN` can override the engine during development. Language servers,
+profile. `DEVKIT_CODEX_BIN` can override the engine during development. The former
+`CODELOGIX_CODEX_BIN` name remains a compatibility fallback. Language servers,
 debugger adapters, non-OpenAI model-provider authentication, and Python dependency profiles remain
 later milestones.
+
+## Codex wrapper contract
+
+DevKit is a transparent desktop client for the bundled Codex App Server. It does not replace
+Codex with a second planner, rewrite a user prompt, generate a fallback answer, or infer successful
+verification from a command event. The visible chat contains the user prompt and the streamed Codex
+response. The activity lane shows only App Server tool and command events.
+
+The Tauri bridge owns Windows process lifecycle, workspace policy, local task/message storage, and
+rendering. It is not an agentic decision layer. Codex owns reasoning, tool selection, progress,
+approvals, and final answers. DevKit only presents the recorded native state.

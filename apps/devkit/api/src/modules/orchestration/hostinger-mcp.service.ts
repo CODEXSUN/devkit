@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, parse, resolve } from "node:path";
 import { AppError } from "@codexsun/framework/errors";
 import type { CodexMcpServerList } from "./codex-app-server.client.js";
 import { codexAppServer } from "./codex-connector.pool.js";
@@ -56,6 +57,12 @@ export class HostingerMcpService {
     this.writeManagedConfiguration();
     await codexAppServer.reloadMcpServers();
     return this.status();
+  }
+
+  async saveToken(token: string): Promise<HostingerMcpStatus> {
+    writeEnvironmentValue(environmentPath(), "HOSTINGER_API_TOKEN", token);
+    process.env.HOSTINGER_API_TOKEN = token;
+    return this.configure();
   }
 
   private response(input: Partial<HostingerMcpStatus>): HostingerMcpStatus {
@@ -146,6 +153,33 @@ function serverToolCount(value: unknown) {
 
 function configPath() {
   return `${resolveDevkitCodexHome()}/config.toml`;
+}
+
+function environmentPath() {
+  const configured = process.env.DEVKIT_ENV_FILE_PATH?.trim();
+  if (configured) return resolve(configured);
+
+  let directory = resolve(process.cwd());
+  const root = parse(directory).root;
+  while (true) {
+    const candidate = join(directory, ".env");
+    if (existsSync(candidate)) return candidate;
+    if (directory === root) {
+      throw AppError.validation("The server .env file is unavailable or not writable.");
+    }
+    directory = dirname(directory);
+  }
+}
+
+function writeEnvironmentValue(path: string, key: string, value: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  const current = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const line = `${key}=${JSON.stringify(value)}`;
+  const pattern = new RegExp(`^${key}=.*$`, "mu");
+  const next = pattern.test(current)
+    ? current.replace(pattern, line)
+    : [current.trimEnd(), line].filter(Boolean).join("\n");
+  writeFileSync(path, `${next}\n`, { encoding: "utf8", mode: 0o600 });
 }
 
 function tomlString(value: string) {

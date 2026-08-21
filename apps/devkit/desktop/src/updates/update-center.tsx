@@ -39,7 +39,7 @@ export function VersionUpdateButton({
 
   return (
     <button
-      aria-label={`CodeLogix version ${update.currentVersion}. Check for updates`}
+      aria-label={`DevKit version ${update.currentVersion}. Check for updates`}
       className={updateReady ? "version-update active" : "version-update"}
       onClick={openAndCheck}
       title={
@@ -76,7 +76,7 @@ export function UpdateCenter({
       >
         <header>
           <div>
-            <strong>CodeLogix updates</strong>
+            <strong>DevKit updates</strong>
             <small>Signed releases from CODEXSUN/devkit</small>
           </div>
           <button aria-label="Close updates" onClick={onClose} type="button">

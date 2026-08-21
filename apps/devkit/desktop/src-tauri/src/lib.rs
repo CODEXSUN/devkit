@@ -73,5 +73,5 @@ pub fn run() {
             commands::settings::save_agent_config
         ])
         .run(tauri::generate_context!())
-        .expect("CodeLogix runtime failed");
+        .expect("DevKit runtime failed");
 }

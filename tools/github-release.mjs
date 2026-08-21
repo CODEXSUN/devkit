@@ -79,7 +79,7 @@ export class GitHubReleasePublisher {
 
   printSummary(state) {
     console.log("");
-    console.log(`CodeLogix release: ${this.version}`);
+    console.log(`DevKit release: ${this.version}`);
     console.log(`Tag:               ${this.tag}`);
     console.log(`Commit:            ${state.head}`);
     console.log(`Branch:            ${state.branch || "detached"}`);
@@ -115,7 +115,7 @@ export class GitHubReleasePublisher {
     const remoteCommit = remoteTagCommit(this.tag);
     this.assertTagTargets(head, localCommit, remoteCommit);
     if (!localCommit) {
-      runGit(["tag", "-a", this.tag, head, "-m", `CodeLogix ${this.version}`]);
+      runGit(["tag", "-a", this.tag, head, "-m", `DevKit ${this.version}`]);
       console.log(`Created tag ${this.tag}.`);
     }
     if (!remoteCommit) {
@@ -194,9 +194,9 @@ export function releaseTag(version) {
 
 export function requiredReleaseAssets(version) {
   return [
-    `CodeLogix_${version}_x64_en-US.msi`,
-    `CodeLogix_${version}_x64_en-US.msi.sig`,
-    `CodeLogix_Setup_${version}_x64.exe`,
+    `DevKit_${version}_x64_en-US.msi`,
+    `DevKit_${version}_x64_en-US.msi.sig`,
+    `DevKit_Setup_${version}_x64.exe`,
     "latest.json"
   ];
 }
@@ -241,7 +241,7 @@ function remoteTagCommit(tag) {
 async function githubJson(path, allowNotFound = false) {
   const headers = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "CodeLogix-release-tool",
+    "User-Agent": "DevKit-release-tool",
     "X-GitHub-Api-Version": "2022-11-28"
   };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;

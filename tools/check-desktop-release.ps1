@@ -34,8 +34,8 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $package = Get-Content -Raw (Join-Path $root "package.json") | ConvertFrom-Json
 $version = $package.version
 $releaseRoot = Join-Path $root "dist\deploy\desktop\$version\windows-x64"
-$installerName = "CodeLogix_${version}_x64_en-US.msi"
-$setupName = "CodeLogix_Setup_${version}_x64.exe"
+$installerName = "DevKit_${version}_x64_en-US.msi"
+$setupName = "DevKit_Setup_${version}_x64.exe"
 $installerPath = Join-Path $releaseRoot "installer\$installerName"
 $setupPath = Join-Path $releaseRoot "installer\$setupName"
 
@@ -55,12 +55,12 @@ if ((Get-ChildItem -Recurse -File $releaseRoot -Filter "*.pdb").Count -ne 0) {
 }
 
 Assert-Equal $setup.VersionInfo.CompanyName "CODEXSUN" "setup company"
-Assert-Equal $setup.VersionInfo.FileDescription "CodeLogix Setup" "setup description"
+Assert-Equal $setup.VersionInfo.FileDescription "DevKit Setup" "setup description"
 Assert-Equal $setup.VersionInfo.FileVersion $version "setup file version"
-Assert-Equal $setup.VersionInfo.ProductName "CodeLogix" "setup product"
+Assert-Equal $setup.VersionInfo.ProductName "DevKit" "setup product"
 Assert-Equal $setup.VersionInfo.ProductVersion $version "setup product version"
 
-Assert-Equal (Read-MsiProperty $installerPath "ProductName") "CodeLogix" "MSI product"
+Assert-Equal (Read-MsiProperty $installerPath "ProductName") "DevKit" "MSI product"
 Assert-Equal (Read-MsiProperty $installerPath "ProductVersion") $version "MSI version"
 Assert-Equal (Read-MsiProperty $installerPath "Manufacturer") "CODEXSUN" "MSI manufacturer"
 Assert-Equal `
@@ -85,4 +85,4 @@ foreach ($role in @("installer", "first-install-launcher", "updater-signature", 
   }
 }
 
-Write-Output "Desktop release check passed for CodeLogix $version."
+Write-Output "Desktop release check passed for DevKit $version."

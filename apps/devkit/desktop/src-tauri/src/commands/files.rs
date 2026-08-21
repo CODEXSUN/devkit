@@ -31,7 +31,8 @@ pub fn open_workspace(
     state: State<'_, DesktopState>,
 ) -> DesktopResult<Workspace> {
     let raw_path = path.filter(|p| !p.trim().is_empty());
-    let selected: PathBuf = std::env::var_os("CODELOGIX_WORKSPACE")
+    let selected: PathBuf = std::env::var_os("DEVKIT_WORKSPACE")
+        .or_else(|| std::env::var_os("CODELOGIX_WORKSPACE"))
         .map(Into::into)
         .or_else(|| raw_path.map(Into::into))
         .or_else(|| rfd::FileDialog::new().pick_folder())

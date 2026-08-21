@@ -12,7 +12,8 @@ import {
   type DevkitSyncResult,
   type DevkitSyncRole,
   type DevkitSyncSnapshot,
-  type DevkitSyncStatus
+  type DevkitSyncStatus,
+  type DevkitSyncTokenSummary
 } from "./sync.types.js";
 
 type CloudSnapshotEnvelope = {
@@ -44,15 +45,18 @@ export class DevkitSyncService {
         ? "disabled"
         : connection?.status === "conflict"
           ? "conflict"
-          : connection
-            ? "bound"
-            : "unbound";
+          : connection?.status === "error"
+            ? "error"
+            : connection
+              ? "bound"
+              : "unbound";
     return {
       bound: Boolean(connection),
       cloudUrl: DEVKIT_SYNC_CLOUD_URL,
       conflictCount: conflicts,
       instanceId: connection?.instance_id ?? process.env.DEVKIT_SYNC_INSTANCE_ID?.trim() ?? "",
       lastError: connection?.last_error ?? null,
+      lastVerifiedAt: iso(connection?.last_verified_at),
       lastPulledAt: iso(connection?.last_pulled_at),
       lastPublishedAt: iso(connection?.last_published_at),
       pendingRecords,
@@ -77,6 +81,27 @@ export class DevkitSyncService {
     };
   }
 
+  async cloudTokens(): Promise<DevkitSyncTokenSummary[]> {
+    this.requireRole("cloud");
+    const tokens = await this.repository.listTokens();
+    return tokens.map((token) => ({
+      createdAt: new Date(token.created_at).toISOString(),
+      createdBy: token.created_by,
+      label: token.label,
+      lastUsedAt: iso(token.last_used_at),
+      status: token.status === "active" ? "active" : "revoked",
+      uuid: token.uuid
+    }));
+  }
+
+  async revokeCloudToken(uuid: string) {
+    this.requireRole("cloud");
+    if (!(await this.repository.revokeToken(uuid))) {
+      throw AppError.validation("The cloud token is missing or already revoked.");
+    }
+    return { revoked: true as const, uuid };
+  }
+
   async bind(token: string, instanceId: string) {
     this.requireRole("local");
     const normalizedToken = requiredToken(token);
@@ -86,6 +111,37 @@ export class DevkitSyncService {
       encryptedToken: encryptSyncToken(normalizedToken),
       instanceId: normalizedInstance
     });
+    return this.status();
+  }
+
+  async verify() {
+    this.requireRole("local");
+    const connection = await this.requiredConnection();
+    const token = decryptSyncToken(connection.encrypted_token);
+    try {
+      const remote = await cloudRequest<{
+        label: string;
+        protocolVersion: number;
+        revision: number;
+        serverId: string;
+        valid: true;
+      }>("/v1/status", token);
+      await this.repository.updateConnection({
+        error: null,
+        revision: remote.revision,
+        status: "bound",
+        verifiedAt: new Date()
+      });
+      return this.status();
+    } catch (error) {
+      await this.repository.updateConnection({ error: errorMessage(error), status: "error" });
+      throw error;
+    }
+  }
+
+  async disconnect() {
+    this.requireRole("local");
+    await this.repository.deleteConnection();
     return this.status();
   }
 

@@ -81,7 +81,7 @@ export function ProjectLearningPanel() {
           <RefreshCw className={loading ? "spin" : undefined} size={13} />
         </button>
       </header>
-      <p>CodeLogix proposes facts from repository evidence. Only approved facts guide the agent.</p>
+      <p>DevKit proposes facts from repository evidence. Only approved facts guide the agent.</p>
       {summary ? (
         <div className="learning-settings">
           <LearningOption

@@ -200,6 +200,24 @@ export class DevkitSyncRepository {
     return uuid;
   }
 
+  listTokens() {
+    return this.database
+      .selectFrom("devkit_sync_tokens")
+      .select(["uuid", "label", "status", "created_by", "created_at", "last_used_at"])
+      .orderBy("created_at", "desc")
+      .execute();
+  }
+
+  async revokeToken(uuid: string) {
+    const result = await this.database
+      .updateTable("devkit_sync_tokens")
+      .set({ status: "revoked" })
+      .where("uuid", "=", uuid)
+      .where("status", "=", "active")
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows) > 0;
+  }
+
   async findActiveToken(hash: string) {
     return this.database
       .selectFrom("devkit_sync_tokens")
@@ -232,6 +250,7 @@ export class DevkitSyncRepository {
         encrypted_token: input.encryptedToken,
         instance_id: input.instanceId,
         last_error: null,
+        last_verified_at: new Date(),
         last_published_at: null,
         last_pulled_at: null,
         remote_revision: 0,
@@ -243,6 +262,7 @@ export class DevkitSyncRepository {
         encrypted_token: input.encryptedToken,
         instance_id: input.instanceId,
         last_error: null,
+        last_verified_at: new Date(),
         status: "bound"
       })
       .executeTakeFirst();
@@ -254,16 +274,25 @@ export class DevkitSyncRepository {
     publishedAt?: Date;
     revision?: number;
     status?: string;
+    verifiedAt?: Date;
   }) {
     await this.database
       .updateTable("devkit_sync_connections")
       .set({
         ...(input.error !== undefined ? { last_error: input.error } : {}),
+        ...(input.verifiedAt ? { last_verified_at: input.verifiedAt } : {}),
         ...(input.pulledAt ? { last_pulled_at: input.pulledAt } : {}),
         ...(input.publishedAt ? { last_published_at: input.publishedAt } : {}),
         ...(input.revision !== undefined ? { remote_revision: input.revision } : {}),
         ...(input.status ? { status: input.status } : {})
       })
+      .where("server_id", "=", "codexsun-cloud")
+      .executeTakeFirst();
+  }
+
+  async deleteConnection() {
+    await this.database
+      .deleteFrom("devkit_sync_connections")
       .where("server_id", "=", "codexsun-cloud")
       .executeTakeFirst();
   }

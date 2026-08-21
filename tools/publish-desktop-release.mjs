@@ -22,8 +22,8 @@ const targetRoot = join(root, "apps", "devkit", "desktop", "src-tauri", "target"
 const bundleRoot = join(targetRoot, "bundle", "msi");
 const deployBase = join(root, "dist", "deploy", "desktop");
 const deployRoot = join(deployBase, version, "windows-x64");
-const installerName = `CodeLogix_${version}_x64_en-US.msi`;
-const setupName = `CodeLogix_Setup_${version}_x64.exe`;
+const installerName = `DevKit_${version}_x64_en-US.msi`;
+const setupName = `DevKit_Setup_${version}_x64.exe`;
 
 await publishDesktopRelease();
 
@@ -32,7 +32,7 @@ async function publishDesktopRelease() {
   const installerPath = join("installer", installerName);
   const setupPath = join("installer", setupName);
   const files = [
-    copyArtifact(join(targetRoot, "devkit-desktop.exe"), join("app", "CodeLogix.exe"), "app"),
+    copyArtifact(join(targetRoot, "DevKit.exe"), join("app", "DevKit.exe"), "app"),
     copyArtifact(join(targetRoot, "codex.exe"), join("app", "codex.exe"), "agent-runtime"),
     copyArtifact(
       join(targetRoot, "codex-code-mode-host.exe"),
@@ -97,8 +97,8 @@ function buildSetupLauncher(installerPath, outputPath) {
       {
         env: {
           ...process.env,
-          CODELOGIX_MSI_PATH: installerPath,
-          CODELOGIX_VERSION: version
+          DEVKIT_MSI_PATH: installerPath,
+          DEVKIT_VERSION: version
         },
         stdio: "inherit"
       }
@@ -124,11 +124,11 @@ BEGIN
     BLOCK "040904E4"
     BEGIN
       VALUE "CompanyName", "CODEXSUN\\0"
-      VALUE "FileDescription", "CodeLogix Setup\\0"
+      VALUE "FileDescription", "DevKit Setup\\0"
       VALUE "FileVersion", "${version}\\0"
-      VALUE "InternalName", "CodeLogix Setup\\0"
+      VALUE "InternalName", "DevKit Setup\\0"
       VALUE "OriginalFilename", "${setupName}\\0"
-      VALUE "ProductName", "CodeLogix\\0"
+      VALUE "ProductName", "DevKit\\0"
       VALUE "ProductVersion", "${version}\\0"
     END
   END
@@ -181,7 +181,7 @@ function writeUpdaterManifest(installerName) {
   const url = `https://github.com/CODEXSUN/devkit/releases/download/${tag}/${installerName}`;
   const manifest = {
     version,
-    notes: `CodeLogix ${version}`,
+    notes: `DevKit ${version}`,
     pub_date: new Date().toISOString(),
     platforms: {
       "windows-x86_64": { signature, url }
@@ -215,7 +215,7 @@ function writeChecksums(files) {
 
 function writeReleaseManifest(files) {
   const manifest = {
-    product: "CodeLogix",
+    product: "DevKit",
     version,
     platform: "windows",
     architecture: "x86_64",

@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ChevronRight,
   ExternalLink,
   Loader2,
@@ -31,7 +32,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { desktopClient } from "../services/desktop-client";
+import { desktopClient, getFallbackAgentConfig } from "../services/desktop-client";
 import type { AgentConfig, AgentProvider, ProviderConfig } from "../contracts/desktop";
 
 export function openExternalUrl(url: string) {
@@ -130,12 +131,7 @@ export const PROVIDERS_META: {
     icon: <Brain size={16} />,
     description: "OpenCode AI coding assistant bridge",
     requiresApiKey: true,
-    models: [
-      "opencode-default",
-      "opencode-v1-pro",
-      "opencode-fast",
-      "opencode-coder-max"
-    ]
+    models: ["opencode-default", "opencode-v1-pro", "opencode-fast", "opencode-coder-max"]
   },
   {
     id: "claude",
@@ -195,18 +191,72 @@ export const PROVIDERS_META: {
 
 export function getDefaultProviders(): Record<AgentProvider, ProviderConfig> {
   return {
-    codex: { enabled: true, isDefault: true, apiKey: undefined, baseUrl: undefined, model: undefined, temperature: 0.2, maxTokens: 4096, systemPrompt: "" },
-    openrouter: { enabled: false, isDefault: false, apiKey: undefined, baseUrl: "https://openrouter.ai/api/v1", model: undefined, temperature: 0.2, maxTokens: 4096, systemPrompt: "" },
-    opencode: { enabled: false, isDefault: false, apiKey: undefined, baseUrl: undefined, model: undefined, temperature: 0.2, maxTokens: 4096, systemPrompt: "" },
-    claude: { enabled: false, isDefault: false, apiKey: undefined, baseUrl: undefined, model: undefined, temperature: 0.2, maxTokens: 4096, systemPrompt: "" },
-    gemini: { enabled: false, isDefault: false, apiKey: undefined, baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-2.0-flash", temperature: 0.2, maxTokens: 8192, systemPrompt: "" },
-    ollama: { enabled: true, isDefault: false, apiKey: undefined, baseUrl: "http://localhost:11434", model: undefined, temperature: 0.2, maxTokens: 4096, systemPrompt: "" }
+    codex: {
+      enabled: true,
+      isDefault: true,
+      apiKey: undefined,
+      baseUrl: undefined,
+      model: undefined,
+      temperature: 0.2,
+      maxTokens: 4096,
+      systemPrompt: ""
+    },
+    openrouter: {
+      enabled: false,
+      isDefault: false,
+      apiKey: undefined,
+      baseUrl: "https://openrouter.ai/api/v1",
+      model: undefined,
+      temperature: 0.2,
+      maxTokens: 4096,
+      systemPrompt: ""
+    },
+    opencode: {
+      enabled: false,
+      isDefault: false,
+      apiKey: undefined,
+      baseUrl: undefined,
+      model: undefined,
+      temperature: 0.2,
+      maxTokens: 4096,
+      systemPrompt: ""
+    },
+    claude: {
+      enabled: false,
+      isDefault: false,
+      apiKey: undefined,
+      baseUrl: undefined,
+      model: undefined,
+      temperature: 0.2,
+      maxTokens: 4096,
+      systemPrompt: ""
+    },
+    gemini: {
+      enabled: false,
+      isDefault: false,
+      apiKey: undefined,
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-2.0-flash",
+      temperature: 0.2,
+      maxTokens: 8192,
+      systemPrompt: ""
+    },
+    ollama: {
+      enabled: true,
+      isDefault: false,
+      apiKey: undefined,
+      baseUrl: "http://localhost:11434",
+      model: undefined,
+      temperature: 0.2,
+      maxTokens: 4096,
+      systemPrompt: ""
+    }
   };
 }
 
 export function SettingsPanel({ onClose }: { onClose?: () => void }) {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
-  const [config, setConfig] = useState<AgentConfig | null>(null);
+  const [activeSection, setActiveSection] = useState<SettingsSection>("agent-overview");
+  const [config, setConfig] = useState<AgentConfig>(() => getFallbackAgentConfig());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string }>();
@@ -218,8 +268,7 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
   async function loadConfig() {
     try {
       const cfg = await desktopClient.getAgentConfig();
-      const actualConfig = (cfg as any)?.config ?? cfg;
-      setConfig(actualConfig);
+      setConfig(cfg);
     } catch (error) {
       setMessage({ type: "error", text: `Failed to load settings: ${String(error)}` });
     } finally {
@@ -232,11 +281,9 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
     setSaving(true);
     setMessage(undefined);
     try {
-      const currentConfig = (config as any)?.config ?? config;
-      const payload = { ...currentConfig, ...updates };
+      const payload = { ...config, ...updates };
       const saved = await desktopClient.saveAgentConfig(payload);
-      const actualSaved = (saved as any)?.config ?? saved;
-      setConfig(actualSaved);
+      setConfig(saved);
       setMessage({ type: "success", text: "Settings saved successfully" });
     } catch (error) {
       setMessage({ type: "error", text: `Failed to save: ${String(error)}` });
@@ -245,30 +292,30 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="settings-loading" role="status">
-        <Loader2 size={24} className="spin" />
-        <span>Loading settings...</span>
-      </div>
-    );
-  }
-
-  const providers = config?.providers ?? getDefaultProviders();
-  const defaultProvider = config?.defaultProvider ?? "codex";
+  const providers = config.providers ?? getDefaultProviders();
+  const defaultProvider = config.defaultProvider ?? "codex";
 
   return (
     <div className="settings-panel">
       <header className="settings-header">
         <div className="settings-header-title">
-          <h1>Settings</h1>
-          <span className="settings-header-subtitle">System & AI Agent Configuration</span>
+          <div className="settings-title-row">
+            {onClose ? (
+              <button className="settings-back" onClick={onClose} type="button">
+                <ArrowLeft size={16} /> Back to Agent
+              </button>
+            ) : null}
+            <h1>Agent and model settings</h1>
+          </div>
+          <span className="settings-header-subtitle">
+            Select the coding provider, model, access, and local runtime behavior.
+          </span>
         </div>
-        {onClose && (
-          <button className="settings-close" onClick={onClose} type="button" aria-label="Close settings">
-            <ChevronRight size={18} />
-          </button>
-        )}
+        {loading ? (
+          <span className="settings-syncing">
+            <Loader2 size={14} className="spin" /> Reading saved settings
+          </span>
+        ) : null}
       </header>
 
       <div className="settings-layout">
@@ -310,8 +357,12 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
                 <span className="sidebar-icon">{provider.icon}</span>
                 <span className="sidebar-label">{provider.name}</span>
                 {isDefault && <span className="sidebar-badge badge-default">Default</span>}
-                {!isDefault && pConfig?.enabled && <span className="sidebar-dot dot-enabled" title="Active" />}
-                {needsKey && pConfig?.enabled && <span className="sidebar-dot dot-warning" title="Key Required" />}
+                {!isDefault && pConfig?.enabled && (
+                  <span className="sidebar-dot dot-enabled" title="Active" />
+                )}
+                {needsKey && pConfig?.enabled && (
+                  <span className="sidebar-dot dot-warning" title="Key Required" />
+                )}
               </button>
             );
           })}
@@ -338,25 +389,60 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
 
           {activeSection === "general" && <GeneralSettingsTab />}
           {activeSection === "agent-overview" && (
-            <AgentOverviewTab config={config} onSave={handleSave} saving={saving} onNavigate={setActiveSection} />
+            <AgentOverviewTab
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+              onNavigate={setActiveSection}
+            />
           )}
           {activeSection === "provider-codex" && (
-            <DedicatedProviderTab providerId="codex" config={config} onSave={handleSave} saving={saving} />
+            <DedicatedProviderTab
+              providerId="codex"
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+            />
           )}
           {activeSection === "provider-openrouter" && (
-            <DedicatedProviderTab providerId="openrouter" config={config} onSave={handleSave} saving={saving} />
+            <DedicatedProviderTab
+              providerId="openrouter"
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+            />
           )}
           {activeSection === "provider-opencode" && (
-            <DedicatedProviderTab providerId="opencode" config={config} onSave={handleSave} saving={saving} />
+            <DedicatedProviderTab
+              providerId="opencode"
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+            />
           )}
           {activeSection === "provider-claude" && (
-            <DedicatedProviderTab providerId="claude" config={config} onSave={handleSave} saving={saving} />
+            <DedicatedProviderTab
+              providerId="claude"
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+            />
           )}
           {activeSection === "provider-gemini" && (
-            <DedicatedProviderTab providerId="gemini" config={config} onSave={handleSave} saving={saving} />
+            <DedicatedProviderTab
+              providerId="gemini"
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+            />
           )}
           {activeSection === "provider-ollama" && (
-            <DedicatedProviderTab providerId="ollama" config={config} onSave={handleSave} saving={saving} />
+            <DedicatedProviderTab
+              providerId="ollama"
+              config={config}
+              onSave={handleSave}
+              saving={saving}
+            />
           )}
           {activeSection === "advanced" && (
             <AdvancedTab config={config} onSave={handleSave} saving={saving} />
@@ -372,7 +458,9 @@ function GeneralSettingsTab() {
     <section className="settings-section">
       <div className="section-header">
         <h2>General Settings</h2>
-        <p className="section-description">Manage overall application theme, language, and auto-save behavior.</p>
+        <p className="section-description">
+          Manage overall application theme, language, and auto-save behavior.
+        </p>
       </div>
 
       <div className="settings-grid">
@@ -408,9 +496,13 @@ function AgentOverviewTab({
   saving: boolean;
   onNavigate: (section: SettingsSection) => void;
 }) {
-  const [defaultAccess, setDefaultAccess] = useState<"readOnly" | "workspaceWrite">(config?.defaultAccess ?? "workspaceWrite");
+  const [defaultAccess, setDefaultAccess] = useState<"readOnly" | "workspaceWrite">(
+    config?.defaultAccess ?? "workspaceWrite"
+  );
   const [autoStart, setAutoStart] = useState(config?.autoStart ?? false);
-  const [defaultProvider, setDefaultProvider] = useState<AgentProvider>(config?.defaultProvider ?? "codex");
+  const [defaultProvider, setDefaultProvider] = useState<AgentProvider>(
+    config?.defaultProvider ?? "codex"
+  );
 
   useEffect(() => {
     if (config) {
@@ -427,7 +519,7 @@ function AgentOverviewTab({
       providers[key] = {
         ...providers[key],
         isDefault: isDef,
-        enabled: isDef ? true : providers[key]?.enabled ?? false
+        enabled: isDef ? true : (providers[key]?.enabled ?? false)
       };
     });
 
@@ -445,7 +537,8 @@ function AgentOverviewTab({
       <div className="section-header">
         <h2>Agent & Model Overview</h2>
         <p className="section-description">
-          Global defaults for new coding sessions. Select your active default AI provider or configure specific providers on the side menu.
+          Global defaults for new coding sessions. Select your active default AI provider or
+          configure specific providers on the side menu.
         </p>
       </div>
 
@@ -466,7 +559,9 @@ function AgentOverviewTab({
                   <span className="provider-option-icon">{meta.icon}</span>
                   <span className="provider-option-name">{meta.name}</span>
                   {isSelected && <Check size={16} className="provider-check" />}
-                  {pConfig?.enabled && !isSelected && <span className="provider-dot-enabled" title="Enabled" />}
+                  {pConfig?.enabled && !isSelected && (
+                    <span className="provider-dot-enabled" title="Enabled" />
+                  )}
                 </button>
               );
             })}
@@ -490,10 +585,16 @@ function AgentOverviewTab({
 
         <div className="setting-item">
           <label className="checkbox-setting-label">
-            <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={autoStart}
+              onChange={(e) => setAutoStart(e.target.checked)}
+            />
             Auto-start Agent Process
           </label>
-          <div className="setting-hint">Initialize agent runtime process on desktop app startup</div>
+          <div className="setting-hint">
+            Initialize agent runtime process on desktop app startup
+          </div>
         </div>
       </div>
 
@@ -518,7 +619,9 @@ function AgentOverviewTab({
 
       <div className="provider-quick-links">
         <h3>Configure Specific Providers</h3>
-        <p className="section-description">Click a provider below or select from the side menu to manage API keys and models.</p>
+        <p className="section-description">
+          Click a provider below or select from the side menu to manage API keys and models.
+        </p>
         <div className="provider-cards-preview">
           {PROVIDERS_META.map((meta) => {
             const pConfig = config?.providers?.[meta.id];
@@ -532,7 +635,9 @@ function AgentOverviewTab({
                 <div className="mini-card-icon">{meta.icon}</div>
                 <div className="mini-card-info">
                   <strong>{meta.name}</strong>
-                  <span>{isDefault ? "Active Default" : pConfig?.enabled ? "Enabled" : "Disabled"}</span>
+                  <span>
+                    {isDefault ? "Active Default" : pConfig?.enabled ? "Enabled" : "Disabled"}
+                  </span>
                 </div>
                 <ChevronRight size={16} className="mini-card-arrow" />
               </div>
@@ -573,7 +678,10 @@ function DedicatedProviderTab({
 
   // Diagnostics & Auto-discovery states
   const [pingingProvider, setPingingProvider] = useState(false);
-  const [pingMessage, setPingMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [pingMessage, setPingMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
   const [detectingOllama, setDetectingOllama] = useState(false);
   const [ollamaDiscoveredModels, setOllamaDiscoveredModels] = useState<string[]>([]);
 
@@ -582,19 +690,27 @@ function DedicatedProviderTab({
   const [deviceCode, setDeviceCode] = useState<string | null>(null);
   const [_deviceCodeExpires, setDeviceCodeExpires] = useState<number>(0);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [authStatus, setAuthStatus] = useState<"disconnected" | "waiting" | "connected">("disconnected");
+  const [authStatus, setAuthStatus] = useState<"disconnected" | "waiting" | "connected">(
+    "disconnected"
+  );
   const [browserCodeInput, setBrowserCodeInput] = useState("");
   const [validatingBrowserToken, setValidatingBrowserToken] = useState(false);
-  const [connectionMessage, setConnectionMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [connectionMessage, setConnectionMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
 
   // CLI Auto-Detect / Search state
   const [isSearchingCli, setIsSearchingCli] = useState(false);
-  const [searchMessage, setSearchMessage] = useState<{ type: "success" | "info" | "error"; text: string } | null>(null);
+  const [searchMessage, setSearchMessage] = useState<{
+    type: "success" | "info" | "error";
+    text: string;
+  } | null>(null);
 
   // OpenRouter Tuning & Performance states
   const [routingPreset, setRoutingPreset] = useState<"latency" | "quality" | "cost">("latency");
   const [siteReferer, setSiteReferer] = useState("https://devkit.codexsun.com");
-  const [siteTitle, setSiteTitle] = useState("DevKit Desktop");
+  const [siteTitle, setSiteTitle] = useState("DevKit");
   const [validatingKey, setValidatingKey] = useState(false);
   const [openRouterKeyInfo, setOpenRouterKeyInfo] = useState<{
     valid: boolean;
@@ -651,7 +767,7 @@ function DedicatedProviderTab({
       updatedProviders[key] = {
         ...updatedProviders[key],
         isDefault: isDef,
-        enabled: isDef ? true : updatedProviders[key]?.enabled ?? false
+        enabled: isDef ? true : (updatedProviders[key]?.enabled ?? false)
       };
     });
 
@@ -670,7 +786,10 @@ function DedicatedProviderTab({
     setDeviceCode(generated);
     setDeviceCodeExpires(900); // 15 mins
     setAuthStatus("waiting");
-    setConnectionMessage({ type: "info", text: "Device code generated. Please visit the authorization URL to pair this machine." });
+    setConnectionMessage({
+      type: "info",
+      text: "Device code generated. Please visit the authorization URL to pair this machine."
+    });
   };
 
   const handleCopyDeviceCode = () => {
@@ -682,19 +801,28 @@ function DedicatedProviderTab({
 
   const handleVerifyDeviceConnection = () => {
     setAuthStatus("connected");
-    setConnectionMessage({ type: "success", text: "Successfully authenticated via Device Code! Device is now linked." });
+    setConnectionMessage({
+      type: "success",
+      text: "Successfully authenticated via Device Code! Device is now linked."
+    });
   };
 
   // Browser Validation Flow
   const handleLaunchBrowserAuth = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     openExternalUrl("https://auth.codexsun.com/device");
-    setConnectionMessage({ type: "info", text: "Opened browser login tab (https://auth.codexsun.com/device). Authorize and paste the redirect code below." });
+    setConnectionMessage({
+      type: "info",
+      text: "Opened browser login tab (https://auth.codexsun.com/device). Authorize and paste the redirect code below."
+    });
   };
 
   const handleValidateBrowserCode = () => {
     if (!browserCodeInput.trim()) {
-      setConnectionMessage({ type: "error", text: "Please enter the authorization code copied from your browser." });
+      setConnectionMessage({
+        type: "error",
+        text: "Please enter the authorization code copied from your browser."
+      });
       return;
     }
     setValidatingBrowserToken(true);
@@ -702,7 +830,10 @@ function DedicatedProviderTab({
       setValidatingBrowserToken(false);
       setAuthStatus("connected");
       setApiKey(`sk-cdx-${browserCodeInput.trim().slice(0, 12)}...`);
-      setConnectionMessage({ type: "success", text: "Browser connection validated successfully! Token linked." });
+      setConnectionMessage({
+        type: "success",
+        text: "Browser connection validated successfully! Token linked."
+      });
     }, 1000);
   };
 
@@ -757,7 +888,7 @@ function DedicatedProviderTab({
       if (apiKey.trim().startsWith("sk-or-v1-") || apiKey.trim().length > 15) {
         setOpenRouterKeyInfo({
           valid: true,
-          label: "DevKit Desktop Master Key",
+          label: "DevKit Master Key",
           creditsRemaining: "$48.50 remaining (Unlimited tier)",
           message: "API Key verified successfully! Response latency: 42ms."
         });
@@ -922,9 +1053,7 @@ function DedicatedProviderTab({
       </div>
 
       {pingMessage && (
-        <div className={`connect-alert margin-top-md ${pingMessage.type}`}>
-          {pingMessage.text}
-        </div>
+        <div className={`connect-alert margin-top-md ${pingMessage.type}`}>{pingMessage.text}</div>
       )}
 
       {/* CODEX AUTHENTICATION & DEVICE CONNECT SECTION */}
@@ -935,17 +1064,25 @@ function DedicatedProviderTab({
               <KeyRound size={18} className="connect-title-icon" />
               <div>
                 <h3>Connect with Codex Account & Device Validation</h3>
-                <span className="connect-subtitle">Pair DevKit Desktop using Device Code or Browser OAuth validation</span>
+                <span className="connect-subtitle">
+                  Pair DevKit using Device Code or Browser OAuth validation
+                </span>
               </div>
             </div>
 
             <div className="connect-status-pill">
               {authStatus === "connected" ? (
-                <span className="status-pill connected"><ShieldCheck size={14} /> Connected & Validated</span>
+                <span className="status-pill connected">
+                  <ShieldCheck size={14} /> Connected & Validated
+                </span>
               ) : authStatus === "waiting" ? (
-                <span className="status-pill waiting"><RefreshCw size={14} className="spin" /> Waiting for Approval</span>
+                <span className="status-pill waiting">
+                  <RefreshCw size={14} className="spin" /> Waiting for Approval
+                </span>
               ) : (
-                <span className="status-pill disconnected"><Laptop size={14} /> Unauthenticated (Local CLI)</span>
+                <span className="status-pill disconnected">
+                  <Laptop size={14} /> Unauthenticated (Local CLI)
+                </span>
               )}
             </div>
           </div>
@@ -980,8 +1117,15 @@ function DedicatedProviderTab({
             <div className="connect-flow-panel">
               {!deviceCode ? (
                 <div className="connect-init-box">
-                  <p>Generate a unique 8-character device pairing code to authorize this computer with Codex Cloud.</p>
-                  <button type="button" className="setting-btn primary" onClick={handleGenerateDeviceCode}>
+                  <p>
+                    Generate a unique 8-character device pairing code to authorize this computer
+                    with Codex Cloud.
+                  </p>
+                  <button
+                    type="button"
+                    className="setting-btn primary"
+                    onClick={handleGenerateDeviceCode}
+                  >
                     <KeyRound size={15} /> Generate Device Pairing Code
                   </button>
                 </div>
@@ -989,7 +1133,11 @@ function DedicatedProviderTab({
                 <div className="device-code-box">
                   <div className="code-display-row">
                     <div className="code-value">{deviceCode}</div>
-                    <button type="button" className="setting-btn secondary" onClick={handleCopyDeviceCode}>
+                    <button
+                      type="button"
+                      className="setting-btn secondary"
+                      onClick={handleCopyDeviceCode}
+                    >
                       {copiedCode ? <Check size={15} /> : <Copy size={15} />}
                       {copiedCode ? "Copied!" : "Copy Code"}
                     </button>
@@ -1012,15 +1160,25 @@ function DedicatedProviderTab({
                           https://auth.codexsun.com/device <ExternalLink size={12} />
                         </a>
                       </li>
-                      <li>Enter code <strong>{deviceCode}</strong> and confirm device pairing.</li>
+                      <li>
+                        Enter code <strong>{deviceCode}</strong> and confirm device pairing.
+                      </li>
                     </ol>
                   </div>
 
                   <div className="code-actions-row">
-                    <button type="button" className="setting-btn primary" onClick={handleVerifyDeviceConnection}>
+                    <button
+                      type="button"
+                      className="setting-btn primary"
+                      onClick={handleVerifyDeviceConnection}
+                    >
                       <ShieldCheck size={15} /> Verify Authorization
                     </button>
-                    <button type="button" className="setting-btn secondary" onClick={handleGenerateDeviceCode}>
+                    <button
+                      type="button"
+                      className="setting-btn secondary"
+                      onClick={handleGenerateDeviceCode}
+                    >
                       <RefreshCw size={14} /> Regenerate Code
                     </button>
                   </div>
@@ -1033,7 +1191,10 @@ function DedicatedProviderTab({
           {authMode === "browser" && (
             <div className="connect-flow-panel">
               <div className="browser-auth-box">
-                <p>Click <strong>Open Browser Page</strong> to authorize in your browser, then paste the returned callback code below:</p>
+                <p>
+                  Click <strong>Open Browser Page</strong> to authorize in your browser, then paste
+                  the returned callback code below:
+                </p>
 
                 <div className="input-with-action-group">
                   <button
@@ -1057,7 +1218,11 @@ function DedicatedProviderTab({
                     onClick={handleValidateBrowserCode}
                     disabled={validatingBrowserToken}
                   >
-                    {validatingBrowserToken ? <Loader2 size={15} className="spin" /> : <ShieldCheck size={15} />}
+                    {validatingBrowserToken ? (
+                      <Loader2 size={15} className="spin" />
+                    ) : (
+                      <ShieldCheck size={15} />
+                    )}
                     Validate Token
                   </button>
                 </div>
@@ -1067,7 +1232,9 @@ function DedicatedProviderTab({
 
           {authStatus === "connected" && (
             <div className="connect-footer-row">
-              <span className="account-label">Logged in as: <strong>user@codexsun.com</strong></span>
+              <span className="account-label">
+                Logged in as: <strong>user@codexsun.com</strong>
+              </span>
               <button type="button" className="setting-btn danger" onClick={handleDisconnectCodex}>
                 <Unlink size={14} /> Disconnect & Revoke
               </button>
@@ -1084,7 +1251,9 @@ function DedicatedProviderTab({
               <Gauge size={18} className="connect-title-icon" />
               <div>
                 <h3>OpenRouter Performance Tuning & Credit Inspector</h3>
-                <span className="connect-subtitle">Optimize request routing, check API credit limits, and configure priority headers</span>
+                <span className="connect-subtitle">
+                  Optimize request routing, check API credit limits, and configure priority headers
+                </span>
               </div>
             </div>
             <button
@@ -1100,10 +1269,14 @@ function DedicatedProviderTab({
 
           {openRouterKeyInfo && (
             <div className={`connect-alert ${openRouterKeyInfo.valid ? "success" : "error"}`}>
-              <strong>{openRouterKeyInfo.valid ? "🟢 Key Validated" : "🔴 Validation Error"}</strong>: {openRouterKeyInfo.message}
+              <strong>
+                {openRouterKeyInfo.valid ? "🟢 Key Validated" : "🔴 Validation Error"}
+              </strong>
+              : {openRouterKeyInfo.message}
               {openRouterKeyInfo.creditsRemaining && (
                 <div className="margin-top-xs">
-                  <Coins size={14} className="inline-icon" /> <strong>Balance</strong>: {openRouterKeyInfo.creditsRemaining}
+                  <Coins size={14} className="inline-icon" /> <strong>Balance</strong>:{" "}
+                  {openRouterKeyInfo.creditsRemaining}
                 </div>
               )}
             </div>
@@ -1159,7 +1332,9 @@ function DedicatedProviderTab({
                 placeholder="https://devkit.codexsun.com"
                 className="setting-input"
               />
-              <div className="setting-hint">Passed as HTTP-Referer header for OpenRouter analytics & priority</div>
+              <div className="setting-hint">
+                Passed as HTTP-Referer header for OpenRouter analytics & priority
+              </div>
             </div>
 
             <div className="setting-item">
@@ -1169,10 +1344,12 @@ function DedicatedProviderTab({
                 type="text"
                 value={siteTitle}
                 onChange={(e) => setSiteTitle(e.target.value)}
-                placeholder="DevKit Desktop"
+                placeholder="DevKit"
                 className="setting-input"
               />
-              <div className="setting-hint">Passed as X-Title header to identify request source</div>
+              <div className="setting-hint">
+                Passed as X-Title header to identify request source
+              </div>
             </div>
           </div>
         </div>
@@ -1186,7 +1363,9 @@ function DedicatedProviderTab({
               <Sparkles size={18} className="connect-title-icon" />
               <div>
                 <h3>Google Gemini Auto-Connect & Thinking Engine</h3>
-                <span className="connect-subtitle">Auto-detect API keys, configure Gemini 2.0 reasoning budget & safety filters</span>
+                <span className="connect-subtitle">
+                  Auto-detect API keys, configure Gemini 2.0 reasoning budget & safety filters
+                </span>
               </div>
             </div>
             <button
@@ -1195,7 +1374,11 @@ function DedicatedProviderTab({
               onClick={handleAutoConnectGemini}
               disabled={autoDetectingGemini}
             >
-              {autoDetectingGemini ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+              {autoDetectingGemini ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <Sparkles size={14} />
+              )}
               Auto-Connect & Validate
             </button>
           </div>
@@ -1213,7 +1396,9 @@ function DedicatedProviderTab({
                 <option value="few">Block Few</option>
                 <option value="standard">Standard Safety</option>
               </select>
-              <div className="setting-hint">Adjust safety thresholds to prevent false positive code generation blocks</div>
+              <div className="setting-hint">
+                Adjust safety thresholds to prevent false positive code generation blocks
+              </div>
             </div>
 
             <div className="setting-item">
@@ -1225,10 +1410,14 @@ function DedicatedProviderTab({
                 className="setting-select"
               >
                 <option value="dynamic">Dynamic Reasoning (Auto-allocate thinking tokens)</option>
-                <option value="max">Maximum Deep Reasoning (Highest quality for complex tasks)</option>
+                <option value="max">
+                  Maximum Deep Reasoning (Highest quality for complex tasks)
+                </option>
                 <option value="disabled">Disabled (Fastest latency)</option>
               </select>
-              <div className="setting-hint">Controls internal reasoning budget for Gemini 2.0 Flash & Pro models</div>
+              <div className="setting-hint">
+                Controls internal reasoning budget for Gemini 2.0 Flash & Pro models
+              </div>
             </div>
           </div>
         </div>
@@ -1242,7 +1431,9 @@ function DedicatedProviderTab({
               <Cpu size={18} className="connect-title-icon" />
               <div>
                 <h3>Ollama Local Model Auto-Discovery</h3>
-                <span className="connect-subtitle">Scan local Ollama daemon (http://localhost:11434) to auto-populate pulled models</span>
+                <span className="connect-subtitle">
+                  Scan local Ollama daemon (http://localhost:11434) to auto-populate pulled models
+                </span>
               </div>
             </div>
             <button
@@ -1308,7 +1499,9 @@ function DedicatedProviderTab({
             )}
 
             <div className="setting-hint">
-              Leave blank to automatically use the built-in bundled Codex CLI executable. Click <strong>Auto-Detect</strong> to search system PATH or <strong>Download CLI</strong> to obtain official binaries.
+              Leave blank to automatically use the built-in bundled Codex CLI executable. Click{" "}
+              <strong>Auto-Detect</strong> to search system PATH or <strong>Download CLI</strong> to
+              obtain official binaries.
             </div>
           </div>
         )}
@@ -1352,7 +1545,9 @@ function DedicatedProviderTab({
               placeholder="http://localhost:11434"
               className="setting-input"
             />
-            <div className="setting-hint">Local Ollama server instance endpoint (default: http://localhost:11434)</div>
+            <div className="setting-hint">
+              Local Ollama server instance endpoint (default: http://localhost:11434)
+            </div>
           </div>
         )}
 
@@ -1371,7 +1566,9 @@ function DedicatedProviderTab({
               </option>
             ))}
           </select>
-          <div className="setting-hint">Specific AI model to pass during task execution for {meta.name}</div>
+          <div className="setting-hint">
+            Specific AI model to pass during task execution for {meta.name}
+          </div>
         </div>
       </div>
 
@@ -1382,7 +1579,10 @@ function DedicatedProviderTab({
             <SlidersHorizontal size={18} className="connect-title-icon" />
             <div>
               <h3>Model Hyperparameters & Custom System Prompt</h3>
-              <span className="connect-subtitle">Fine-tune generation temperature, output token limits, and agent instructions for {meta.name}</span>
+              <span className="connect-subtitle">
+                Fine-tune generation temperature, output token limits, and agent instructions for{" "}
+                {meta.name}
+              </span>
             </div>
           </div>
         </div>
@@ -1402,7 +1602,9 @@ function DedicatedProviderTab({
               onChange={(e) => setTemperature(parseFloat(e.target.value))}
               className="setting-range"
             />
-            <div className="setting-hint">Lower (0.1-0.3) for precise code syntax; Higher (0.7-0.9) for creative problem solving</div>
+            <div className="setting-hint">
+              Lower (0.1-0.3) for precise code syntax; Higher (0.7-0.9) for creative problem solving
+            </div>
           </div>
 
           <div className="setting-item">
@@ -1417,7 +1619,9 @@ function DedicatedProviderTab({
               onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
               className="setting-input"
             />
-            <div className="setting-hint">Maximum output tokens generated per agent turn (256 - 128,000)</div>
+            <div className="setting-hint">
+              Maximum output tokens generated per agent turn (256 - 128,000)
+            </div>
           </div>
 
           <div className="setting-item setting-item-wide">
@@ -1430,13 +1634,20 @@ function DedicatedProviderTab({
               placeholder="Optional custom instructions to inject into system prompt for this provider..."
               className="setting-textarea"
             />
-            <div className="setting-hint">Custom instructions appended to the default agent prompt for {meta.name}</div>
+            <div className="setting-hint">
+              Custom instructions appended to the default agent prompt for {meta.name}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="settings-actions">
-        <button className="setting-btn primary" onClick={handleSaveThisProvider} disabled={saving} type="button">
+        <button
+          className="setting-btn primary"
+          onClick={handleSaveThisProvider}
+          disabled={saving}
+          type="button"
+        >
           {saving ? (
             <>
               <Loader2 size={16} className="spin" /> Saving...
@@ -1461,14 +1672,18 @@ function AdvancedTab({
   onSave: (updates: Partial<AgentConfig>) => void;
   saving: boolean;
 }) {
-  const [approvalPolicy, setApprovalPolicy] = useState<"on-request" | "never" | "always">(config?.approvalPolicy ?? "on-request");
-  const [sandboxType, setSandboxType] = useState<"workspace-write" | "read-only" | "danger-full-access">(
-    config?.sandboxType ?? "workspace-write"
+  const [approvalPolicy, setApprovalPolicy] = useState<"on-request" | "never" | "always">(
+    config?.approvalPolicy ?? "on-request"
   );
+  const [sandboxType, setSandboxType] = useState<
+    "workspace-write" | "read-only" | "danger-full-access"
+  >(config?.sandboxType ?? "workspace-write");
   const [networkAccess, setNetworkAccess] = useState(config?.networkAccess ?? false);
   const [maxTurns, setMaxTurns] = useState(config?.maxTurns ?? 50);
   const [idleTimeout, setIdleTimeout] = useState(config?.idleTimeout ?? 180);
-  const [useKeychainEncryption, setUseKeychainEncryption] = useState(config?.useKeychainEncryption ?? true);
+  const [useKeychainEncryption, setUseKeychainEncryption] = useState(
+    config?.useKeychainEncryption ?? true
+  );
 
   useEffect(() => {
     if (config) {
@@ -1485,7 +1700,9 @@ function AdvancedTab({
     <section className="settings-section">
       <div className="section-header">
         <h2>Advanced Agent Settings</h2>
-        <p className="section-description">Fine-tune execution safety, sandboxing, network access, secure key vault, and turn limits.</p>
+        <p className="section-description">
+          Fine-tune execution safety, sandboxing, network access, secure key vault, and turn limits.
+        </p>
       </div>
 
       <div className="settings-grid">
@@ -1498,7 +1715,10 @@ function AdvancedTab({
             />
             <span>Encrypt Stored API Keys with Native OS Keychain / Credential Vault</span>
           </label>
-          <div className="setting-hint">Uses Windows Credential Manager / macOS Keychain for hardware-level key encryption on disk</div>
+          <div className="setting-hint">
+            Uses Windows Credential Manager / macOS Keychain for hardware-level key encryption on
+            disk
+          </div>
         </div>
 
         <div className="setting-item">
@@ -1521,7 +1741,11 @@ function AdvancedTab({
           <select
             id="sandbox-type"
             value={sandboxType}
-            onChange={(e) => setSandboxType(e.target.value as "workspace-write" | "read-only" | "danger-full-access")}
+            onChange={(e) =>
+              setSandboxType(
+                e.target.value as "workspace-write" | "read-only" | "danger-full-access"
+              )
+            }
             className="setting-select"
           >
             <option value="workspace-write">Workspace Write</option>
@@ -1533,7 +1757,11 @@ function AdvancedTab({
 
         <div className="setting-item">
           <label className="checkbox-setting-label">
-            <input type="checkbox" checked={networkAccess} onChange={(e) => setNetworkAccess(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={networkAccess}
+              onChange={(e) => setNetworkAccess(e.target.checked)}
+            />
             Allow Outbound Network Access
           </label>
           <div className="setting-hint">Allow agent turns to make external network connections</div>
@@ -1550,7 +1778,9 @@ function AdvancedTab({
             onChange={(e) => setMaxTurns(Number(e.target.value))}
             className="setting-input"
           />
-          <div className="setting-hint">Maximum agent turns allowed before auto-stopping (1-200)</div>
+          <div className="setting-hint">
+            Maximum agent turns allowed before auto-stopping (1-200)
+          </div>
         </div>
 
         <div className="setting-item">
@@ -1564,14 +1794,25 @@ function AdvancedTab({
             onChange={(e) => setIdleTimeout(Number(e.target.value))}
             className="setting-input"
           />
-          <div className="setting-hint">Inactivity timeout before agent process halts (30-600 seconds)</div>
+          <div className="setting-hint">
+            Inactivity timeout before agent process halts (30-600 seconds)
+          </div>
         </div>
       </div>
 
       <div className="settings-actions">
         <button
           className="setting-btn primary"
-          onClick={() => onSave({ approvalPolicy, sandboxType, networkAccess, maxTurns, idleTimeout, useKeychainEncryption })}
+          onClick={() =>
+            onSave({
+              approvalPolicy,
+              sandboxType,
+              networkAccess,
+              maxTurns,
+              idleTimeout,
+              useKeychainEncryption
+            })
+          }
           disabled={saving}
           type="button"
         >

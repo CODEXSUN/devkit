@@ -1,5 +1,4 @@
 import {
-  Blocks,
   Download,
   FolderOpen,
   PanelBottom,
@@ -9,6 +8,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect } from "react";
+import codeItIcon from "../../src-tauri/icons/icon.png";
 
 type Theme = "dark" | "light" | "system";
 
@@ -65,11 +65,20 @@ export function AppDrawer({
 
   return (
     <div className="app-drawer-layer">
-      <button aria-label="Close menu" className="app-drawer-backdrop" onClick={onClose} type="button" />
-      <aside aria-label="CodeLogix menu" aria-modal="true" className="app-drawer" role="dialog">
+      <button
+        aria-label="Close menu"
+        className="app-drawer-backdrop"
+        onClick={onClose}
+        type="button"
+      />
+      <aside aria-label="DevKit menu" aria-modal="true" className="app-drawer" role="dialog">
         <header>
-          <span><Blocks size={19} /> CodeLogix</span>
-          <button aria-label="Close menu" onClick={onClose} type="button"><X size={18} /></button>
+          <span>
+            <img alt="" className="product-icon" src={codeItIcon} /> DevKit
+          </span>
+          <button aria-label="Close menu" onClick={onClose} type="button">
+            <X size={18} />
+          </button>
         </header>
         <nav aria-label="Application actions">
           {actions.map((action) => (
@@ -80,7 +89,9 @@ export function AppDrawer({
           ))}
         </nav>
         <section className="drawer-settings">
-          <h2><Settings size={16} /> Settings</h2>
+          <h2>
+            <Settings size={16} /> Settings
+          </h2>
           <span>Theme</span>
           <div className="drawer-theme-options">
             {(["system", "light", "dark"] as const).map((option) => (

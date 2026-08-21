@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@codexsun/ui/components/button";
+import { Input } from "@codexsun/ui/components/input";
 import {
   CircleAlertIcon,
   KeyRoundIcon,
@@ -13,7 +15,8 @@ import { HostingerSshPanel } from "./hostinger-ssh-panel";
 import {
   configureHostingerMcp,
   getHostingerDashboard,
-  getHostingerMcpStatus
+  getHostingerMcpStatus,
+  saveHostingerCredential
 } from "./hostinger-mcp.services";
 
 export function HostingerMcpWorkspace() {
@@ -35,6 +38,15 @@ export function HostingerMcpWorkspace() {
       queryClient.setQueryData(["devkit", "hostinger-mcp", "status"], result);
       await dashboard.refetch();
       toast.success("Hostinger MCP configured.");
+    },
+    onError: (error) => toast.error(error.message)
+  });
+  const saveCredential = useMutation({
+    mutationFn: saveHostingerCredential,
+    onSuccess: async (result) => {
+      queryClient.setQueryData(["devkit", "hostinger-mcp", "status"], result);
+      await dashboard.refetch();
+      toast.success("Hostinger credential saved and connected.");
     },
     onError: (error) => toast.error(error.message)
   });
@@ -74,7 +86,10 @@ export function HostingerMcpWorkspace() {
       </header>
 
       {dashboard.data ? (
-        <><HostingerDashboard dashboard={dashboard.data} />{dashboard.data.nodes[0] ? <HostingerSshPanel node={dashboard.data.nodes[0]} /> : null}</>
+        <>
+          <HostingerDashboard dashboard={dashboard.data} />
+          {dashboard.data.nodes[0] ? <HostingerSshPanel node={dashboard.data.nodes[0]} /> : null}
+        </>
       ) : (
         <ConnectionState
           configured={status.data?.configured ?? false}
@@ -82,6 +97,8 @@ export function HostingerMcpWorkspace() {
           error={dashboard.error?.message ?? status.error?.message ?? status.data?.error ?? null}
           loading={loading}
           onConfigure={() => configure.mutate()}
+          onSaveCredential={(token) => saveCredential.mutateAsync(token)}
+          savingCredential={saveCredential.isPending}
           tokenConfigured={status.data?.tokenConfigured ?? false}
         />
       )}
@@ -95,6 +112,8 @@ function ConnectionState({
   error,
   loading,
   onConfigure,
+  onSaveCredential,
+  savingCredential,
   tokenConfigured
 }: {
   configured: boolean;
@@ -102,8 +121,11 @@ function ConnectionState({
   error: string | null;
   loading: boolean;
   onConfigure: () => void;
+  onSaveCredential: (token: string) => Promise<unknown>;
+  savingCredential: boolean;
   tokenConfigured: boolean;
 }) {
+  const [token, setToken] = useState("");
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-3 py-24 text-sm text-muted-foreground">
@@ -126,8 +148,41 @@ function ConnectionState({
       <p className="mx-auto max-w-lg pt-2 text-sm leading-6 text-muted-foreground">
         {tokenConfigured
           ? "Install the managed MCP configuration, then load live VPS and Docker information."
-          : "Add HOSTINGER_API_TOKEN to the backend .env and restart the API. The credential is never returned to this page."}
+          : "Enter a Hostinger API token to connect this server to your VPS account."}
       </p>
+      {!tokenConfigured ? (
+        <form
+          className="mx-auto flex max-w-lg flex-col gap-3 pt-6 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onSaveCredential(token).then(() => setToken(""));
+          }}
+        >
+          <label className="sr-only" htmlFor="hostinger-api-token">
+            Hostinger API token
+          </label>
+          <Input
+            autoComplete="off"
+            className="h-10 flex-1"
+            id="hostinger-api-token"
+            onChange={(event) => setToken(event.target.value)}
+            placeholder="Paste Hostinger API token"
+            required
+            spellCheck={false}
+            type="password"
+            value={token}
+          />
+          <Button disabled={savingCredential || !token.trim()} type="submit">
+            {savingCredential ? <LoaderCircleIcon className="animate-spin" /> : <KeyRoundIcon />}
+            Save and connect
+          </Button>
+        </form>
+      ) : null}
+      {!tokenConfigured ? (
+        <p className="pt-3 text-xs text-muted-foreground">
+          Saved only to the server environment. The token is never returned to the browser.
+        </p>
+      ) : null}
       {error ? (
         <p className="mt-4 flex items-center justify-center gap-2 text-sm text-destructive">
           <CircleAlertIcon className="size-4" /> {error}

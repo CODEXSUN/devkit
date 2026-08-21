@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const INSTALLER_BYTES: &[u8] = include_bytes!(env!("CODELOGIX_MSI_PATH"));
-const VERSION: &str = env!("CODELOGIX_VERSION");
+const INSTALLER_BYTES: &[u8] = include_bytes!(env!("DEVKIT_MSI_PATH"));
+const VERSION: &str = env!("DEVKIT_VERSION");
 
 fn main() {
     if let Err(error) = install() {
@@ -20,7 +20,7 @@ fn main() {
 
 fn install() -> io::Result<()> {
     let directory = create_installer_directory()?;
-    let installer = directory.join(format!("CodeLogix_{VERSION}_x64_en-US.msi"));
+    let installer = directory.join(format!("DevKit_{VERSION}_x64_en-US.msi"));
 
     write_installer(&installer)?;
     let status = Command::new("msiexec.exe")
@@ -51,7 +51,7 @@ fn create_installer_directory() -> io::Result<PathBuf> {
         .map_err(io::Error::other)?
         .as_nanos();
     let directory = std::env::temp_dir().join(format!(
-        "CodeLogix-setup-{VERSION}-{}-{timestamp}",
+        "DevKit-setup-{VERSION}-{}-{timestamp}",
         process::id()
     ));
     create_dir(&directory)?;
@@ -71,7 +71,7 @@ fn cleanup(installer: &Path, directory: &Path) -> io::Result<()> {
 
 fn show_error(message: &str) {
     let message = wide(message);
-    let title = wide("CodeLogix Setup");
+    let title = wide("DevKit Setup");
     unsafe {
         MessageBoxW(
             std::ptr::null_mut(),

@@ -59,8 +59,8 @@ jobs:
           projectPath: apps/devkit/desktop
           tauriScript: npm run tauri
           tagName: desktop-v__VERSION__
-          releaseName: CodeLogix __VERSION__
-          releaseBody: Signed CodeLogix desktop release produced by the verified release workflow.
+          releaseName: DevKit __VERSION__
+          releaseBody: Signed DevKit desktop release produced by the verified release workflow.
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: false
@@ -77,7 +77,7 @@ jobs:
         env:
           MANIFEST_PATH: dist/deploy/desktop/${{ steps.tauri-release.outputs.appVersion }}/windows-x64/updater/latest.json
           RELEASE_ID: ${{ steps.tauri-release.outputs.releaseId }}
-          SETUP_PATH: dist/deploy/desktop/${{ steps.tauri-release.outputs.appVersion }}/windows-x64/installer/CodeLogix_Setup_${{ steps.tauri-release.outputs.appVersion }}_x64.exe
+          SETUP_PATH: dist/deploy/desktop/${{ steps.tauri-release.outputs.appVersion }}/windows-x64/installer/DevKit_Setup_${{ steps.tauri-release.outputs.appVersion }}_x64.exe
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -101,7 +101,7 @@ jobs:
       - name: Upload root deploy outputs
         uses: actions/upload-artifact@v4
         with:
-          name: codelogix-${{ github.ref_name }}-windows-x64
+          name: devkit-${{ github.ref_name }}-windows-x64
           path: dist/deploy/desktop/*/windows-x64
           if-no-files-found: error
 

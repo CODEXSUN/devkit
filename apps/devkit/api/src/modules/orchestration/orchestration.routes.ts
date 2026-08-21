@@ -67,6 +67,7 @@ const hostingerSshTargetSchema = z
     virtualMachineId: z.coerce.number().int().positive()
   })
   .strict();
+const hostingerCredentialSchema = z.object({ token: z.string().trim().min(1).max(4096) }).strict();
 
 export async function registerOrchestrationRoutes(app: FastifyInstance) {
   let recoveryReported = false;
@@ -391,6 +392,10 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   app.post("/orchestration/integrations/hostinger/configure", async (request) =>
     ok(await hostingerMcpService.configure(), { requestId: request.id })
   );
+  app.put("/orchestration/integrations/hostinger/credential", async (request) => {
+    const { token } = hostingerCredentialSchema.parse(request.body);
+    return ok(await hostingerMcpService.saveToken(token), { requestId: request.id });
+  });
   app.get("/orchestration/integrations/hostinger/dashboard", async (request) =>
     ok(await hostingerDashboardService.dashboard(), { requestId: request.id })
   );

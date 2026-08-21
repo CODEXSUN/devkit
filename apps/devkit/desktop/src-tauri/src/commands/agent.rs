@@ -50,7 +50,7 @@ pub fn start_agent_runtime(
 
     let mut child = command.spawn().map_err(|error| {
         DesktopError::Policy(format!(
-            "CodeLogix could not start its Codex engine. Set CODELOGIX_CODEX_BIN to override it. {error}"
+            "DevKit could not start its Codex engine. Set DEVKIT_CODEX_BIN to override it. {error}"
         ))
     })?;
     let stdout = child
@@ -74,8 +74,8 @@ pub fn start_agent_runtime(
         "initialize",
         json!({
             "clientInfo": {
-                "name": "codelogix_desktop",
-                "title": "CodeLogix",
+                "name": "devkit_desktop",
+                "title": "DevKit",
                 "version": env!("CARGO_PKG_VERSION")
             }
         }),
@@ -101,7 +101,7 @@ fn prepend_runtime_directory_to_path(command: &mut Command, executable: &str) ->
     let paths = std::iter::once(directory.to_path_buf()).chain(std::env::split_paths(&path));
     let path = std::env::join_paths(paths).map_err(|error| {
         DesktopError::Policy(format!(
-            "CodeLogix could not prepare the Codex runtime path. {error}"
+            "DevKit could not prepare the Codex runtime path. {error}"
         ))
     })?;
     command.env("PATH", path);
@@ -109,6 +109,9 @@ fn prepend_runtime_directory_to_path(command: &mut Command, executable: &str) ->
 }
 
 fn resolve_codex_executable() -> String {
+    if let Ok(path) = std::env::var("DEVKIT_CODEX_BIN") {
+        return path;
+    }
     if let Ok(path) = std::env::var("CODELOGIX_CODEX_BIN") {
         return path;
     }
@@ -161,37 +164,12 @@ fn codex_binary_name() -> &'static str {
 #[tauri::command]
 pub fn start_agent_thread(state: State<'_, DesktopState>) -> DesktopResult<u64> {
     let root = workspace_root(&state)?;
-    let (provider, model, api_key, base_url) = state
-        .with_database(|database| {
-            let config = database.get_agent_config()?;
-            let default_provider = config.default_provider.clone();
-            let provider_cfg = config.providers.get(&default_provider);
-            let model = provider_cfg.and_then(|p| p.model.clone());
-            let api_key = provider_cfg.and_then(|p| p.api_key.clone());
-            let base_url = provider_cfg.and_then(|p| p.base_url.clone());
-            Ok((default_provider, model, api_key, base_url))
-        })
-        .unwrap_or_else(|_| ("codex".to_string(), None, None, None));
-
-    let mut thread_payload = json!({
+    send_request(&state, "thread/start", json!({
         "cwd": root,
         "approvalPolicy": "on-request",
         "sandbox": "workspace-write",
-        "serviceName": "codelogix_desktop",
-        "provider": provider
-    });
-
-    if let Some(m) = model {
-        thread_payload["model"] = json!(m);
-    }
-    if let Some(k) = api_key {
-        thread_payload["apiKey"] = json!(k);
-    }
-    if let Some(b) = base_url {
-        thread_payload["baseUrl"] = json!(b);
-    }
-
-    send_request(&state, "thread/start", thread_payload)
+        "serviceName": "devkit_desktop"
+    }))
 }
 
 #[tauri::command]
@@ -237,71 +215,13 @@ pub fn send_agent_turn(
         })
     };
 
-    let (provider, model, api_key, base_url, temperature, system_prompt) = state
-        .with_database(|database| {
-            let config = database.get_agent_config()?;
-            let default_provider = config.default_provider.clone();
-            let provider_cfg = config.providers.get(&default_provider);
-            let model = provider_cfg.and_then(|p| p.model.clone());
-            let api_key = provider_cfg.and_then(|p| p.api_key.clone());
-            let base_url = provider_cfg.and_then(|p| p.base_url.clone());
-            let temperature = provider_cfg.and_then(|p| p.temperature);
-            let system_prompt = provider_cfg.and_then(|p| p.system_prompt.clone());
-            Ok((default_provider, model, api_key, base_url, temperature, system_prompt))
-        })
-        .unwrap_or_else(|_| ("codex".to_string(), None, None, None, None, None));
-
-    let effective_system_prompt = system_prompt.unwrap_or_else(|| match provider.as_str() {
-        "gemini" => format!(
-            "You are Google Gemini (model: {}), an expert AI coding assistant pair-programming with the user.",
-            model.as_deref().unwrap_or("gemini-2.0-flash")
-        ),
-        "claude" => format!(
-            "You are Anthropic Claude (model: {}), an expert AI coding assistant pair-programming with the user.",
-            model.as_deref().unwrap_or("claude-3.5-sonnet")
-        ),
-        "openrouter" => format!(
-            "You are an AI coding assistant powered by OpenRouter Gateway (model: {}).",
-            model.as_deref().unwrap_or("deepseek-r1")
-        ),
-        "ollama" => format!(
-            "You are a local AI coding assistant powered by Ollama (model: {}).",
-            model.as_deref().unwrap_or("llama3.3:70b")
-        ),
-        "opencode" => format!(
-            "You are OpenCode AI (model: {}), an expert open-source AI coding assistant.",
-            model.as_deref().unwrap_or("opencode-v1")
-        ),
-        _ => format!(
-            "You are OpenAI Codex (model: {}), an expert AI coding assistant.",
-            model.as_deref().unwrap_or("gpt-4o")
-        )
-    });
-
-    let mut turn_payload = json!({
+    send_request(&state, "turn/start", json!({
         "threadId": thread_id,
         "input": [{ "type": "text", "text": prompt.trim() }],
         "cwd": root,
         "approvalPolicy": "on-request",
-        "sandboxPolicy": sandbox,
-        "provider": provider,
-        "systemPrompt": effective_system_prompt
-    });
-
-    if let Some(m) = model {
-        turn_payload["model"] = json!(m);
-    }
-    if let Some(k) = api_key {
-        turn_payload["apiKey"] = json!(k);
-    }
-    if let Some(b) = base_url {
-        turn_payload["baseUrl"] = json!(b);
-    }
-    if let Some(t) = temperature {
-        turn_payload["temperature"] = json!(t);
-    }
-
-    send_request(&state, "turn/start", turn_payload)
+        "sandboxPolicy": sandbox
+    }))
 }
 
 #[tauri::command]

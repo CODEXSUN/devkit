@@ -620,6 +620,7 @@ export type DevkitSyncConnectionsTable = {
   id: Generated<number>;
   instance_id: string;
   last_error: string | null;
+  last_verified_at: TimestampColumn | null;
   last_published_at: TimestampColumn | null;
   last_pulled_at: TimestampColumn | null;
   remote_revision: number;

@@ -1,31 +1,27 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
-  Blocks,
   Bot,
   BrainCircuit,
   Box,
   CircleDot,
+  CloudCog,
   Files,
   GitBranch,
   ListTodo,
   Menu,
   PanelBottom,
   Search,
+  ServerCog,
   Settings,
   SlidersHorizontal
 } from "lucide-react";
+import codeItIcon from "../../src-tauri/icons/icon.png";
 import { AgentWorkspace } from "../workspaces/agent-workspace";
-import { MAX_AGENT_CONTEXT_FILES } from "../workspaces/agent-context";
-import { SettingsPanel } from "../workspaces/settings-panel";
 import { SetupWorkspace } from "../workspaces/setup-workspace";
 import { AppDrawer } from "./app-drawer";
 import { OpenInMenu } from "./open-in-menu";
 import { CommandPalette, type PaletteCommand } from "./command-palette";
-import {
-  UpdateButton,
-  UpdateCenter,
-  VersionUpdateButton
-} from "../updates/update-center";
+import { UpdateButton, UpdateCenter, VersionUpdateButton } from "../updates/update-center";
 import { useDesktopUpdater } from "../updates/use-desktop-updater";
 import { useDesktopSession } from "./use-desktop-session";
 import { useDesktopUiStore } from "./use-desktop-ui-store";
@@ -47,6 +43,16 @@ const TerminalPanel = lazy(() =>
 const DesktopSidePanel = lazy(() =>
   import("./desktop-side-panel").then((module) => ({ default: module.DesktopSidePanel }))
 );
+const PortalWorkspace = lazy(() =>
+  import("../workspaces/portal-workspace").then((module) => ({
+    default: module.PortalWorkspace
+  }))
+);
+const SettingsPanel = lazy(() =>
+  import("../workspaces/settings-panel").then((module) => ({
+    default: module.SettingsPanel
+  }))
+);
 
 const activities = [
   { icon: Bot, id: "assist", label: "Agent" },
@@ -56,7 +62,9 @@ const activities = [
   { icon: ListTodo, id: "tasks", label: "Tasks" },
   { icon: BrainCircuit, id: "learning", label: "Project learning" },
   { icon: Box, id: "docker", label: "Docker" },
-  { icon: SlidersHorizontal, id: "settings", label: "Settings" }
+  { icon: SlidersHorizontal, id: "settings", label: "Settings" },
+  { icon: ServerCog, id: "hostinger", label: "Hostinger infrastructure" },
+  { icon: CloudCog, id: "sync", label: "Local-first sync" }
 ] as const;
 
 export function DesktopApp() {
@@ -70,7 +78,6 @@ export function DesktopApp() {
     () => matchMedia("(prefers-color-scheme: dark)").matches
   );
   const [selectedPath, setSelectedPath] = useState<string>();
-  const [agentContextPaths, setAgentContextPaths] = useState<string[]>([]);
   const [editorStarted, setEditorStarted] = useState(false);
   const updater = useDesktopUpdater();
   const session = useDesktopSession();
@@ -102,7 +109,6 @@ export function DesktopApp() {
   }, [resolvedTheme, theme]);
 
   useEffect(() => {
-    setAgentContextPaths([]);
     setSelectedPath(undefined);
   }, [workspace?.path]);
 
@@ -122,7 +128,16 @@ export function DesktopApp() {
     if (resources.files && filesState === "idle") void loadFiles();
     if (resources.changes && changesState === "idle") void refreshChanges();
     if (resources.system && !system) void loadSystem();
-  }, [changesState, filesState, loadFiles, loadSystem, refreshChanges, system, ui.activity, workspace]);
+  }, [
+    changesState,
+    filesState,
+    loadFiles,
+    loadSystem,
+    refreshChanges,
+    system,
+    ui.activity,
+    workspace
+  ]);
 
   useEffect(() => {
     function keyboard(event: KeyboardEvent) {
@@ -225,7 +240,7 @@ export function DesktopApp() {
           >
             <Menu size={18} />
           </button>
-          <Blocks size={17} /> CodeLogix
+          <img alt="" className="product-icon" src={codeItIcon} /> DevKit
         </div>
         <button className="command-center" onClick={() => ui.setPaletteOpen(true)} type="button">
           <Search size={14} /> Search commands and files <kbd>Ctrl K</kbd>
@@ -236,7 +251,16 @@ export function DesktopApp() {
           <UpdateButton onOpen={() => ui.setUpdateOpen(true)} update={updater} />
         </div>
       </header>
-      <div className={ui.activity === "assist" || ui.activity === "settings" ? "ide-body agent-active" : "ide-body"}>
+      <div
+        className={
+          ui.activity === "assist" ||
+          ui.activity === "settings" ||
+          ui.activity === "hostinger" ||
+          ui.activity === "sync"
+            ? "ide-body agent-active"
+            : "ide-body"
+        }
+      >
         <nav className="activity-bar" aria-label="IDE activities">
           <div>
             {activities.map((item) => (
@@ -252,15 +276,11 @@ export function DesktopApp() {
               </button>
             ))}
           </div>
-          <button
-            aria-label="Open settings"
-            onClick={() => ui.setDrawerOpen(true)}
-            type="button"
-          >
+          <button aria-label="Open settings" onClick={() => ui.setDrawerOpen(true)} type="button">
             <Settings size={21} />
           </button>
         </nav>
-        {ui.activity !== "assist" && ui.activity !== "settings" ? (
+        {!isFullWorkspace(ui.activity) ? (
           <aside className="side-panel">
             <div className="panel-heading">{panelTitle}</div>
             <Suspense fallback={<div className="panel-progress">Loading view...</div>}>
@@ -270,13 +290,6 @@ export function DesktopApp() {
                 changesState={session.changesState}
                 files={files}
                 filesState={session.filesState}
-                onAddContext={(path) =>
-                  setAgentContextPaths((current) =>
-                    current.includes(path) || current.length >= MAX_AGENT_CONTEXT_FILES
-                      ? current
-                      : [...current, path]
-                  )
-                }
                 onOpenWorkspace={() => void session.openWorkspace()}
                 onRefreshChanges={session.refreshChanges}
                 onSelectChange={(change) => setSelectedPath(change.path)}
@@ -295,27 +308,14 @@ export function DesktopApp() {
             <AgentWorkspace
               changes={changes}
               changesState={session.changesState}
-              contextPaths={agentContextPaths}
               files={files}
               filesState={session.filesState}
               key={workspace.path}
-              onAddContext={(path) =>
-                setAgentContextPaths((current) =>
-                  current.includes(path) || current.length >= MAX_AGENT_CONTEXT_FILES
-                    ? current
-                    : [...current, path]
-                )
-              }
-              onClearContext={() => setAgentContextPaths([])}
               onOpenFile={(path) => {
                 setSelectedPath(path);
                 ui.setActivity("files");
               }}
               onRefreshChanges={session.refreshChanges}
-              onRemoveContext={(path) =>
-                setAgentContextPaths((current) => current.filter((entry) => entry !== path))
-              }
-              selectedPath={selectedPath}
               workspace={workspace}
             />
           </div>
@@ -324,12 +324,30 @@ export function DesktopApp() {
               <SettingsPanel onClose={() => ui.setActivity("assist")} />
             </Suspense>
           </div>
+          <div className="workspace-surface" hidden={ui.activity !== "hostinger"}>
+            <Suspense fallback={<div className="workspace-loading">Loading Hostinger...</div>}>
+              <PortalWorkspace
+                description="VPS health, Hostinger metrics, Docker projects, and credentials."
+                path="/app/devkit/hostinger"
+                title="Hostinger infrastructure"
+              />
+            </Suspense>
+          </div>
+          <div className="workspace-surface" hidden={ui.activity !== "sync"}>
+            <Suspense fallback={<div className="workspace-loading">Loading sync...</div>}>
+              <PortalWorkspace
+                description="Connect local work data to DevKit Cloud and control synchronization."
+                path="/app/devkit/project-sync"
+                title="Local-first sync"
+              />
+            </Suspense>
+          </div>
           {editorStarted ? (
             <div
               className="workspace-surface"
               hidden={
                 ui.activity === "assist" ||
-                ui.activity === "settings" ||
+                isFullWorkspace(ui.activity) ||
                 (ui.activity === "git" && Boolean(selectedChange))
               }
             >
@@ -345,14 +363,14 @@ export function DesktopApp() {
           ) : null}
           {ui.activity === "git" && selectedChange ? (
             <div className="workspace-surface">
-              <Suspense fallback={<div className="workspace-loading">Loading diff reviewer...</div>}>
+              <Suspense
+                fallback={<div className="workspace-loading">Loading diff reviewer...</div>}
+              >
                 <GitDiffWorkspace change={selectedChange} theme={resolvedTheme} />
               </Suspense>
             </div>
           ) : null}
-          {ui.terminalOpen ? (
-            <TerminalPanel theme={resolvedTheme} workspace={workspace} />
-          ) : null}
+          {ui.terminalOpen ? <TerminalPanel theme={resolvedTheme} workspace={workspace} /> : null}
         </main>
       </div>
       <footer className="statusbar">
@@ -390,4 +408,8 @@ export function DesktopApp() {
       ) : null}
     </div>
   );
+}
+
+function isFullWorkspace(activity: string) {
+  return ["assist", "hostinger", "settings", "sync"].includes(activity);
 }

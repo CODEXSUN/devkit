@@ -1,8 +1,12 @@
 [package]
 name = "devkit-desktop"
-version = "1.0.67"
-description = "CodeLogix IDE runtime"
+version = "1.0.70"
+description = "DevKit IDE runtime"
 edition = "2021"
+
+[[bin]]
+name = "DevKit"
+path = "src/main.rs"
 
 [lib]
 name = "devkit_desktop_lib"
