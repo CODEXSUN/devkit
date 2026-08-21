@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
+import type { DesktopSetup, FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 import { afterFirstPaint } from "./startup-scheduler";
 
@@ -9,6 +9,7 @@ export type AgentRuntimeState = "idle" | "connecting" | "ready" | "unavailable";
 export function useDesktopSession() {
   const [agentRuntimeState] = useState<AgentRuntimeState>("idle");
   const [changes, setChanges] = useState<GitChange[]>([]);
+  const [desktopSetup, setDesktopSetup] = useState<DesktopSetup>();
   const [changesState, setChangesState] = useState<ResourceState>("idle");
   const [error, setError] = useState<string>();
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -51,6 +52,12 @@ export function useDesktopSession() {
     }
   }, []);
 
+  const refreshDesktopSetup = useCallback(async () => {
+    const next = await desktopClient.getDesktopSetup();
+    setDesktopSetup(next);
+    return next;
+  }, []);
+
   const openWorkspace = useCallback(
     async (path?: string) => {
       const generation = requestGeneration.current + 1;
@@ -66,8 +73,7 @@ export function useDesktopSession() {
         setChanges([]);
         setChangesState("idle");
         setSystem(undefined);
-        localStorage.setItem("devkit-workspace", next.path);
-        localStorage.removeItem("codelogix-workspace");
+        void refreshDesktopSetup();
       } catch (reason) {
         if (path) {
           localStorage.removeItem("devkit-workspace");
@@ -78,19 +84,35 @@ export function useDesktopSession() {
         if (requestGeneration.current === generation) setOpening(false);
       }
     },
-    []
+    [refreshDesktopSetup]
   );
 
   useEffect(() => {
-    const recentWorkspace = localStorage.getItem("devkit-workspace") ?? localStorage.getItem("codelogix-workspace");
-    if (!recentWorkspace) return;
-    return afterFirstPaint(() => void openWorkspace(recentWorkspace));
-  }, [openWorkspace]);
+    let active = true;
+    void refreshDesktopSetup().then((setup) => {
+      const profile = setup.profile;
+      if (
+        !active ||
+        !profile ||
+        !profile.rememberIdentity ||
+        profile.confirmOnStartup ||
+        !profile.lastWorkspacePath
+      ) return;
+      const lastWorkspacePath = profile.lastWorkspacePath;
+      if (lastWorkspacePath) afterFirstPaint(() => void openWorkspace(lastWorkspacePath));
+    }).catch(() => {
+      if (active) setDesktopSetup({ workspaces: [] });
+    });
+    return () => {
+      active = false;
+    };
+  }, [openWorkspace, refreshDesktopSetup]);
 
   return {
     agentRuntimeState,
     changes,
     changesState,
+    desktopSetup,
     error,
     files,
     filesState,
@@ -99,6 +121,7 @@ export function useDesktopSession() {
     openWorkspace,
     opening,
     refreshChanges,
+    refreshDesktopSetup,
     system,
     workspace
   };

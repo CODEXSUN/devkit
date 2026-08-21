@@ -1,4 +1,4 @@
-use crate::database::AgentConfig;
+use crate::database::{AgentConfig, DesktopProfile, DesktopSetup, DesktopWorkspace};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 use serde::Serialize;
@@ -16,6 +16,36 @@ pub fn get_agent_config(state: State<'_, DesktopState>) -> DesktopResult<AgentCo
         let config = database.get_agent_config()?;
         Ok(AgentConfigResponse { config })
     })
+}
+
+#[tauri::command]
+pub fn get_desktop_setup(state: State<'_, DesktopState>) -> DesktopResult<DesktopSetup> {
+    state.with_database(|database| database.desktop_setup())
+}
+
+#[tauri::command]
+pub fn save_desktop_profile(profile: DesktopProfile, state: State<'_, DesktopState>) -> DesktopResult<DesktopProfile> {
+    let display_name = profile.display_name.trim();
+    if display_name.is_empty() || display_name.len() > 80 {
+        return Err(DesktopError::Policy("Enter a display name of up to 80 characters.".into()));
+    }
+    let email = profile.email.as_deref().map(str::trim).filter(|value| !value.is_empty());
+    if email.is_some_and(|value| value.len() > 254 || !value.contains('@')) {
+        return Err(DesktopError::Policy("Enter a valid email address or leave it blank.".into()));
+    }
+    state.with_database(|database| database.save_desktop_profile(&DesktopProfile {
+        display_name: display_name.into(), email: email.map(str::to_owned), ..profile
+    }))
+}
+
+#[tauri::command]
+pub fn save_desktop_workspace(workspace: DesktopWorkspace, state: State<'_, DesktopState>) -> DesktopResult<DesktopWorkspace> {
+    let valid_kinds = ["application", "plugin", "document", "other"];
+    let valid_relationships = ["project", "addOn", "standalone"];
+    if !valid_kinds.contains(&workspace.kind.as_str()) || !valid_relationships.contains(&workspace.relationship.as_str()) {
+        return Err(DesktopError::Policy("Invalid workspace mapping.".into()));
+    }
+    state.with_database(|database| database.save_desktop_workspace(&workspace))
 }
 
 #[tauri::command]

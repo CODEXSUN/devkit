@@ -18,6 +18,8 @@ import {
 import codeItIcon from "../../src-tauri/icons/icon.png";
 import { AgentWorkspace } from "../workspaces/agent-workspace";
 import { SetupWorkspace } from "../workspaces/setup-workspace";
+import { DesktopSetup } from "../workspaces/desktop-setup";
+import { WorkspaceIdentitySettings } from "../workspaces/workspace-identity-settings";
 import { AppDrawer } from "./app-drawer";
 import { OpenInMenu } from "./open-in-menu";
 import { CommandPalette, type PaletteCommand } from "./command-palette";
@@ -206,7 +208,9 @@ export function DesktopApp() {
     [files, ui.setActivity, ui.setUpdateOpen, ui.terminalOpen, ui.toggleTerminal]
   );
 
-  if (!workspace)
+  if (!workspace) {
+    if (!session.desktopSetup || !session.desktopSetup.profile || session.desktopSetup.profile.confirmOnStartup)
+      return <DesktopSetup onComplete={async () => { await session.refreshDesktopSetup(); }} setup={session.desktopSetup} />;
     return (
       <>
         <SetupWorkspace
@@ -227,6 +231,7 @@ export function DesktopApp() {
         ) : null}
       </>
     );
+  }
 
   return (
     <div className="ide">
@@ -321,7 +326,11 @@ export function DesktopApp() {
           </div>
           <div className="workspace-surface" hidden={ui.activity !== "settings"}>
             <Suspense fallback={<div className="workspace-loading">Loading settings...</div>}>
-              <SettingsPanel onClose={() => ui.setActivity("assist")} />
+              <SettingsPanel
+                currentWorkspace={workspace}
+                onClose={() => ui.setActivity("assist")}
+                onOpenWorkspace={session.openWorkspace}
+              />
             </Suspense>
           </div>
           <div className="workspace-surface" hidden={ui.activity !== "hostinger"}>

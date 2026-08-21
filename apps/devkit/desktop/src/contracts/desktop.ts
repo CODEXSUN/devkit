@@ -4,6 +4,25 @@ export type Workspace = {
   branch: string;
 };
 
+export type WorkspaceKind = "application" | "plugin" | "document" | "other";
+export type WorkspaceRelationship = "project" | "addOn" | "standalone";
+export type DesktopProfile = {
+  displayName: string;
+  email?: string | null;
+  rememberIdentity: boolean;
+  confirmOnStartup: boolean;
+  lastWorkspacePath?: string | null;
+};
+export type DesktopWorkspace = {
+  path: string;
+  name: string;
+  kind: WorkspaceKind;
+  relationship: WorkspaceRelationship;
+  projectName?: string | null;
+  lastOpenedAt: string;
+};
+export type DesktopSetup = { profile?: DesktopProfile | null; workspaces: DesktopWorkspace[] };
+
 export type FileEntry = {
   name: string;
   path: string;

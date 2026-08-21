@@ -38,6 +38,13 @@ function copyBinary(binary, sourceDirectory) {
   );
 
   if (!existsSync(source)) {
+    if (!process.env.CI && existsSync(destination) && statSync(destination).size > 0) {
+      console.warn(
+        `Using the existing ${binary} sidecar for ${target}; run npm install from the repository root to restore its vendor source.`,
+      );
+      return;
+    }
+
     throw new Error(
       `${binary} is unavailable for ${target}. Run npm install from the repository root.`,
     );

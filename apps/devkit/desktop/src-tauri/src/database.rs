@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
-use crate::error::DesktopResult;
+use crate::error::{DesktopError, DesktopResult};
 
 mod learning;
 #[cfg(test)]
@@ -105,6 +105,34 @@ pub struct AgentMessage {
     pub role: String,
     pub content: String,
     pub created_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopProfile {
+    pub display_name: String,
+    pub email: Option<String>,
+    pub remember_identity: bool,
+    pub confirm_on_startup: bool,
+    pub last_workspace_path: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopWorkspace {
+    pub path: String,
+    pub name: String,
+    pub kind: String,
+    pub relationship: String,
+    pub project_name: Option<String>,
+    pub last_opened_at: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopSetup {
+    pub profile: Option<DesktopProfile>,
+    pub workspaces: Vec<DesktopWorkspace>,
 }
 
 pub struct DesktopDatabase {
@@ -253,6 +281,49 @@ impl DesktopDatabase {
         Ok(count as usize)
     }
 
+    pub fn desktop_setup(&self) -> DesktopResult<DesktopSetup> {
+        Ok(DesktopSetup {
+            profile: self.desktop_profile()?,
+            workspaces: self.list_desktop_workspaces()?,
+        })
+    }
+
+    pub fn save_desktop_profile(&self, profile: &DesktopProfile) -> DesktopResult<DesktopProfile> {
+        self.connection.execute(
+            "INSERT INTO desktop_local_profile (id, display_name, email, remember_identity, confirm_on_startup, last_workspace_path)
+             VALUES (1, ?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email,
+             remember_identity = excluded.remember_identity, confirm_on_startup = excluded.confirm_on_startup,
+             last_workspace_path = excluded.last_workspace_path, updated_at = CURRENT_TIMESTAMP",
+            params![profile.display_name, profile.email, profile.remember_identity, profile.confirm_on_startup, profile.last_workspace_path],
+        )?;
+        self.desktop_profile()?.ok_or_else(|| DesktopError::Policy("Local profile was not saved.".into()))
+    }
+
+    pub fn save_desktop_workspace(&self, workspace: &DesktopWorkspace) -> DesktopResult<DesktopWorkspace> {
+        self.connection.execute(
+            "INSERT INTO desktop_workspaces (path, name, kind, relationship, project_name)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(path) DO UPDATE SET name = excluded.name, kind = excluded.kind,
+             relationship = excluded.relationship, project_name = excluded.project_name, updated_at = CURRENT_TIMESTAMP",
+            params![workspace.path, workspace.name, workspace.kind, workspace.relationship, workspace.project_name],
+        )?;
+        self.workspace_by_path(&workspace.path)
+    }
+
+    pub fn mark_workspace_opened(&self, path: &str, name: &str) -> DesktopResult<()> {
+        self.connection.execute(
+            "INSERT INTO desktop_workspaces (path, name) VALUES (?1, ?2)
+             ON CONFLICT(path) DO UPDATE SET name = excluded.name, last_opened_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP",
+            params![path, name],
+        )?;
+        self.connection.execute(
+            "UPDATE desktop_local_profile SET last_workspace_path = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+            params![path],
+        )?;
+        Ok(())
+    }
+
     pub fn get_agent_config(&self) -> DesktopResult<AgentConfig> {
         let mut statement = self.connection.prepare(
             "SELECT key, value FROM desktop_settings WHERE key LIKE 'agent.%'",
@@ -349,8 +420,55 @@ impl DesktopDatabase {
             .execute_batch(include_str!("../migrations/0003_project_learning.sql"))?;
         self.connection
             .execute_batch(include_str!("../migrations/0004_settings.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0005_desktop_setup.sql"))?;
+        self.ensure_workspace_column("kind", "TEXT NOT NULL DEFAULT 'application'")?;
+        self.ensure_workspace_column("relationship", "TEXT NOT NULL DEFAULT 'standalone'")?;
+        self.ensure_workspace_column("project_name", "TEXT")?;
+        self.ensure_workspace_column("updated_at", "TEXT NOT NULL DEFAULT ''")?;
         Ok(())
     }
+
+    fn ensure_workspace_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
+        let mut statement = self.connection.prepare("PRAGMA table_info(desktop_workspaces)")?;
+        let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+        if columns.filter_map(Result::ok).any(|name| name == column) {
+            return Ok(());
+        }
+        self.connection.execute_batch(&format!("ALTER TABLE desktop_workspaces ADD COLUMN {column} {definition}"))?;
+        Ok(())
+    }
+
+    fn desktop_profile(&self) -> DesktopResult<Option<DesktopProfile>> {
+        let mut statement = self.connection.prepare(
+            "SELECT display_name, email, remember_identity, confirm_on_startup, last_workspace_path FROM desktop_local_profile WHERE id = 1",
+        )?;
+        let mut rows = statement.query([])?;
+        let Some(row) = rows.next()? else { return Ok(None) };
+        Ok(Some(DesktopProfile {
+            display_name: row.get(0)?, email: row.get(1)?, remember_identity: row.get::<_, i64>(2)? != 0,
+            confirm_on_startup: row.get::<_, i64>(3)? != 0, last_workspace_path: row.get(4)?,
+        }))
+    }
+
+    fn list_desktop_workspaces(&self) -> DesktopResult<Vec<DesktopWorkspace>> {
+        let mut statement = self.connection.prepare(
+            "SELECT path, name, kind, relationship, project_name, last_opened_at FROM desktop_workspaces ORDER BY last_opened_at DESC, name COLLATE NOCASE",
+        )?;
+        let rows = statement.query_map([], desktop_workspace_from_row)?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    fn workspace_by_path(&self, path: &str) -> DesktopResult<DesktopWorkspace> {
+        Ok(self.connection.query_row(
+            "SELECT path, name, kind, relationship, project_name, last_opened_at FROM desktop_workspaces WHERE path = ?1",
+            params![path], desktop_workspace_from_row,
+        )?)
+    }
+}
+
+fn desktop_workspace_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DesktopWorkspace> {
+    Ok(DesktopWorkspace { path: row.get(0)?, name: row.get(1)?, kind: row.get(2)?, relationship: row.get(3)?, project_name: row.get(4)?, last_opened_at: row.get(5)? })
 }
 
 fn agent_task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTask> {
@@ -365,7 +483,7 @@ fn agent_task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTask> {
 
 #[cfg(test)]
 mod tests {
-    use super::DesktopDatabase;
+    use super::{DesktopDatabase, DesktopProfile, DesktopWorkspace};
 
     #[test]
     fn persists_agent_tasks_and_messages_per_workspace() {
@@ -408,6 +526,28 @@ mod tests {
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].id, "message-2");
 
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn persists_local_identity_and_workspace_mapping() {
+        let path = std::env::temp_dir().join(format!("devkit-desktop-setup-{}.db", uuid::Uuid::new_v4()));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        database.save_desktop_profile(&DesktopProfile {
+            display_name: "Aaran".into(), email: Some("aaran@example.com".into()), remember_identity: true,
+            confirm_on_startup: false, last_workspace_path: None,
+        }).expect("save profile");
+        database.save_desktop_workspace(&DesktopWorkspace {
+            path: "C:/work/sample".into(), name: "sample".into(), kind: "plugin".into(),
+            relationship: "addOn".into(), project_name: Some("DevKit".into()), last_opened_at: String::new(),
+        }).expect("save workspace");
+        database.mark_workspace_opened("C:/work/sample", "sample").expect("mark opened");
+        drop(database);
+        let database = DesktopDatabase::open(path.clone()).expect("reopen migrated database");
+        let setup = database.desktop_setup().expect("load setup");
+        assert_eq!(setup.profile.expect("profile").display_name, "Aaran");
+        assert_eq!(setup.workspaces[0].relationship, "addOn");
         drop(database);
         std::fs::remove_file(path).expect("remove test database");
     }

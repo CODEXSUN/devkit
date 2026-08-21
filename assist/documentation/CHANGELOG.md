@@ -1,8 +1,20 @@
 # Changelog
 
-Current version: 1.0.70
-Release tag: v-1.0.70
-Changelog label: v 1.0.70
+Current version: 1.0.71
+Release tag: v-1.0.71
+Changelog label: v 1.0.71
+
+## v-1.0.71
+
+### [v 1.0.71] 2026-08-21 9:54 am - Desktop startup and local workspace setup
+
+#### Database Changes
+
+- Database update: Yes.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.71.
 
 ## v-1.0.70
 

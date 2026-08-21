@@ -52,9 +52,12 @@ pub fn open_workspace(
         .map_err(|_| DesktopError::Policy("Workspace state is unavailable.".into()))? =
         Some(root.clone());
     let branch = super::git::current_branch(&root).unwrap_or_else(|_| "no branch".into());
+    let path = root.display().to_string();
+    let name = display_name(&root);
+    state.with_database(|database| database.mark_workspace_opened(&path, &name))?;
     Ok(Workspace {
-        name: display_name(&root),
-        path: root.display().to_string(),
+        name,
+        path,
         branch,
     })
 }

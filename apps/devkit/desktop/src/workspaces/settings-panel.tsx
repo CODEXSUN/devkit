@@ -34,6 +34,8 @@ import {
 import { useEffect, useState } from "react";
 import { desktopClient, getFallbackAgentConfig } from "../services/desktop-client";
 import type { AgentConfig, AgentProvider, ProviderConfig } from "../contracts/desktop";
+import type { Workspace } from "../contracts/desktop";
+import { WorkspaceIdentitySettings } from "./workspace-identity-settings";
 
 export function openExternalUrl(url: string) {
   try {
@@ -51,6 +53,7 @@ export function openExternalUrl(url: string) {
 
 export type SettingsSection =
   | "general"
+  | "workspace-identity"
   | "agent-overview"
   | "provider-codex"
   | "provider-openrouter"
@@ -254,7 +257,15 @@ export function getDefaultProviders(): Record<AgentProvider, ProviderConfig> {
   };
 }
 
-export function SettingsPanel({ onClose }: { onClose?: () => void }) {
+export function SettingsPanel({
+  currentWorkspace,
+  onClose,
+  onOpenWorkspace
+}: {
+  currentWorkspace?: Workspace;
+  onClose?: () => void;
+  onOpenWorkspace: (path?: string) => Promise<void>;
+}) {
   const [activeSection, setActiveSection] = useState<SettingsSection>("agent-overview");
   const [config, setConfig] = useState<AgentConfig>(() => getFallbackAgentConfig());
   const [loading, setLoading] = useState(true);
@@ -332,6 +343,15 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
 
           <button
             type="button"
+            className={`sidebar-item${activeSection === "workspace-identity" ? " active" : ""}`}
+            onClick={() => setActiveSection("workspace-identity")}
+          >
+            <Laptop size={16} className="sidebar-icon" />
+            <span className="sidebar-label">Identity & workspaces</span>
+          </button>
+
+          <button
+            type="button"
             className={`sidebar-item${activeSection === "agent-overview" ? " active" : ""}`}
             onClick={() => setActiveSection("agent-overview")}
           >
@@ -388,6 +408,9 @@ export function SettingsPanel({ onClose }: { onClose?: () => void }) {
           )}
 
           {activeSection === "general" && <GeneralSettingsTab />}
+          {activeSection === "workspace-identity" && (
+            <WorkspaceIdentitySettings currentWorkspace={currentWorkspace} onOpenWorkspace={onOpenWorkspace} />
+          )}
           {activeSection === "agent-overview" && (
             <AgentOverviewTab
               config={config}

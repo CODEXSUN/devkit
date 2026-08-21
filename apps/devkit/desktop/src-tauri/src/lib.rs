@@ -70,7 +70,10 @@ pub fn run() {
             commands::terminal::write_terminal,
             commands::terminal::close_terminal,
             commands::settings::get_agent_config,
-            commands::settings::save_agent_config
+            commands::settings::save_agent_config,
+            commands::settings::get_desktop_setup,
+            commands::settings::save_desktop_profile,
+            commands::settings::save_desktop_workspace
         ])
         .run(tauri::generate_context!())
         .expect("DevKit runtime failed");

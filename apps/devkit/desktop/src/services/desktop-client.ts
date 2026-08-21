@@ -5,6 +5,9 @@ import type {
   AgentMessage,
   AgentRuntimeStatus,
   AgentTask,
+  DesktopProfile,
+  DesktopSetup,
+  DesktopWorkspace,
   FileEntry,
   ExternalEditor,
   GitChange,
@@ -82,6 +85,18 @@ export class DesktopClient {
 
   async openWorkspace(path?: string) {
     return invoke<Workspace>("open_workspace", { path: path ?? null });
+  }
+
+  async getDesktopSetup() {
+    return invoke<DesktopSetup>("get_desktop_setup");
+  }
+
+  async saveDesktopProfile(profile: DesktopProfile) {
+    return invoke<DesktopProfile>("save_desktop_profile", { profile });
+  }
+
+  async saveDesktopWorkspace(workspace: DesktopWorkspace) {
+    return invoke<DesktopWorkspace>("save_desktop_workspace", { workspace });
   }
 
   async listFiles(path = ".") {
