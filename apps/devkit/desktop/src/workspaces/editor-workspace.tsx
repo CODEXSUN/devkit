@@ -2,18 +2,26 @@ import Editor from "@monaco-editor/react";
 import { LoaderCircle, Save, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadMonacoLanguages } from "../editor/monaco-config";
+import type { DesktopWorkspace, Workspace } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
+import { WorkspaceSwitcher } from "../shell/workspace-switcher";
 
 type Document = { content: string; saved: string; loading: boolean; error: string | undefined };
 
 export function EditorWorkspace({
+  currentWorkspace,
+  onSelectWorkspace,
   path,
   onSelectPath,
-  theme
+  theme,
+  workspaces
 }: {
+  currentWorkspace: Workspace;
+  onSelectWorkspace: (path: string) => void;
   path: string | undefined;
   onSelectPath: (path: string | undefined) => void;
   theme: "dark" | "light";
+  workspaces: DesktopWorkspace[];
 }) {
   const [documents, setDocuments] = useState<Record<string, Document>>({});
   const [monacoReady, setMonacoReady] = useState(false);
@@ -143,6 +151,11 @@ export function EditorWorkspace({
       </div>
       <header>
         <span>{path}</span>
+        <WorkspaceSwitcher
+          currentWorkspace={currentWorkspace}
+          onSelectWorkspace={onSelectWorkspace}
+          workspaces={workspaces}
+        />
         <button disabled={!dirty} onClick={() => void save(path)} type="button">
           <Save size={14} /> Save
         </button>

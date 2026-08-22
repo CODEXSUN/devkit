@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { FileEntry, GitChange, Workspace } from "../contracts/desktop";
 import type { ResourceState } from "../shell/use-desktop-session";
+import type { DesktopPerformanceSample } from "../shell/desktop-performance";
 
 export type RunItem = { id: string; label: string; status: string; type: string };
 export type Approval = { id: number; command: string; reason: string };
@@ -119,6 +120,7 @@ export function EnvironmentPanel({
   files,
   filesState,
   onOpenFile,
+  performance,
   workspace
 }: {
   changes: GitChange[];
@@ -127,6 +129,7 @@ export function EnvironmentPanel({
   files: FileEntry[];
   filesState: ResourceState;
   onOpenFile: (path: string) => void;
+  performance: DesktopPerformanceSample[];
   workspace: Workspace;
 }) {
   return (
@@ -154,6 +157,21 @@ export function EnvironmentPanel({
       {diff ? (
         <section><h2><Play size={15} /> Latest diff</h2><pre>{diff.slice(0, 1600)}</pre></section>
       ) : null}
+      {performance.length ? (
+        <section>
+          <h2><Play size={15} /> Local performance</h2>
+          {performance.map((sample, index) => (
+            <div className="environment-row" key={`${sample.at}-${sample.operation}-${index}`}>
+              <span title={sample.detail}>{sample.operation}</span>
+              <strong>{formatDuration(sample.durationMs)}</strong>
+            </div>
+          ))}
+        </section>
+      ) : null}
     </aside>
   );
+}
+
+function formatDuration(durationMs: number) {
+  return durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(1)}s` : `${Math.round(durationMs)}ms`;
 }

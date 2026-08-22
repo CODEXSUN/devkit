@@ -30,9 +30,9 @@ pub struct GitFileDiff {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitWorktree {
-    path: String,
-    branch: String,
-    head: String,
+    pub path: String,
+    pub branch: String,
+    pub head: String,
 }
 
 #[tauri::command]
@@ -304,12 +304,20 @@ pub fn git_create_worktree(
 ) -> DesktopResult<GitWorktree> {
     let slug = worktree_slug(&name)?;
     let root = workspace_root(&state)?;
+    create_managed_worktree(&root, &slug)
+}
+
+pub fn create_agent_task_worktree(root: &Path, task_id: i64) -> DesktopResult<GitWorktree> {
+    create_managed_worktree(root, &format!("task-{task_id}"))
+}
+
+fn create_managed_worktree(root: &Path, slug: &str) -> DesktopResult<GitWorktree> {
     let parent = root
         .parent()
         .ok_or_else(|| DesktopError::Policy("The workspace has no parent directory.".into()))?;
     let managed_root = parent.join(".devkit-worktrees");
     fs::create_dir_all(&managed_root)?;
-    let target = managed_root.join(&slug);
+    let target = managed_root.join(slug);
     if target.exists() {
         return Err(DesktopError::Policy(
             "A worktree with this name already exists.".into(),
@@ -320,7 +328,7 @@ pub fn git_create_worktree(
     command
         .args(["worktree", "add", "-b", &branch])
         .arg(&target);
-    checked_output(command.current_dir(&root), "Git worktree creation failed.")?;
+    checked_output(command.current_dir(root), "Git worktree creation failed.")?;
     let head = git_head(&target)?;
     Ok(GitWorktree {
         path: target.display().to_string(),

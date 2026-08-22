@@ -11,6 +11,7 @@ export type DesktopProfile = {
   email?: string | null;
   rememberIdentity: boolean;
   confirmOnStartup: boolean;
+  defaultWorkGroupPath?: string | null;
   lastWorkspacePath?: string | null;
 };
 export type DesktopWorkspace = {
@@ -19,9 +20,32 @@ export type DesktopWorkspace = {
   kind: WorkspaceKind;
   relationship: WorkspaceRelationship;
   projectName?: string | null;
+  pinned: boolean;
   lastOpenedAt: string;
 };
 export type DesktopSetup = { profile?: DesktopProfile | null; workspaces: DesktopWorkspace[] };
+export type WorkGroup = { name: string; path: string };
+export type SavedRepositoryUrl = {
+  id: number;
+  workGroupPath: string;
+  url: string;
+  kind: WorkspaceKind;
+  relationship: WorkspaceRelationship;
+  updatedAt: string;
+};
+export type RepositoryCandidate = {
+  path: string;
+  name: string;
+  connected: boolean;
+  kind: WorkspaceKind;
+  relationship: WorkspaceRelationship;
+  projectName?: string | null;
+};
+export type WorkGroupScan = {
+  group: WorkGroup;
+  repositories: RepositoryCandidate[];
+  savedRepositoryUrls: SavedRepositoryUrl[];
+};
 
 export type FileEntry = {
   name: string;
@@ -92,16 +116,17 @@ export type PythonEnvironment = {
   virtualEnvironment: string | null;
 };
 
-export type LocalTask = {
-  id: number;
-  title: string;
-  status: "todo" | "active" | "done";
-};
-
 export type TerminalResult = {
   code: number | null;
   stderr: string;
   stdout: string;
+};
+
+export type LocalTask = {
+  execution: string;
+  id: number;
+  title: string;
+  status: "todo" | "active" | "done";
 };
 
 export type SyncResult = {
@@ -111,11 +136,16 @@ export type SyncResult = {
 
 export type AgentAccess = "readOnly" | "workspaceWrite";
 export type AgentTask = {
+  archived: boolean;
+  executionPath?: string | null;
   id: number;
+  reviewRequested: boolean;
+  runStatus: "ready" | "running" | "completed" | "failed" | "stopped";
   threadId: string;
   title: string;
   access: AgentAccess;
   updatedAt: string;
+  worktreeBranch?: string | null;
 };
 export type AgentMessage = {
   id: string;
@@ -138,6 +168,7 @@ export type AgentProtocolMessage = {
 };
 
 export type AgentProvider = "codex" | "openrouter" | "opencode" | "claude" | "ollama" | "gemini";
+export type AgentReasoningEffort = "low" | "medium" | "high";
 
 export type ProviderConfig = {
   enabled: boolean;
@@ -145,6 +176,7 @@ export type ProviderConfig = {
   apiKey?: string | undefined;
   baseUrl?: string | undefined;
   model?: string | undefined;
+  reasoningEffort?: AgentReasoningEffort | undefined;
   temperature?: number | undefined;
   maxTokens?: number | undefined;
   systemPrompt?: string | undefined;

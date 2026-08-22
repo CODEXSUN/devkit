@@ -17,6 +17,8 @@ pub fn save_agent_task(
     thread_id: String,
     title: String,
     access: String,
+    surface: Option<String>,
+    local_task_id: Option<i64>,
     state: State<'_, DesktopState>,
 ) -> DesktopResult<AgentTask> {
     let thread_id = required(&thread_id, "Codex thread")?;
@@ -29,8 +31,50 @@ pub fn save_agent_task(
     if !["readOnly", "workspaceWrite"].contains(&access.as_str()) {
         return Err(DesktopError::Policy("Unknown agent access mode.".into()));
     }
+    let root = workspace_root(&state)?;
+    let workspace = root.to_string_lossy().into_owned();
+    let surface = surface.unwrap_or_else(|| "chat".into());
+    if !["chat", "runner"].contains(&surface.as_str()) {
+        return Err(DesktopError::Policy("Unknown task surface.".into()));
+    }
+    if surface == "runner" && local_task_id.is_none() {
+        return Err(DesktopError::Policy("Runner tasks need a local task reference.".into()));
+    }
+    let task = state.with_database(|database| {
+        database.save_agent_task(&workspace, thread_id, title, &access, &surface, local_task_id)
+    })?;
+    if access == "readOnly" || task.execution_path.is_some() {
+        return Ok(task);
+    }
+    let worktree = match super::git::create_agent_task_worktree(&root, task.id) {
+        Ok(worktree) => worktree,
+        Err(error) => {
+            let _ = state.with_database(|database| database.delete_agent_task(&workspace, task.id));
+            return Err(error);
+        }
+    };
+    state.with_database(|database| {
+        database.set_agent_task_execution(&workspace, task.id, &worktree.path, &worktree.branch)
+    })
+}
+
+#[tauri::command]
+pub fn get_runner_task(local_task_id: i64, state: State<'_, DesktopState>) -> DesktopResult<Option<AgentTask>> {
     let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
-    state.with_database(|database| database.save_agent_task(&workspace, thread_id, title, &access))
+    state.with_database(|database| database.runner_task(&workspace, local_task_id))
+}
+
+#[tauri::command]
+pub fn set_agent_task_status(
+    task_id: i64,
+    status: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<AgentTask> {
+    if !["ready", "running", "completed", "failed", "stopped"].contains(&status.as_str()) {
+        return Err(DesktopError::Policy("Unknown agent task status.".into()));
+    }
+    let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
+    state.with_database(|database| database.set_agent_task_status(&workspace, task_id, &status))
 }
 
 #[tauri::command]
@@ -70,6 +114,27 @@ pub fn delete_agent_message(
 ) -> DesktopResult<bool> {
     let id = required(&id, "Message identifier")?;
     state.with_database(|database| database.delete_agent_message(task_id, id))
+}
+
+#[tauri::command]
+pub fn archive_agent_task(task_id: i64, state: State<'_, DesktopState>) -> DesktopResult<bool> {
+    let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
+    state.with_database(|database| database.archive_agent_task(&workspace, task_id))
+}
+
+#[tauri::command]
+pub fn delete_agent_task(task_id: i64, state: State<'_, DesktopState>) -> DesktopResult<bool> {
+    let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
+    state.with_database(|database| database.delete_agent_task(&workspace, task_id))
+}
+
+#[tauri::command]
+pub fn request_agent_task_review(
+    task_id: i64,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<AgentTask> {
+    let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
+    state.with_database(|database| database.request_agent_task_review(&workspace, task_id))
 }
 
 fn required<'a>(value: &'a str, label: &str) -> DesktopResult<&'a str> {

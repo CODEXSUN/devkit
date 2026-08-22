@@ -10,9 +10,10 @@ pub mod search;
 pub mod settings;
 pub mod skills;
 pub mod sync;
-pub mod system;
 pub mod tasks;
+pub mod system;
 pub mod terminal;
+pub mod work_group;
 mod workspace_policy;
 
 use std::ffi::OsStr;
@@ -44,7 +45,10 @@ pub(crate) fn workspace_root(state: &State<'_, DesktopState>) -> DesktopResult<P
     Ok(sanitize_path(raw))
 }
 
-pub(crate) fn workspace_path(state: &State<'_, DesktopState>, input: &str) -> DesktopResult<PathBuf> {
+pub(crate) fn workspace_path(
+    state: &State<'_, DesktopState>,
+    input: &str,
+) -> DesktopResult<PathBuf> {
     let root = workspace_root(state)?;
     let clean_input = input.trim();
     if clean_input.is_empty() || clean_input == "." {

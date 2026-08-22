@@ -168,6 +168,9 @@ vite.config.ts.timestamp-*
 **/src-tauri/gen/schemas/
 **/src-tauri/binaries/codex-*
 **/src-tauri/binaries/rg-*
+/cargo-project-jobs-check/
+/.tmp-cargo-*/
+/target-codex-verify/
 
 # Test and browser-runner output
 **/coverage/
@@ -196,3 +199,4 @@ vite.config.ts.timestamp-*
 .DS_Store
 Thumbs.db
 Desktop.ini
+apps/devkit/desktop/src-tauri/binaries/

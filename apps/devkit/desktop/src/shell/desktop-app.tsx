@@ -6,6 +6,7 @@ import {
   CircleDot,
   CloudCog,
   Files,
+  FolderKanban,
   GitBranch,
   ListTodo,
   Menu,
@@ -15,11 +16,10 @@ import {
   Settings,
   SlidersHorizontal
 } from "lucide-react";
-import codeItIcon from "../../src-tauri/icons/icon.png";
 import { AgentWorkspace } from "../workspaces/agent-workspace";
-import { SetupWorkspace } from "../workspaces/setup-workspace";
+import { TaskRunnerWorkspace } from "../workspaces/task-runner-workspace";
 import { DesktopSetup } from "../workspaces/desktop-setup";
-import { WorkspaceIdentitySettings } from "../workspaces/workspace-identity-settings";
+import { WorkGroupSetup } from "../workspaces/work-group-setup";
 import { AppDrawer } from "./app-drawer";
 import { OpenInMenu } from "./open-in-menu";
 import { CommandPalette, type PaletteCommand } from "./command-palette";
@@ -55,9 +55,15 @@ const SettingsPanel = lazy(() =>
     default: module.SettingsPanel
   }))
 );
-
+const ProjectOverview = lazy(() =>
+  import("../workspaces/project-overview").then((module) => ({ default: module.ProjectOverview }))
+);
+const ProjectSummary = lazy(() =>
+  import("../workspaces/project-summary").then((module) => ({ default: module.ProjectSummary }))
+);
 const activities = [
   { icon: Bot, id: "assist", label: "Agent" },
+  { icon: FolderKanban, id: "projects", label: "Projects" },
   { icon: Files, id: "files", label: "Explorer" },
   { icon: Search, id: "search", label: "Search" },
   { icon: GitBranch, id: "git", label: "Source control" },
@@ -81,6 +87,7 @@ export function DesktopApp() {
   );
   const [selectedPath, setSelectedPath] = useState<string>();
   const [editorStarted, setEditorStarted] = useState(false);
+  const [workGroupOpen, setWorkGroupOpen] = useState(false);
   const updater = useDesktopUpdater();
   const session = useDesktopSession();
   const {
@@ -95,6 +102,11 @@ export function DesktopApp() {
     workspace
   } = session;
   const selectedChange = changes.find((change) => change.path === selectedPath);
+
+  async function openProjectOverview(path: string) {
+    await session.openWorkspace(path);
+    ui.setActivity("overview");
+  }
 
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
@@ -156,10 +168,17 @@ export function DesktopApp() {
     return () => window.removeEventListener("keydown", keyboard);
   }, [togglePalette, toggleTerminal]);
 
+  useEffect(() => {
+    const openTerminal = () => ui.setTerminalOpen(true);
+    window.addEventListener("devkit:open-terminal", openTerminal);
+    return () => window.removeEventListener("devkit:open-terminal", openTerminal);
+  }, [ui.setTerminalOpen]);
+
   const panelTitle = useMemo(
     () => activities.find((item) => item.id === ui.activity)?.label ?? "Explorer",
     [ui.activity]
   );
+  const titlebarLabel = ui.activity === "tasks" ? "Task orchestration" : panelTitle;
 
   const paletteCommands = useMemo<PaletteCommand[]>(
     () => [
@@ -208,17 +227,25 @@ export function DesktopApp() {
     [files, ui.setActivity, ui.setUpdateOpen, ui.terminalOpen, ui.toggleTerminal]
   );
 
-  if (!workspace) {
-    if (!session.desktopSetup || !session.desktopSetup.profile || session.desktopSetup.profile.confirmOnStartup)
-      return <DesktopSetup onComplete={async () => { await session.refreshDesktopSetup(); }} setup={session.desktopSetup} />;
+  if (!workspace || workGroupOpen) {
+    if (!session.desktopSetup || !session.desktopSetup.profile)
+      return (
+        <DesktopSetup
+          onComplete={async () => {
+            await session.refreshDesktopSetup();
+          }}
+          setup={session.desktopSetup}
+        />
+      );
     return (
       <>
-        <SetupWorkspace
-          agentRuntimeState={session.agentRuntimeState}
-          error={session.error}
-          onOpen={session.openWorkspace}
-          opening={session.opening}
-          system={system}
+        <WorkGroupSetup
+          onOpenWorkspace={session.openWorkspace}
+          onRefresh={async () => {
+            await session.refreshDesktopSetup();
+          }}
+          onReturn={workspace ? () => setWorkGroupOpen(false) : undefined}
+          profile={session.desktopSetup.profile}
         />
         <div className="setup-update">
           <UpdateButton onOpen={() => ui.setUpdateOpen(true)} update={updater} />
@@ -245,7 +272,7 @@ export function DesktopApp() {
           >
             <Menu size={18} />
           </button>
-          <img alt="" className="product-icon" src={codeItIcon} /> DevKit
+          {titlebarLabel}
         </div>
         <button className="command-center" onClick={() => ui.setPaletteOpen(true)} type="button">
           <Search size={14} /> Search commands and files <kbd>Ctrl K</kbd>
@@ -259,6 +286,9 @@ export function DesktopApp() {
       <div
         className={
           ui.activity === "assist" ||
+          ui.activity === "tasks" ||
+          ui.activity === "overview" ||
+          ui.activity === "projects" ||
           ui.activity === "settings" ||
           ui.activity === "hostinger" ||
           ui.activity === "sync"
@@ -309,7 +339,7 @@ export function DesktopApp() {
         <main
           className={`workbench${ui.activity === "assist" ? " agent-workbench" : ""}${ui.terminalOpen ? " terminal-visible" : ""}`}
         >
-          <div className="workspace-surface" hidden={ui.activity !== "assist"}>
+          {ui.activity === "assist" ? <div className="workspace-surface">
             <AgentWorkspace
               changes={changes}
               changesState={session.changesState}
@@ -320,37 +350,72 @@ export function DesktopApp() {
                 setSelectedPath(path);
                 ui.setActivity("files");
               }}
+              onOpenProjectOverview={() => ui.setActivity("overview")}
               onRefreshChanges={session.refreshChanges}
               workspace={workspace}
             />
-          </div>
-          <div className="workspace-surface" hidden={ui.activity !== "settings"}>
-            <Suspense fallback={<div className="workspace-loading">Loading settings...</div>}>
-              <SettingsPanel
-                currentWorkspace={workspace}
-                onClose={() => ui.setActivity("assist")}
-                onOpenWorkspace={session.openWorkspace}
-              />
-            </Suspense>
-          </div>
-          <div className="workspace-surface" hidden={ui.activity !== "hostinger"}>
-            <Suspense fallback={<div className="workspace-loading">Loading Hostinger...</div>}>
-              <PortalWorkspace
-                description="VPS health, Hostinger metrics, Docker projects, and credentials."
-                path="/app/devkit/hostinger"
-                title="Hostinger infrastructure"
-              />
-            </Suspense>
-          </div>
-          <div className="workspace-surface" hidden={ui.activity !== "sync"}>
-            <Suspense fallback={<div className="workspace-loading">Loading sync...</div>}>
-              <PortalWorkspace
-                description="Connect local work data to DevKit Cloud and control synchronization."
-                path="/app/devkit/project-sync"
-                title="Local-first sync"
-              />
-            </Suspense>
-          </div>
+          </div> : null}
+          {ui.activity === "tasks" ? <div className="workspace-surface"><TaskRunnerWorkspace onRefreshChanges={session.refreshChanges} /></div> : null}
+          {ui.activity === "projects" ? (
+            <div className="workspace-surface">
+              <Suspense fallback={<div className="workspace-loading">Loading projects...</div>}>
+                <ProjectOverview
+                  currentWorkspace={workspace}
+                  onOpenProject={(path) => {
+                    void openProjectOverview(path);
+                  }}
+                  workspaces={session.desktopSetup?.workspaces ?? []}
+                />
+              </Suspense>
+            </div>
+          ) : null}
+          {ui.activity === "overview" ? (
+            <div className="workspace-surface project-summary-surface">
+              <Suspense
+                fallback={<div className="workspace-loading">Loading project overview...</div>}
+              >
+                <ProjectSummary
+                  onBrowseFiles={() => ui.setActivity("files")}
+                  onOpenAgent={() => ui.setActivity("assist")}
+                  workspace={workspace}
+                  workspaces={session.desktopSetup?.workspaces ?? []}
+                />
+              </Suspense>
+            </div>
+          ) : null}
+          {ui.activity === "settings" ? (
+            <div className="workspace-surface">
+              <Suspense fallback={<div className="workspace-loading">Loading settings...</div>}>
+                <SettingsPanel
+                  currentWorkspace={workspace}
+                  onClose={() => ui.setActivity("assist")}
+                  onOpenWorkspace={session.openWorkspace}
+                />
+              </Suspense>
+            </div>
+          ) : null}
+          {ui.activity === "hostinger" ? (
+            <div className="workspace-surface">
+              <Suspense fallback={<div className="workspace-loading">Loading Hostinger...</div>}>
+                <PortalWorkspace
+                  description="VPS health, Hostinger metrics, Docker projects, and credentials."
+                  path="/app/devkit/hostinger"
+                  title="Hostinger infrastructure"
+                />
+              </Suspense>
+            </div>
+          ) : null}
+          {ui.activity === "sync" ? (
+            <div className="workspace-surface">
+              <Suspense fallback={<div className="workspace-loading">Loading sync...</div>}>
+                <PortalWorkspace
+                  description="Connect local work data to DevKit Cloud and control synchronization."
+                  path="/app/devkit/project-sync"
+                  title="Local-first sync"
+                />
+              </Suspense>
+            </div>
+          ) : null}
           {editorStarted ? (
             <div
               className="workspace-surface"
@@ -363,9 +428,12 @@ export function DesktopApp() {
               <Suspense fallback={<div className="workspace-loading">Loading editor...</div>}>
                 <EditorWorkspace
                   key={workspace.path}
+                  currentWorkspace={workspace}
+                  onSelectWorkspace={(path) => void session.openWorkspace(path)}
                   onSelectPath={setSelectedPath}
                   path={selectedPath}
                   theme={resolvedTheme}
+                  workspaces={session.desktopSetup?.workspaces ?? []}
                 />
               </Suspense>
             </div>
@@ -402,12 +470,15 @@ export function DesktopApp() {
         onOpenCommands={() => ui.setPaletteOpen(true)}
         onOpenSettings={() => ui.setActivity("settings")}
         onOpenUpdates={() => ui.setUpdateOpen(true)}
+        onOpenWorkGroup={() => setWorkGroupOpen(true)}
         onOpenWorkspace={() => void session.openWorkspace()}
+        onSelectWorkspace={(path) => void session.openWorkspace(path)}
         onThemeChange={setTheme}
         onToggleTerminal={ui.toggleTerminal}
         open={ui.drawerOpen}
         terminalOpen={ui.terminalOpen}
         theme={theme}
+        workspaces={session.desktopSetup?.workspaces ?? []}
       />
       {ui.paletteOpen ? (
         <CommandPalette commands={paletteCommands} onClose={() => ui.setPaletteOpen(false)} />
@@ -420,5 +491,5 @@ export function DesktopApp() {
 }
 
 function isFullWorkspace(activity: string) {
-  return ["assist", "hostinger", "settings", "sync"].includes(activity);
+  return ["assist", "tasks", "hostinger", "overview", "projects", "settings", "sync"].includes(activity);
 }

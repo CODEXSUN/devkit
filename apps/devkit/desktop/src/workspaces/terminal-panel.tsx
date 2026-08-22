@@ -49,24 +49,28 @@ export function TerminalPanel({
     xterm.open(host.current);
     let disposed = false;
     let removeListener: (() => void) | undefined;
-    void listen<TerminalOutput>("terminal-output", (event) => {
-      if (event.payload.sessionId === session.current) xterm.write(event.payload.data);
-    }).then((remove) => {
-      removeListener = remove;
-    });
-    void desktopClient
-      .startTerminal(shell)
-      .then((id) => {
+    void (async () => {
+      removeListener = await listen<TerminalOutput>("terminal-output", (event) => {
+        if (event.payload.sessionId === session.current) xterm.write(event.payload.data);
+      });
+      if (disposed) return;
+      const id = await desktopClient.startTerminal(shell);
+      try {
         if (disposed) return void desktopClient.closeTerminal(id);
         session.current = id;
         xterm.onData((data) => void desktopClient.writeTerminal(id, data));
+        void desktopClient.writeTerminal(id, "\r");
         if (!disposed) setReady(true);
-      })
-      .catch((reason) => {
+      } catch (reason) {
         setError(String(reason));
         xterm.writeln("Terminal could not start.");
         if (!disposed) setReady(true);
-      });
+      }
+    })().catch((reason) => {
+      setError(String(reason));
+      xterm.writeln("Terminal could not start.");
+      if (!disposed) setReady(true);
+    });
     return () => {
       disposed = true;
       removeListener?.();

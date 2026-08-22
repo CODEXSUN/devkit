@@ -5,7 +5,9 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::commands::workspace_policy::is_hidden_workspace_entry;
-use crate::commands::{display_name, sanitize_path, workspace_path, workspace_root};
+use crate::commands::{
+    background_command, display_name, sanitize_path, workspace_path, workspace_root,
+};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
@@ -55,11 +57,24 @@ pub fn open_workspace(
     let path = root.display().to_string();
     let name = display_name(&root);
     state.with_database(|database| database.mark_workspace_opened(&path, &name))?;
-    Ok(Workspace {
-        name,
-        path,
-        branch,
-    })
+    Ok(Workspace { name, path, branch })
+}
+
+#[tauri::command]
+pub fn open_workspace_folder(path: String) -> DesktopResult<()> {
+    let folder = PathBuf::from(path.trim())
+        .canonicalize()
+        .map(sanitize_path)?;
+    if !folder.is_dir() {
+        return Err(DesktopError::Policy(
+            "The selected workspace folder is unavailable.".into(),
+        ));
+    }
+    #[cfg(windows)]
+    background_command("explorer").arg(folder).spawn()?;
+    #[cfg(not(windows))]
+    background_command("xdg-open").arg(folder).spawn()?;
+    Ok(())
 }
 
 #[tauri::command]

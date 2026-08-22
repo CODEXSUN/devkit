@@ -1,8 +1,15 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 
-type RailMessage = { id: string; role: "agent" | "user" };
-type RailMarker = RailMessage & { active: boolean; index: number; position: number };
+type RailMessage = { id: string };
+type RailMessageHeader = {
+  active: boolean;
+  id: string;
+  offset: number;
+  summary: string;
+  title: string;
+};
 
 export function ConversationRail({
   messages,
@@ -11,40 +18,40 @@ export function ConversationRail({
   messages: RailMessage[];
   transcript: RefObject<HTMLDivElement | null>;
 }) {
-  const [markers, setMarkers] = useState<RailMarker[]>([]);
+  const [headers, setHeaders] = useState<RailMessageHeader[]>([]);
+  const [previewId, setPreviewId] = useState<string | undefined>();
 
   useEffect(() => {
     const element = transcript.current;
     if (!element || !messages.length) {
-      setMarkers([]);
+      setHeaders([]);
       return;
     }
 
     let frame = 0;
     const update = () => {
       const articles = messageArticles(element);
-      const maxScroll = element.scrollHeight - element.clientHeight;
-      setMarkers(
-        messages.flatMap((message, index) => {
-          const article = articles.get(message.id);
-          if (!article) return [];
-          return {
-            ...message,
-            active: isVisible(article, element),
-            index,
-            position: conversationMarkerPosition(article.offsetTop, maxScroll)
-          };
-        })
-      );
+      setHeaders(articles.map((article, index) => {
+        const top = relativeTop(article, element);
+        return {
+          active: isVisible(top, article.offsetHeight, element),
+          id: railMessageId(article, index),
+          offset: conversationMarkerOffset(index, articles.length),
+          summary: messagePreview(article),
+          title: messageHeader(article)
+        };
+      }));
+      for (const article of articles) observer.observe(article);
     };
     const requestUpdate = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(update);
     };
     const observer = new ResizeObserver(requestUpdate);
+    const mutations = new MutationObserver(requestUpdate);
 
     observer.observe(element);
-    for (const article of messageArticles(element).values()) observer.observe(article);
+    mutations.observe(element, { childList: true, characterData: true, subtree: true });
     element.addEventListener("scroll", requestUpdate, { passive: true });
     requestUpdate();
 
@@ -52,51 +59,89 @@ export function ConversationRail({
       window.cancelAnimationFrame(frame);
       element.removeEventListener("scroll", requestUpdate);
       observer.disconnect();
+      mutations.disconnect();
     };
   }, [messages, transcript]);
 
-  if (!markers.length) return null;
+  if (!headers.length) return null;
 
   return (
     <nav aria-label="Conversation messages" className="conversation-rail">
-      <span aria-hidden="true" className="conversation-rail-track" />
-      {markers.map((marker) => (
-        <button
-          aria-label={`Go to ${marker.role} message ${marker.index + 1}`}
-          className={`${marker.role}${marker.active ? " active" : ""}`}
-          key={marker.id}
-          onClick={() => jumpToMessage(transcript.current, marker.id)}
-          style={{ top: `${marker.position}%` }}
-          title={`Go to ${marker.role} message ${marker.index + 1}`}
-          type="button"
-        />
-      ))}
+      {headers.map((header) => {
+        const expanded = previewId === header.id;
+        return (
+          <div className="conversation-rail-marker" key={header.id} style={{ top: conversationMarkerTop(header.offset) }}>
+            <motion.button
+              animate={{ opacity: expanded || header.active ? 1 : 0.62, scale: expanded ? 1.2 : 1, width: expanded ? 38 : 13 }}
+              aria-label={`Go to ${header.title} message`}
+              className={header.active ? "active" : ""}
+              onBlur={() => setPreviewId(undefined)}
+              onClick={() => jumpToMessage(transcript.current, header.id)}
+              onFocus={() => setPreviewId(header.id)}
+              onMouseEnter={() => setPreviewId(header.id)}
+              onMouseLeave={() => setPreviewId(undefined)}
+              transition={{ damping: 21, stiffness: 460, type: "spring" }}
+              type="button"
+            />
+            <AnimatePresence>
+              {expanded ? (
+                <motion.div
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  className="conversation-rail-preview"
+                  exit={{ opacity: 0, scale: 0.96, x: -8 }}
+                  initial={{ opacity: 0, scale: 0.96, x: -8 }}
+                  transition={{ damping: 22, stiffness: 420, type: "spring" }}
+                >
+                  <strong>{header.title}</strong>
+                  <span>{header.summary}</span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        );
+      })}
     </nav>
   );
 }
 
-export function conversationMarkerPosition(offsetTop: number, maxScroll: number) {
-  if (maxScroll <= 0) return 0;
-  return Math.min(100, Math.max(0, (offsetTop / maxScroll) * 100));
+export function conversationMarkerOffset(index: number, count: number) {
+  return (index - (count - 1) / 2) * 18;
+}
+
+export function conversationMarkerTop(offset: number) {
+  return offset < 0 ? `calc(50% - ${Math.abs(offset)}px)` : `calc(50% + ${offset}px)`;
 }
 
 function messageArticles(element: HTMLDivElement) {
-  return new Map(
-    Array.from(element.querySelectorAll<HTMLElement>("[data-message-id]")).map((article) => [
-      article.dataset.messageId ?? "",
-      article
-    ])
-  );
+  return Array.from(element.querySelectorAll<HTMLElement>("[data-message-id]"));
 }
 
-function isVisible(article: HTMLElement, transcript: HTMLDivElement) {
-  const top = article.offsetTop;
-  const bottom = top + article.offsetHeight;
+function railMessageId(article: HTMLElement, index: number) {
+  const id = article.dataset.messageId ?? `message-${index}`;
+  article.dataset.railMessageId = id;
+  return id;
+}
+
+function messageHeader(article: HTMLElement) {
+  return article.firstElementChild?.textContent?.trim() || "Conversation";
+}
+
+function messagePreview(article: HTMLElement) {
+  const content = article.querySelector<HTMLElement>(".agent-response, p")?.textContent?.trim() ?? "";
+  return content.slice(0, 120) || "Open this message";
+}
+
+function relativeTop(element: HTMLElement, transcript: HTMLDivElement) {
+  return element.getBoundingClientRect().top - transcript.getBoundingClientRect().top + transcript.scrollTop;
+}
+
+function isVisible(top: number, height: number, transcript: HTMLDivElement) {
+  const bottom = top + height;
   return bottom >= transcript.scrollTop && top <= transcript.scrollTop + transcript.clientHeight;
 }
 
 function jumpToMessage(transcript: HTMLDivElement | null, id: string) {
-  const article = transcript ? messageArticles(transcript).get(id) : undefined;
-  if (!article || !transcript) return;
-  transcript.scrollTo({ behavior: "smooth", top: Math.max(0, article.offsetTop - 16) });
+  const message = transcript?.querySelector<HTMLElement>(`[data-rail-message-id="${id}"]`);
+  if (!message || !transcript) return;
+  transcript.scrollTo({ behavior: "smooth", top: Math.max(0, relativeTop(message, transcript) - 16) });
 }

@@ -1,22 +1,22 @@
 import {
   Bot,
+  Check,
+  ChevronDown,
   CircleStop,
-  Clock,
-  FolderGit2,
   LoaderCircle,
-  MessageSquare,
-  MessageSquarePlus,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Plus,
   Send,
 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
-import type { AgentAccess, FileEntry, GitChange, Workspace } from "../contracts/desktop";
+import { lazy, Suspense, useEffect, useState } from "react";
+import type { AgentAccess, AgentReasoningEffort, FileEntry, GitChange, Workspace } from "../contracts/desktop";
 import type { ResourceState } from "../shell/use-desktop-session";
+import { useDesktopPerformance } from "../shell/desktop-performance";
 import { AgentErrorBanner } from "./agent-error-banner";
+import { AgentChatHistory } from "./agent-chat-history";
+import { AgentChatTabs } from "./agent-chat-tabs";
 import { AgentMessageActions } from "./agent-message-actions";
 import { ConversationRail } from "./conversation-rail";
 import {
@@ -28,11 +28,6 @@ import {
 import "./agent-workspace.css";
 import { useAgentSession } from "./use-agent-session";
 
-function formatPath(pathStr: string) {
-  if (!pathStr) return "";
-  return pathStr.replace(/^\\\\\?\\/, "");
-}
-
 const AgentMarkdown = lazy(() =>
   import("./agent-markdown").then((module) => ({ default: module.AgentMarkdown }))
 );
@@ -43,6 +38,7 @@ export function AgentWorkspace({
   files,
   filesState,
   onOpenFile,
+  onOpenProjectOverview,
   onRefreshChanges,
   workspace
 }: {
@@ -51,91 +47,107 @@ export function AgentWorkspace({
   files: FileEntry[];
   filesState: ResourceState;
   onOpenFile: (path: string) => void;
+  onOpenProjectOverview: () => void;
   onRefreshChanges: () => Promise<void>;
   workspace: Workspace;
 }) {
   const session = useAgentSession({ onRefreshChanges });
   const [leftDrawerOpen, setLeftDrawerOpen] = useState(true);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [openTaskIds, setOpenTaskIds] = useState<number[]>([]);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(true);
+  const performance = useDesktopPerformance();
+  const activeTask = session.tasks.find((task) => task.id === session.activeTaskId);
+
+  useEffect(() => {
+    const availableTaskIds = new Set(session.tasks.map((task) => task.id));
+    setOpenTaskIds((current) => {
+      const retained = current.filter((taskId) => availableTaskIds.has(taskId));
+      if (session.activeTaskId && !retained.includes(session.activeTaskId)) {
+        return [...retained, session.activeTaskId];
+      }
+      return retained;
+    });
+  }, [session.activeTaskId, session.tasks]);
+
+  useEffect(() => {
+    const prepareTask = (event: Event) => {
+      const taskTitle = (event as CustomEvent<string>).detail;
+      if (typeof taskTitle === "string" && taskTitle.trim()) {
+        session.setComposer(`Work on this task: ${taskTitle.trim()}`);
+      }
+    };
+    window.addEventListener("devkit:prepare-agent-task", prepareTask);
+    return () => window.removeEventListener("devkit:prepare-agent-task", prepareTask);
+  }, [session.setComposer]);
+
+  const openTasks = openTaskIds
+    .map((taskId) => session.tasks.find((task) => task.id === taskId))
+    .filter((task): task is NonNullable<typeof task> => Boolean(task));
+
+  function openTask(task: NonNullable<typeof activeTask>) {
+    setOpenTaskIds((current) => current.includes(task.id) ? current : [...current, task.id]);
+    void session.openTask(task);
+  }
+
+  function closeTaskTab(taskId: number) {
+    if (openTasks.length < 2 || session.busy) return;
+    const closingIndex = openTasks.findIndex((task) => task.id === taskId);
+    const remaining = openTasks.filter((task) => task.id !== taskId);
+    setOpenTaskIds(remaining.map((task) => task.id));
+    if (taskId !== session.activeTaskId) return;
+    const replacement = remaining[Math.min(closingIndex, remaining.length - 1)];
+    if (replacement) void session.openTask(replacement);
+  }
+
   return (
     <section className={`agent-layout${leftDrawerOpen ? "" : " left-collapsed"}${rightDrawerOpen ? "" : " right-collapsed"}`}>
       <aside className={`agent-history${leftDrawerOpen ? "" : " collapsed"}`}>
-        <div className="history-header">
-          <button type="button" className="history-new-btn" onClick={session.newChat}>
-            <Plus size={16} /> New task
-          </button>
-        </div>
-
-        <div className="history-project-card">
-          <div className="project-card-header">
-            <FolderGit2 size={13} className="project-icon" />
-            <span>ACTIVE WORKSPACE</span>
-          </div>
-          <div className="project-name">{workspace.name}</div>
-          <div className="project-path" title={formatPath(workspace.path)}>
-            {formatPath(workspace.path)}
-          </div>
-        </div>
-
-        <div className="history-divider" />
-
-        <div className="history-section-header">
-          <Clock size={12} />
-          <span>RECENT TASKS</span>
-        </div>
-
-        <div className="history-list">
-          {session.tasks.length > 0 ? (
-            session.tasks.map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                className={`history-item${session.activeTaskId === task.id ? " active" : ""}`}
-                onClick={() => session.openTask(task)}
-              >
-                <div className="history-item-top">
-                  <MessageSquare size={13} className="history-item-icon" />
-                  <span className="history-item-title">{task.title}</span>
-                </div>
-                <div className="history-item-meta">
-                  <span className="history-item-time">{relativeTime(task.updatedAt)}</span>
-                  {session.activeTaskId === task.id && session.running && (
-                    <span className="history-status-badge">
-                      <LoaderCircle size={10} className="spin" /> Working
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="history-empty-state">
-              <MessageSquarePlus size={20} className="empty-icon" />
-              <span>No recent tasks</span>
-              <p>Click <strong>New task</strong> above to start a conversation with the agent.</p>
-            </div>
-          )}
-        </div>
+        <AgentChatHistory
+          activeTaskId={session.activeTaskId}
+          busy={session.busy}
+          onArchive={(task) => void session.archiveTask(task)}
+          onDelete={(task) => session.deleteTask(task)}
+          onOpenTask={openTask}
+          onRequestReview={(task) => void session.requestTaskReview(task)}
+          tasks={session.tasks}
+        />
       </aside>
 
-      <div className="agent-chat">
+      <div className={`agent-chat${openTasks.length > 1 ? " has-open-chat-tabs" : ""}`}>
         <header className="agent-chat-header">
           <div className="agent-title-wrapper">
             <button
               type="button"
               className={`drawer-toggle-btn${leftDrawerOpen ? " active" : ""}`}
               onClick={() => setLeftDrawerOpen(!leftDrawerOpen)}
-              title={leftDrawerOpen ? "Collapse Left Drawer (Task History)" : "Expand Left Drawer (Task History)"}
+              title={leftDrawerOpen ? "Collapse chat history" : "Expand chat history"}
             >
               {leftDrawerOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
             </button>
 
-            <div className="agent-title" title="Transparent Codex App Server client">
+            <button
+              aria-label={`Open ${workspace.name} project overview`}
+              className="agent-title agent-title-button"
+              onClick={onOpenProjectOverview}
+              title={`Open ${workspace.name} project overview`}
+              type="button"
+            >
               <Bot size={16} />
-              <span><strong>Codex</strong><small>DevKit coding workspace</small></span>
-            </div>
+              <span><strong>{workspace.name}</strong><small className="agent-chat-tab">{activeTask?.title ?? "Project chat"}</small></span>
+            </button>
           </div>
 
           <div className="agent-header-actions">
+            <ModelPreferencesMenu
+              connection={session.connection}
+              disabled={session.busy}
+              onChange={(model, effort) => void session.updateAgentPreferences("codex", model, effort)}
+              open={modelMenuOpen}
+              setOpen={setModelMenuOpen}
+              status={session.runtime}
+            />
+
             <small className={`agent-state ${session.running ? "running" : session.runtime === "unavailable" ? "unavailable" : "ready"}`}>
               {session.running ? (
                 <>
@@ -144,9 +156,7 @@ export function AgentWorkspace({
               ) : session.runtime === "unavailable" ? (
                 "Agent unavailable"
               ) : (
-                <>
-                  <>Codex ready</>
-                </>
+                "Connected"
               )}
             </small>
 
@@ -160,6 +170,14 @@ export function AgentWorkspace({
             </button>
           </div>
         </header>
+
+        <AgentChatTabs
+          activeTaskId={session.activeTaskId}
+          disabled={session.busy}
+          onClose={closeTaskTab}
+          onOpen={openTask}
+          tasks={openTasks}
+        />
 
         <div className="agent-transcript-shell">
           <ConversationRail messages={session.messages} transcript={session.transcript} />
@@ -258,6 +276,7 @@ export function AgentWorkspace({
           files={files}
           filesState={filesState}
           onOpenFile={onOpenFile}
+          performance={performance}
           workspace={workspace}
         />
       </div>
@@ -265,13 +284,86 @@ export function AgentWorkspace({
   );
 }
 
-function relativeTime(dateString: string) {
-  const diffMs = Date.now() - new Date(dateString).getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+const CODEX_MODELS = [
+  { description: "Balanced speed and quality", id: "gpt-5.6-terra", label: "5.6 Terra" },
+  { description: "Fastest option for focused tasks", id: "gpt-5.6-luna", label: "5.6 Luna" }
+];
+
+const EFFORTS: { description: string; id: AgentReasoningEffort; label: string }[] = [
+  { description: "Fast responses for routine work", id: "low", label: "Light" },
+  { description: "Balanced speed and depth", id: "medium", label: "Medium" },
+  { description: "More deliberate reasoning for difficult work", id: "high", label: "Heavy" }
+];
+
+function ModelPreferencesMenu({
+  connection,
+  disabled,
+  onChange,
+  open,
+  setOpen,
+  status
+}: {
+  connection: { effort: AgentReasoningEffort; model: string; provider: string };
+  disabled: boolean;
+  onChange: (model: string, effort: AgentReasoningEffort) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  status: "idle" | "connecting" | "ready" | "unavailable";
+}) {
+  const update = (model: string, effort: AgentReasoningEffort) => {
+    onChange(model, effort);
+    setOpen(false);
+  };
+
+  return (
+    <div className="agent-model-menu">
+      <button
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={`agent-connection-badge ${status === "ready" ? "connected" : ""}`}
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        type="button"
+      >
+        <i aria-hidden="true" />
+        {connection.provider} · {connection.model} · {effortLabel(connection.effort)}
+        <ChevronDown aria-hidden="true" size={12} />
+      </button>
+      {open ? (
+        <div aria-label="Codex model preferences" className="agent-model-menu-popover" role="menu">
+          <p>Model</p>
+          {CODEX_MODELS.map((model) => (
+            <button
+              className={connection.model === model.id ? "selected" : ""}
+              key={model.id}
+              onClick={() => update(model.id, connection.effort)}
+              role="menuitemradio"
+              type="button"
+            >
+              <span><strong>{model.label}</strong><small>{model.description}</small></span>
+              {connection.model === model.id ? <Check aria-label="Selected" size={14} /> : null}
+            </button>
+          ))}
+          <p>Reasoning effort</p>
+          {EFFORTS.map((effort) => (
+            <button
+              className={connection.effort === effort.id ? "selected" : ""}
+              key={effort.id}
+              onClick={() => update(connection.model, effort.id)}
+              role="menuitemradio"
+              type="button"
+            >
+              <span><strong>{effort.label}</strong><small>{effort.description}</small></span>
+              {connection.effort === effort.id ? <Check aria-label="Selected" size={14} /> : null}
+            </button>
+          ))}
+          <footer>Applies to the next Codex chat.</footer>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function effortLabel(effort: AgentReasoningEffort) {
+  return { high: "Heavy", low: "Light", medium: "Medium" }[effort];
 }

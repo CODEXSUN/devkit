@@ -1,6 +1,6 @@
 {
   "name": "@devkit/desktop",
-  "version": "1.0.71",
+  "version": "1.0.77",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@xterm/xterm": "^6.0.0",
+    "framer-motion": "^13.1.1",
     "lucide-react": "^1.33.0",
     "monaco-editor": "^0.56.0",
     "react": "^19.2.8",

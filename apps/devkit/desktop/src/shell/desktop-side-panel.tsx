@@ -5,7 +5,6 @@ import { GitPanel } from "../workspaces/git-panel";
 import { RuntimePanel } from "../workspaces/runtime-panel";
 import { SearchPanel } from "../workspaces/search-panel";
 import { SkillsPanel } from "../workspaces/skills-panel";
-import { TasksPanel } from "../workspaces/tasks-panel";
 import type { ResourceState } from "./use-desktop-session";
 
 export type Activity =
@@ -15,6 +14,8 @@ export type Activity =
   | "git"
   | "hostinger"
   | "learning"
+  | "overview"
+  | "projects"
   | "search"
   | "settings"
   | "sync"
@@ -64,7 +65,6 @@ export function DesktopSidePanel({
     );
   }
   if (activity === "search") return <SearchPanel onOpen={onSelectFile} />;
-  if (activity === "tasks") return <TasksPanel />;
   if (activity === "learning") return <SkillsPanel onOpen={onSelectFile} />;
   if (activity === "docker") return <RuntimePanel system={system} />;
   if (activity !== "files") return <EmptyPanel activity={activity} />;
@@ -117,10 +117,12 @@ function EmptyPanel({ activity }: { activity: Activity }) {
     git: "Open a Git repository to review changes.",
     hostinger: "Manage Hostinger VPS infrastructure through the connected DevKit server.",
     learning: "Review project facts before the coding agent uses them.",
+    overview: "Review the selected project and repository connection.",
+    projects: "Review connected projects and their local workspace details.",
     search: "Search every text file in this workspace.",
     settings: "Configure agent, appearance, and advanced options.",
     sync: "Connect this local-first workspace to DevKit Cloud.",
-    tasks: "Local tasks remain available offline and sync to DevKit."
+    tasks: "Plan and run local tasks."
   };
   return (
     <div className="empty-panel">

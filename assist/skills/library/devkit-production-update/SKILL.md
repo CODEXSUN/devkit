@@ -7,16 +7,19 @@ description: Safely release and operate DevKit at /home/devkit on its Ubuntu Doc
 
 Run repository release checks locally, deploy only a reviewed fast-forward
 commit, and retain evidence for every production action. Read
-`references/runbook.md` before changing the VPS.
+`assist/documentation/release-notes-standard.md` and `references/runbook.md`
+before changing the VPS.
 
 ## Workflow
 
-1. Read repository governance and inspect the complete Git status. Treat all
+1. Read repository governance, the release-note standard, and the newest
+   changelog entry. Inspect the complete Git status. Treat all
    existing changes as user-owned until their release scope is confirmed.
 2. Run focused checks, the full repository check, and the GitHub helper dry run.
-3. Update the immutable changelog and repository version. Confirm package version
-   contracts before staging.
-4. Commit and push only after explicit authorization.
+3. Confirm that the changelog has complete database, codebase, and verification
+   evidence. Confirm package version contracts before staging.
+4. Confirm that the Git subject matches `#<patch> - <title>` from the newest
+   changelog entry. Commit and push only after explicit authorization.
 5. Connect to the pinned VPS host key. Inspect `/home/devkit`, Docker, disk space,
    current containers, and deployment configuration without printing secrets.
 6. Require a clean `main` checkout and a fast-forward remote update. Never reset,
@@ -26,8 +29,19 @@ commit, and retain evidence for every production action. Read
    application replacement, health checks, metadata, and compatible rollback.
 8. Verify Git commit, application version, Compose health, HTTP health, migration
    list, backup checksum, deployment metadata, and systemd timer.
-9. Record exact commands and outcomes. Distinguish local static checks from live
-   SSH, Docker, MariaDB, provider, and public HTTP evidence.
+9. Add the actual deployment outcome to the same release entry. Distinguish local
+   static checks from live SSH, Docker, MariaDB, provider, and public HTTP evidence.
+
+## Per-release checklist
+
+1. Confirm the intended commit and desktop version are already on `origin/main`.
+2. Open an SSH session without echoing `.env` values. Verify host key, `/home/devkit`, branch, clean status, disk, and Compose state.
+3. Fetch `origin/main`; stop when the target is not a fast-forward or the checkout is dirty.
+4. Run the watcher preflight or `bash update.sh --check`; inspect the candidate result before executing an update.
+5. Run the watcher once or `bash update.sh --yes` only after explicit production approval.
+6. Watch the service journal until it reaches a terminal result. Do not start a second updater while one is active.
+7. Verify API health, web health, Compose health, migration list, retained backup, deployed commit/version, and watcher timer.
+8. Write a short deployment record with time, commit, version, commands, health results, backup identifier, and unresolved issues.
 
 ## Watcher safety rules
 

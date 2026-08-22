@@ -141,6 +141,7 @@ function checkVersions() {
   ]) {
     if (!changelog.includes(expectedLine)) failures.push(`Changelog is missing: ${expectedLine}`);
   }
+  validateLatestChangelogEntry(failures, changelog, expected);
 
   if (failures.length) {
     console.error(`Version check failed for ${expected}:`);
@@ -428,12 +429,46 @@ function updateChangelog(nextVersion, title, databaseUpdate) {
     "#### App Codebase Changes",
     "",
     `- Bumped repository version to ${nextVersion}.`,
+    "",
+    "#### Verification",
+    "",
+    "- Not yet run. Add the exact commands and live checks before commit.",
     ""
   ].join("\n");
   const index = changelog.indexOf("## v-");
   const insertAt = index < 0 ? changelog.length : index;
   changelog = `${changelog.slice(0, insertAt)}${entry}\n${changelog.slice(insertAt)}`;
   writeFileSync(changelogPath, changelog, "utf8");
+}
+
+function validateLatestChangelogEntry(failures, changelog, version) {
+  const escaped = version.replaceAll(".", "\\.");
+  const entry = changelog.match(
+    new RegExp(`^## v-${escaped}\\r?\\n([\\s\\S]*?)(?=^## v-|(?![\\s\\S]))`, "mu")
+  )?.[1];
+  if (!entry) {
+    failures.push(`Changelog entry for v-${version} is missing.`);
+    return;
+  }
+
+  const sections = ["Database Changes", "App Codebase Changes", "Verification"];
+  for (const section of sections) {
+    if (!new RegExp(`^#### ${section}\\r?\\n\\r?\\n- .+`, "mu").test(entry)) {
+      failures.push(`Changelog v-${version} needs a non-empty ${section} section.`);
+    }
+  }
+
+  if (/^- Database update: Yes\.$/mu.test(entry)) {
+    const databaseBody = entry.match(
+      /^#### Database Changes\r?\n\r?\n([\s\S]*?)(?=^#### |(?![\s\S]))/mu
+    )?.[1] ?? "";
+    const detailCount = databaseBody
+      .split(/\r?\n/u)
+      .filter((line) => line.startsWith("- ") && !line.startsWith("- Database update:")).length;
+    if (!detailCount) {
+      failures.push(`Changelog v-${version} says Database update: Yes but lists no schema or data detail.`);
+    }
+  }
 }
 
 function databaseUpdateMode() {

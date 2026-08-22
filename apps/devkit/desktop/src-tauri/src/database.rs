@@ -22,6 +22,7 @@ pub struct ProviderConfig {
     pub api_key: Option<String>,
     pub base_url: Option<String>,
     pub model: Option<String>,
+    pub reasoning_effort: Option<String>,
     pub temperature: Option<f64>,
     pub system_prompt: Option<String>,
 }
@@ -34,6 +35,7 @@ impl Default for ProviderConfig {
             api_key: None,
             base_url: None,
             model: None,
+            reasoning_effort: None,
             temperature: None,
             system_prompt: None,
         }
@@ -58,12 +60,36 @@ pub struct AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         let mut providers = HashMap::new();
-        providers.insert("codex".into(), ProviderConfig { enabled: true, is_default: true, ..Default::default() });
+        providers.insert(
+            "codex".into(),
+            ProviderConfig {
+                enabled: true,
+                is_default: true,
+                model: Some("gpt-5.6-terra".into()),
+                reasoning_effort: Some("low".into()),
+                ..Default::default()
+            },
+        );
         providers.insert("openrouter".into(), ProviderConfig::default());
         providers.insert("opencode".into(), ProviderConfig::default());
         providers.insert("claude".into(), ProviderConfig::default());
-        providers.insert("gemini".into(), ProviderConfig { enabled: false, base_url: Some("https://generativelanguage.googleapis.com/v1beta".into()), model: Some("gemini-2.0-flash".into()), ..Default::default() });
-        providers.insert("ollama".into(), ProviderConfig { enabled: true, base_url: Some("http://localhost:11434".into()), ..Default::default() });
+        providers.insert(
+            "gemini".into(),
+            ProviderConfig {
+                enabled: false,
+                base_url: Some("https://generativelanguage.googleapis.com/v1beta".into()),
+                model: Some("gemini-2.0-flash".into()),
+                ..Default::default()
+            },
+        );
+        providers.insert(
+            "ollama".into(),
+            ProviderConfig {
+                enabled: true,
+                base_url: Some("http://localhost:11434".into()),
+                ..Default::default()
+            },
+        );
         Self {
             codex_path: None,
             default_access: "workspaceWrite".into(),
@@ -79,22 +105,19 @@ impl Default for AgentConfig {
     }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LocalTask {
-    pub id: i64,
-    pub title: String,
-    pub status: String,
-}
-
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentTask {
+    pub archived: bool,
+    pub execution_path: Option<String>,
     pub id: i64,
+    pub review_requested: bool,
+    pub run_status: String,
     pub thread_id: String,
     pub title: String,
     pub access: String,
     pub updated_at: String,
+    pub worktree_branch: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -107,6 +130,15 @@ pub struct AgentMessage {
     pub created_at: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalTask {
+    pub execution: String,
+    pub id: i64,
+    pub title: String,
+    pub status: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopProfile {
@@ -114,6 +146,7 @@ pub struct DesktopProfile {
     pub email: Option<String>,
     pub remember_identity: bool,
     pub confirm_on_startup: bool,
+    pub default_work_group_path: Option<String>,
     pub last_workspace_path: Option<String>,
 }
 
@@ -125,7 +158,19 @@ pub struct DesktopWorkspace {
     pub kind: String,
     pub relationship: String,
     pub project_name: Option<String>,
+    pub pinned: bool,
     pub last_opened_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedRepositoryUrl {
+    pub id: i64,
+    pub work_group_path: String,
+    pub url: String,
+    pub kind: String,
+    pub relationship: String,
+    pub updated_at: String,
 }
 
 #[derive(Serialize)]
@@ -148,37 +193,46 @@ impl DesktopDatabase {
         Ok(database)
     }
 
-    pub fn list_tasks(&self) -> DesktopResult<Vec<LocalTask>> {
+    pub fn list_local_tasks(&self) -> DesktopResult<Vec<LocalTask>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, title, status FROM desktop_tasks ORDER BY updated_at DESC, id DESC",
+            "SELECT id, title, COALESCE(execution, title), status FROM desktop_tasks ORDER BY updated_at DESC, id DESC",
         )?;
         let rows = statement.query_map([], |row| {
-            Ok(LocalTask {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                status: row.get(2)?,
-            })
+            Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)? })
         })?;
-        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
-    pub fn save_task(&self, title: &str) -> DesktopResult<LocalTask> {
+    pub fn save_local_task(&self, title: &str, execution: &str) -> DesktopResult<LocalTask> {
         self.connection.execute(
-            "INSERT INTO desktop_tasks (title, status) VALUES (?1, 'todo')",
-            params![title],
+            "INSERT INTO desktop_tasks (title, execution) VALUES (?1, ?2)",
+            params![title, execution],
         )?;
-        Ok(LocalTask {
-            id: self.connection.last_insert_rowid(),
-            title: title.to_owned(),
-            status: "todo".to_owned(),
-        })
+        let id = self.connection.last_insert_rowid();
+        self.connection.query_row(
+            "SELECT id, title, COALESCE(execution, title), status FROM desktop_tasks WHERE id = ?1",
+            params![id],
+            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)? }),
+        ).map_err(Into::into)
+    }
+
+    pub fn set_local_task_status(&self, task_id: i64, status: &str) -> DesktopResult<LocalTask> {
+        self.connection.execute(
+            "UPDATE desktop_tasks SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            params![status, task_id],
+        )?;
+        self.connection.query_row(
+            "SELECT id, title, COALESCE(execution, title), status FROM desktop_tasks WHERE id = ?1",
+            params![task_id],
+            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)? }),
+        ).map_err(Into::into)
     }
 
     pub fn list_agent_tasks(&self, workspace_path: &str) -> DesktopResult<Vec<AgentTask>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, thread_id, title, access, updated_at
+            "SELECT id, thread_id, title, access, archived, review_requested, updated_at, execution_path, worktree_branch, run_status
              FROM desktop_agent_tasks
-             WHERE workspace_path = ?1
+             WHERE workspace_path = ?1 AND archived = 0 AND surface = 'chat'
              ORDER BY updated_at DESC, id DESC",
         )?;
         let rows = statement.query_map(params![workspace_path], agent_task_from_row)?;
@@ -191,22 +245,91 @@ impl DesktopDatabase {
         thread_id: &str,
         title: &str,
         access: &str,
+        surface: &str,
+        local_task_id: Option<i64>,
     ) -> DesktopResult<AgentTask> {
         self.connection.execute(
-            "INSERT INTO desktop_agent_tasks (workspace_path, thread_id, title, access)
-             VALUES (?1, ?2, ?3, ?4)
+            "INSERT INTO desktop_agent_tasks (workspace_path, thread_id, title, access, surface, local_task_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(thread_id) DO UPDATE SET
                title = excluded.title,
                access = excluded.access,
+               surface = excluded.surface,
+               local_task_id = excluded.local_task_id,
+               archived = 0,
                updated_at = CURRENT_TIMESTAMP",
-            params![workspace_path, thread_id, title, access],
+            params![workspace_path, thread_id, title, access, surface, local_task_id],
         )?;
         Ok(self.connection.query_row(
-            "SELECT id, thread_id, title, access, updated_at
+            "SELECT id, thread_id, title, access, archived, review_requested, updated_at, execution_path, worktree_branch, run_status
              FROM desktop_agent_tasks WHERE thread_id = ?1",
             params![thread_id],
             agent_task_from_row,
         )?)
+    }
+
+    pub fn runner_task(&self, workspace_path: &str, local_task_id: i64) -> DesktopResult<Option<AgentTask>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, thread_id, title, access, archived, review_requested, updated_at, execution_path, worktree_branch, run_status
+             FROM desktop_agent_tasks WHERE workspace_path = ?1 AND surface = 'runner' AND local_task_id = ?2
+             ORDER BY updated_at DESC, id DESC LIMIT 1",
+        )?;
+        let mut rows = statement.query(params![workspace_path, local_task_id])?;
+        rows.next()?.map(agent_task_from_row).transpose().map_err(Into::into)
+    }
+
+    pub fn set_agent_task_execution(
+        &self,
+        workspace_path: &str,
+        task_id: i64,
+        execution_path: &str,
+        worktree_branch: &str,
+    ) -> DesktopResult<AgentTask> {
+        self.connection.execute(
+            "UPDATE desktop_agent_tasks
+             SET execution_path = ?1, worktree_branch = ?2, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?3 AND workspace_path = ?4",
+            params![execution_path, worktree_branch, task_id, workspace_path],
+        )?;
+        self.agent_task(workspace_path, task_id)
+    }
+
+    pub fn set_agent_task_status(
+        &self,
+        workspace_path: &str,
+        task_id: i64,
+        run_status: &str,
+    ) -> DesktopResult<AgentTask> {
+        self.connection.execute(
+            "UPDATE desktop_agent_tasks SET run_status = ?1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?2 AND workspace_path = ?3",
+            params![run_status, task_id, workspace_path],
+        )?;
+        self.agent_task(workspace_path, task_id)
+    }
+
+    pub fn agent_task_execution_path(
+        &self,
+        workspace_path: &str,
+        task_id: i64,
+    ) -> DesktopResult<String> {
+        self.connection
+            .query_row(
+                "SELECT COALESCE(execution_path, workspace_path) FROM desktop_agent_tasks
+             WHERE id = ?1 AND workspace_path = ?2",
+                params![task_id, workspace_path],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
+    fn agent_task(&self, workspace_path: &str, task_id: i64) -> DesktopResult<AgentTask> {
+        self.connection.query_row(
+            "SELECT id, thread_id, title, access, archived, review_requested, updated_at, execution_path, worktree_branch, run_status
+             FROM desktop_agent_tasks WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+            agent_task_from_row,
+        ).map_err(Into::into)
     }
 
     pub fn list_agent_messages(&self, task_id: i64) -> DesktopResult<Vec<AgentMessage>> {
@@ -272,6 +395,50 @@ impl DesktopDatabase {
         Ok(deleted > 0)
     }
 
+    pub fn archive_agent_task(&self, workspace_path: &str, task_id: i64) -> DesktopResult<bool> {
+        let updated = self.connection.execute(
+            "UPDATE desktop_agent_tasks
+             SET archived = 1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+        )?;
+        Ok(updated > 0)
+    }
+
+    pub fn delete_agent_task(&mut self, workspace_path: &str, task_id: i64) -> DesktopResult<bool> {
+        let transaction = self.connection.transaction()?;
+        transaction.execute(
+            "DELETE FROM desktop_agent_messages
+             WHERE task_id IN (SELECT id FROM desktop_agent_tasks WHERE id = ?1 AND workspace_path = ?2)",
+            params![task_id, workspace_path],
+        )?;
+        let deleted = transaction.execute(
+            "DELETE FROM desktop_agent_tasks WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+        )?;
+        transaction.commit()?;
+        Ok(deleted > 0)
+    }
+
+    pub fn request_agent_task_review(
+        &self,
+        workspace_path: &str,
+        task_id: i64,
+    ) -> DesktopResult<AgentTask> {
+        self.connection.execute(
+            "UPDATE desktop_agent_tasks
+             SET review_requested = 1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+        )?;
+        self.connection.query_row(
+            "SELECT id, thread_id, title, access, archived, review_requested, updated_at, execution_path, worktree_branch, run_status
+             FROM desktop_agent_tasks WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+            agent_task_from_row,
+        ).map_err(Into::into)
+    }
+
     pub fn pending_sync_count(&self) -> DesktopResult<usize> {
         let count = self.connection.query_row(
             "SELECT COUNT(*) FROM desktop_sync_outbox WHERE status='pending'",
@@ -290,17 +457,52 @@ impl DesktopDatabase {
 
     pub fn save_desktop_profile(&self, profile: &DesktopProfile) -> DesktopResult<DesktopProfile> {
         self.connection.execute(
-            "INSERT INTO desktop_local_profile (id, display_name, email, remember_identity, confirm_on_startup, last_workspace_path)
-             VALUES (1, ?1, ?2, ?3, ?4, ?5)
+            "INSERT INTO desktop_local_profile (id, display_name, email, remember_identity, confirm_on_startup, default_work_group_path, last_workspace_path)
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email,
              remember_identity = excluded.remember_identity, confirm_on_startup = excluded.confirm_on_startup,
+             default_work_group_path = excluded.default_work_group_path,
              last_workspace_path = excluded.last_workspace_path, updated_at = CURRENT_TIMESTAMP",
-            params![profile.display_name, profile.email, profile.remember_identity, profile.confirm_on_startup, profile.last_workspace_path],
+            params![profile.display_name, profile.email, profile.remember_identity, profile.confirm_on_startup, profile.default_work_group_path, profile.last_workspace_path],
         )?;
-        self.desktop_profile()?.ok_or_else(|| DesktopError::Policy("Local profile was not saved.".into()))
+        self.desktop_profile()?
+            .ok_or_else(|| DesktopError::Policy("Local profile was not saved.".into()))
     }
 
-    pub fn save_desktop_workspace(&self, workspace: &DesktopWorkspace) -> DesktopResult<DesktopWorkspace> {
+    pub fn save_default_work_group(&self, path: &str) -> DesktopResult<DesktopProfile> {
+        let updated = self.connection.execute(
+            "UPDATE desktop_local_profile SET default_work_group_path = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+            params![path],
+        )?;
+        if updated == 0 {
+            return Err(DesktopError::Policy(
+                "Save a local identity before selecting a work group.".into(),
+            ));
+        }
+        self.desktop_profile()?
+            .ok_or_else(|| DesktopError::Policy("Work group was not saved.".into()))
+    }
+
+    pub fn reset_default_work_group(&self) -> DesktopResult<DesktopProfile> {
+        let updated = self.connection.execute(
+            "UPDATE desktop_local_profile
+             SET default_work_group_path = NULL, last_workspace_path = NULL, updated_at = CURRENT_TIMESTAMP
+             WHERE id = 1",
+            [],
+        )?;
+        if updated == 0 {
+            return Err(DesktopError::Policy(
+                "Save a local identity before resetting a work group.".into(),
+            ));
+        }
+        self.desktop_profile()?
+            .ok_or_else(|| DesktopError::Policy("Work group was not reset.".into()))
+    }
+
+    pub fn save_desktop_workspace(
+        &self,
+        workspace: &DesktopWorkspace,
+    ) -> DesktopResult<DesktopWorkspace> {
         self.connection.execute(
             "INSERT INTO desktop_workspaces (path, name, kind, relationship, project_name)
              VALUES (?1, ?2, ?3, ?4, ?5)
@@ -309,6 +511,60 @@ impl DesktopDatabase {
             params![workspace.path, workspace.name, workspace.kind, workspace.relationship, workspace.project_name],
         )?;
         self.workspace_by_path(&workspace.path)
+    }
+
+    pub fn set_desktop_workspace_pinned(
+        &self,
+        path: &str,
+        pinned: bool,
+    ) -> DesktopResult<DesktopWorkspace> {
+        self.connection.execute(
+            "UPDATE desktop_workspaces SET pinned = ?2, updated_at = CURRENT_TIMESTAMP WHERE path = ?1",
+            params![path, pinned],
+        )?;
+        self.workspace_by_path(path)
+    }
+
+    pub fn remove_desktop_workspace(&self, path: &str) -> DesktopResult<bool> {
+        let removed = self.connection.execute(
+            "DELETE FROM desktop_workspaces WHERE path = ?1",
+            params![path],
+        )? > 0;
+        self.connection.execute(
+            "UPDATE desktop_local_profile SET last_workspace_path = NULL, updated_at = CURRENT_TIMESTAMP WHERE last_workspace_path = ?1",
+            params![path],
+        )?;
+        Ok(removed)
+    }
+
+    pub fn save_repository_url(
+        &self,
+        work_group_path: &str,
+        url: &str,
+        kind: &str,
+        relationship: &str,
+    ) -> DesktopResult<SavedRepositoryUrl> {
+        self.connection.execute(
+            "INSERT INTO desktop_saved_repository_urls (work_group_path, url, kind, relationship)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(work_group_path, url) DO UPDATE SET kind = excluded.kind,
+             relationship = excluded.relationship, updated_at = CURRENT_TIMESTAMP",
+            params![work_group_path, url, kind, relationship],
+        )?;
+        self.saved_repository_url(work_group_path, url)
+    }
+
+    pub fn list_repository_urls(
+        &self,
+        work_group_path: &str,
+    ) -> DesktopResult<Vec<SavedRepositoryUrl>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, work_group_path, url, kind, relationship, updated_at
+             FROM desktop_saved_repository_urls WHERE work_group_path = ?1
+             ORDER BY updated_at DESC, id DESC",
+        )?;
+        let rows = statement.query_map(params![work_group_path], saved_repository_url_from_row)?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
     pub fn mark_workspace_opened(&self, path: &str, name: &str) -> DesktopResult<()> {
@@ -325,9 +581,9 @@ impl DesktopDatabase {
     }
 
     pub fn get_agent_config(&self) -> DesktopResult<AgentConfig> {
-        let mut statement = self.connection.prepare(
-            "SELECT key, value FROM desktop_settings WHERE key LIKE 'agent.%'",
-        )?;
+        let mut statement = self
+            .connection
+            .prepare("SELECT key, value FROM desktop_settings WHERE key LIKE 'agent.%'")?;
         let rows = statement.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
@@ -335,7 +591,9 @@ impl DesktopDatabase {
         for row in rows {
             let (key, value) = row?;
             match key.as_str() {
-                "agent.codex_path" => config.codex_path = if value.is_empty() { None } else { Some(value) },
+                "agent.codex_path" => {
+                    config.codex_path = if value.is_empty() { None } else { Some(value) }
+                }
                 "agent.default_access" => config.default_access = value,
                 "agent.auto_start" => config.auto_start = value == "true",
                 "agent.approval_policy" => config.approval_policy = value,
@@ -353,11 +611,27 @@ impl DesktopDatabase {
                         match field {
                             "enabled" => provider_config.enabled = value == "true",
                             "is_default" => provider_config.is_default = value == "true",
-                            "api_key" => provider_config.api_key = if value.is_empty() { None } else { Some(value) },
-                            "base_url" => provider_config.base_url = if value.is_empty() { None } else { Some(value) },
-                            "model" => provider_config.model = if value.is_empty() { None } else { Some(value) },
+                            "api_key" => {
+                                provider_config.api_key =
+                                    if value.is_empty() { None } else { Some(value) }
+                            }
+                            "base_url" => {
+                                provider_config.base_url =
+                                    if value.is_empty() { None } else { Some(value) }
+                            }
+                            "model" => {
+                                provider_config.model =
+                                    if value.is_empty() { None } else { Some(value) }
+                            }
+                            "reasoning_effort" => {
+                                provider_config.reasoning_effort =
+                                    if value.is_empty() { None } else { Some(value) }
+                            }
                             "temperature" => provider_config.temperature = value.parse().ok(),
-                            "system_prompt" => provider_config.system_prompt = if value.is_empty() { None } else { Some(value) },
+                            "system_prompt" => {
+                                provider_config.system_prompt =
+                                    if value.is_empty() { None } else { Some(value) }
+                            }
                             _ => {}
                         }
                     }
@@ -371,7 +645,10 @@ impl DesktopDatabase {
     pub fn save_agent_config(&mut self, config: &AgentConfig) -> DesktopResult<AgentConfig> {
         let transaction = self.connection.transaction()?;
         let settings = [
-            ("agent.codex_path", config.codex_path.clone().unwrap_or_default()),
+            (
+                "agent.codex_path",
+                config.codex_path.clone().unwrap_or_default(),
+            ),
             ("agent.default_access", config.default_access.clone()),
             ("agent.auto_start", config.auto_start.to_string()),
             ("agent.approval_policy", config.approval_policy.clone()),
@@ -391,13 +668,41 @@ impl DesktopDatabase {
         for (provider, provider_config) in &config.providers {
             let prefix = format!("agent.providers.{provider}.");
             let provider_settings = [
-                (format!("{prefix}enabled"), provider_config.enabled.to_string()),
-                (format!("{prefix}is_default"), provider_config.is_default.to_string()),
-                (format!("{prefix}api_key"), provider_config.api_key.clone().unwrap_or_default()),
-                (format!("{prefix}base_url"), provider_config.base_url.clone().unwrap_or_default()),
-                (format!("{prefix}model"), provider_config.model.clone().unwrap_or_default()),
-                (format!("{prefix}temperature"), provider_config.temperature.map(|t| t.to_string()).unwrap_or_default()),
-                (format!("{prefix}system_prompt"), provider_config.system_prompt.clone().unwrap_or_default()),
+                (
+                    format!("{prefix}enabled"),
+                    provider_config.enabled.to_string(),
+                ),
+                (
+                    format!("{prefix}is_default"),
+                    provider_config.is_default.to_string(),
+                ),
+                (
+                    format!("{prefix}api_key"),
+                    provider_config.api_key.clone().unwrap_or_default(),
+                ),
+                (
+                    format!("{prefix}base_url"),
+                    provider_config.base_url.clone().unwrap_or_default(),
+                ),
+                (
+                    format!("{prefix}model"),
+                    provider_config.model.clone().unwrap_or_default(),
+                ),
+                (
+                    format!("{prefix}reasoning_effort"),
+                    provider_config.reasoning_effort.clone().unwrap_or_default(),
+                ),
+                (
+                    format!("{prefix}temperature"),
+                    provider_config
+                        .temperature
+                        .map(|t| t.to_string())
+                        .unwrap_or_default(),
+                ),
+                (
+                    format!("{prefix}system_prompt"),
+                    provider_config.system_prompt.clone().unwrap_or_default(),
+                ),
             ];
             for (key, value) in provider_settings {
                 transaction.execute(
@@ -422,53 +727,165 @@ impl DesktopDatabase {
             .execute_batch(include_str!("../migrations/0004_settings.sql"))?;
         self.connection
             .execute_batch(include_str!("../migrations/0005_desktop_setup.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0006_desktop_work_group.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0007_saved_repository_urls.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0008_agent_task_actions.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0009_agent_task_execution.sql"))?;
+        self.ensure_agent_task_column("archived", "INTEGER NOT NULL DEFAULT 0")?;
+        self.ensure_agent_task_column("review_requested", "INTEGER NOT NULL DEFAULT 0")?;
+        self.ensure_agent_task_column("execution_path", "TEXT")?;
+        self.ensure_agent_task_column("worktree_branch", "TEXT")?;
+        self.ensure_agent_task_column("run_status", "TEXT NOT NULL DEFAULT 'ready'")?;
+        self.ensure_agent_task_column("surface", "TEXT NOT NULL DEFAULT 'chat'")?;
+        self.ensure_agent_task_column("local_task_id", "INTEGER")?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0010_task_runner_isolation.sql"))?;
+        self.ensure_local_task_column("execution", "TEXT")?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0011_task_runner_task_execution.sql"))?;
+        self.connection.execute_batch(
+            "CREATE INDEX IF NOT EXISTS desktop_agent_tasks_workspace_status
+             ON desktop_agent_tasks (workspace_path, run_status, updated_at DESC);",
+        )?;
+        self.ensure_profile_column("default_work_group_path", "TEXT")?;
         self.ensure_workspace_column("kind", "TEXT NOT NULL DEFAULT 'application'")?;
         self.ensure_workspace_column("relationship", "TEXT NOT NULL DEFAULT 'standalone'")?;
         self.ensure_workspace_column("project_name", "TEXT")?;
+        self.ensure_workspace_column("pinned", "INTEGER NOT NULL DEFAULT 0")?;
         self.ensure_workspace_column("updated_at", "TEXT NOT NULL DEFAULT ''")?;
         Ok(())
     }
 
     fn ensure_workspace_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
-        let mut statement = self.connection.prepare("PRAGMA table_info(desktop_workspaces)")?;
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA table_info(desktop_workspaces)")?;
         let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
         if columns.filter_map(Result::ok).any(|name| name == column) {
             return Ok(());
         }
-        self.connection.execute_batch(&format!("ALTER TABLE desktop_workspaces ADD COLUMN {column} {definition}"))?;
+        self.connection.execute_batch(&format!(
+            "ALTER TABLE desktop_workspaces ADD COLUMN {column} {definition}"
+        ))?;
+        Ok(())
+    }
+
+    fn ensure_profile_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA table_info(desktop_local_profile)")?;
+        let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+        if columns.filter_map(Result::ok).any(|name| name == column) {
+            return Ok(());
+        }
+        self.connection.execute_batch(&format!(
+            "ALTER TABLE desktop_local_profile ADD COLUMN {column} {definition}"
+        ))?;
+        Ok(())
+    }
+
+    fn ensure_agent_task_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA table_info(desktop_agent_tasks)")?;
+        let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+        if columns.filter_map(Result::ok).any(|name| name == column) {
+            return Ok(());
+        }
+        self.connection.execute_batch(&format!(
+            "ALTER TABLE desktop_agent_tasks ADD COLUMN {column} {definition}"
+        ))?;
+        Ok(())
+    }
+
+    fn ensure_local_task_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA table_info(desktop_tasks)")?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if !columns.iter().any(|existing| existing == column) {
+            self.connection
+                .execute_batch(&format!("ALTER TABLE desktop_tasks ADD COLUMN {column} {definition}"))?;
+        }
         Ok(())
     }
 
     fn desktop_profile(&self) -> DesktopResult<Option<DesktopProfile>> {
         let mut statement = self.connection.prepare(
-            "SELECT display_name, email, remember_identity, confirm_on_startup, last_workspace_path FROM desktop_local_profile WHERE id = 1",
+            "SELECT display_name, email, remember_identity, confirm_on_startup, default_work_group_path, last_workspace_path FROM desktop_local_profile WHERE id = 1",
         )?;
         let mut rows = statement.query([])?;
-        let Some(row) = rows.next()? else { return Ok(None) };
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
         Ok(Some(DesktopProfile {
-            display_name: row.get(0)?, email: row.get(1)?, remember_identity: row.get::<_, i64>(2)? != 0,
-            confirm_on_startup: row.get::<_, i64>(3)? != 0, last_workspace_path: row.get(4)?,
+            display_name: row.get(0)?,
+            email: row.get(1)?,
+            remember_identity: row.get::<_, i64>(2)? != 0,
+            confirm_on_startup: row.get::<_, i64>(3)? != 0,
+            default_work_group_path: row.get(4)?,
+            last_workspace_path: row.get(5)?,
         }))
     }
 
     fn list_desktop_workspaces(&self) -> DesktopResult<Vec<DesktopWorkspace>> {
         let mut statement = self.connection.prepare(
-            "SELECT path, name, kind, relationship, project_name, last_opened_at FROM desktop_workspaces ORDER BY last_opened_at DESC, name COLLATE NOCASE",
+            "SELECT path, name, kind, relationship, project_name, pinned, last_opened_at FROM desktop_workspaces ORDER BY pinned DESC, relationship, name COLLATE NOCASE, path COLLATE NOCASE",
         )?;
         let rows = statement.query_map([], desktop_workspace_from_row)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
+    fn saved_repository_url(
+        &self,
+        work_group_path: &str,
+        url: &str,
+    ) -> DesktopResult<SavedRepositoryUrl> {
+        self.connection
+            .query_row(
+                "SELECT id, work_group_path, url, kind, relationship, updated_at
+             FROM desktop_saved_repository_urls WHERE work_group_path = ?1 AND url = ?2",
+                params![work_group_path, url],
+                saved_repository_url_from_row,
+            )
+            .map_err(Into::into)
+    }
+
     fn workspace_by_path(&self, path: &str) -> DesktopResult<DesktopWorkspace> {
         Ok(self.connection.query_row(
-            "SELECT path, name, kind, relationship, project_name, last_opened_at FROM desktop_workspaces WHERE path = ?1",
+            "SELECT path, name, kind, relationship, project_name, pinned, last_opened_at FROM desktop_workspaces WHERE path = ?1",
             params![path], desktop_workspace_from_row,
         )?)
     }
 }
 
 fn desktop_workspace_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DesktopWorkspace> {
-    Ok(DesktopWorkspace { path: row.get(0)?, name: row.get(1)?, kind: row.get(2)?, relationship: row.get(3)?, project_name: row.get(4)?, last_opened_at: row.get(5)? })
+    Ok(DesktopWorkspace {
+        path: row.get(0)?,
+        name: row.get(1)?,
+        kind: row.get(2)?,
+        relationship: row.get(3)?,
+        project_name: row.get(4)?,
+        pinned: row.get::<_, i64>(5)? != 0,
+        last_opened_at: row.get(6)?,
+    })
+}
+
+fn saved_repository_url_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedRepositoryUrl> {
+    Ok(SavedRepositoryUrl {
+        id: row.get(0)?,
+        work_group_path: row.get(1)?,
+        url: row.get(2)?,
+        kind: row.get(3)?,
+        relationship: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
 }
 
 fn agent_task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTask> {
@@ -477,7 +894,12 @@ fn agent_task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTask> {
         thread_id: row.get(1)?,
         title: row.get(2)?,
         access: row.get(3)?,
-        updated_at: row.get(4)?,
+        archived: row.get::<_, i64>(4)? != 0,
+        review_requested: row.get::<_, i64>(5)? != 0,
+        updated_at: row.get(6)?,
+        execution_path: row.get(7)?,
+        worktree_branch: row.get(8)?,
+        run_status: row.get(9)?,
     })
 }
 
@@ -487,10 +909,8 @@ mod tests {
 
     #[test]
     fn persists_agent_tasks_and_messages_per_workspace() {
-        let path = std::env::temp_dir().join(format!(
-            "devkit-agent-history-{}.db",
-            uuid::Uuid::new_v4()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("devkit-agent-history-{}.db", uuid::Uuid::new_v4()));
         let mut database = DesktopDatabase::open(path.clone()).expect("open test database");
 
         let task = database
@@ -499,8 +919,26 @@ mod tests {
                 "thread-1",
                 "Fix startup",
                 "workspaceWrite",
+                "chat",
+                None,
             )
             .expect("save agent task");
+        let task = database
+            .set_agent_task_execution(
+                "C:/work/devkit",
+                task.id,
+                "C:/work/.devkit-worktrees/task-1",
+                "devkit/task-1",
+            )
+            .expect("save task worktree");
+        assert_eq!(task.run_status, "ready");
+        assert_eq!(task.worktree_branch.as_deref(), Some("devkit/task-1"));
+        assert_eq!(
+            database
+                .agent_task_execution_path("C:/work/devkit", task.id)
+                .expect("read task worktree"),
+            "C:/work/.devkit-worktrees/task-1"
+        );
         database
             .save_agent_message(task.id, "message-1", "user", "Make startup faster")
             .expect("save user message");
@@ -531,23 +969,194 @@ mod tests {
     }
 
     #[test]
+    fn archives_reviews_and_deletes_agent_tasks_per_workspace() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-agent-task-actions-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let mut database = DesktopDatabase::open(path.clone()).expect("open test database");
+        let task = database
+            .save_agent_task(
+                "C:/work/devkit",
+                "thread-actions",
+                "Review me",
+                "workspaceWrite",
+                "chat",
+                None,
+            )
+            .expect("save agent task");
+
+        let reviewed = database
+            .request_agent_task_review("C:/work/devkit", task.id)
+            .expect("request review");
+        assert!(reviewed.review_requested);
+        assert!(database
+            .archive_agent_task("C:/work/devkit", task.id)
+            .expect("archive task"));
+        assert!(database
+            .list_agent_tasks("C:/work/devkit")
+            .unwrap()
+            .is_empty());
+        assert!(database
+            .delete_agent_task("C:/work/devkit", task.id)
+            .expect("delete task"));
+
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
     fn persists_local_identity_and_workspace_mapping() {
-        let path = std::env::temp_dir().join(format!("devkit-desktop-setup-{}.db", uuid::Uuid::new_v4()));
+        let path =
+            std::env::temp_dir().join(format!("devkit-desktop-setup-{}.db", uuid::Uuid::new_v4()));
         let database = DesktopDatabase::open(path.clone()).expect("open test database");
-        database.save_desktop_profile(&DesktopProfile {
-            display_name: "Aaran".into(), email: Some("aaran@example.com".into()), remember_identity: true,
-            confirm_on_startup: false, last_workspace_path: None,
-        }).expect("save profile");
-        database.save_desktop_workspace(&DesktopWorkspace {
-            path: "C:/work/sample".into(), name: "sample".into(), kind: "plugin".into(),
-            relationship: "addOn".into(), project_name: Some("DevKit".into()), last_opened_at: String::new(),
-        }).expect("save workspace");
-        database.mark_workspace_opened("C:/work/sample", "sample").expect("mark opened");
+        database
+            .save_desktop_profile(&DesktopProfile {
+                display_name: "Aaran".into(),
+                email: Some("aaran@example.com".into()),
+                remember_identity: true,
+                confirm_on_startup: false,
+                default_work_group_path: Some("C:/work".into()),
+                last_workspace_path: None,
+            })
+            .expect("save profile");
+        database
+            .save_desktop_workspace(&DesktopWorkspace {
+                path: "C:/work/sample".into(),
+                name: "sample".into(),
+                kind: "plugin".into(),
+                relationship: "addOn".into(),
+                project_name: Some("DevKit".into()),
+                pinned: false,
+                last_opened_at: String::new(),
+            })
+            .expect("save workspace");
+        database
+            .mark_workspace_opened("C:/work/sample", "sample")
+            .expect("mark opened");
         drop(database);
         let database = DesktopDatabase::open(path.clone()).expect("reopen migrated database");
         let setup = database.desktop_setup().expect("load setup");
-        assert_eq!(setup.profile.expect("profile").display_name, "Aaran");
+        let profile = setup.profile.expect("profile");
+        assert_eq!(profile.display_name, "Aaran");
+        assert_eq!(profile.default_work_group_path.as_deref(), Some("C:/work"));
         assert_eq!(setup.workspaces[0].relationship, "addOn");
+        let reset = database
+            .reset_default_work_group()
+            .expect("reset work group");
+        assert_eq!(reset.default_work_group_path, None);
+        assert_eq!(reset.last_workspace_path, None);
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn keeps_workspace_list_order_when_a_workspace_opens() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-workspace-order-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        for (name, path) in [
+            ("cxapp", "C:/work/cxapp"),
+            ("cxshop", "C:/work/cxshop"),
+            ("devkit", "C:/work/devkit"),
+        ] {
+            database
+                .save_desktop_workspace(&DesktopWorkspace {
+                    path: path.into(),
+                    name: name.into(),
+                    kind: "application".into(),
+                    relationship: "project".into(),
+                    project_name: None,
+                    pinned: false,
+                    last_opened_at: String::new(),
+                })
+                .expect("save workspace");
+        }
+
+        database
+            .mark_workspace_opened("C:/work/devkit", "devkit")
+            .expect("open workspace");
+        let names = database
+            .list_desktop_workspaces()
+            .expect("list workspaces")
+            .into_iter()
+            .map(|workspace| workspace.name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, ["cxapp", "cxshop", "devkit"]);
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn pins_and_removes_workspace_mappings_without_touching_the_folder() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-workspace-actions-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        database
+            .save_desktop_workspace(&DesktopWorkspace {
+                path: "C:/work/sample".into(),
+                name: "sample".into(),
+                kind: "application".into(),
+                relationship: "project".into(),
+                project_name: None,
+                pinned: false,
+                last_opened_at: String::new(),
+            })
+            .expect("save workspace");
+
+        assert!(
+            database
+                .set_desktop_workspace_pinned("C:/work/sample", true)
+                .expect("pin workspace")
+                .pinned
+        );
+        assert!(database
+            .remove_desktop_workspace("C:/work/sample")
+            .expect("remove workspace mapping"));
+        assert!(database
+            .desktop_setup()
+            .expect("load setup")
+            .workspaces
+            .is_empty());
+
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn saves_repository_urls_per_work_group() {
+        let path =
+            std::env::temp_dir().join(format!("devkit-repository-url-{}.db", uuid::Uuid::new_v4()));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+
+        database
+            .save_repository_url(
+                "C:/work",
+                "https://github.com/CODEXSUN/devkit.git",
+                "application",
+                "project",
+            )
+            .expect("save repository URL");
+        database
+            .save_repository_url(
+                "C:/other",
+                "https://github.com/CODEXSUN/zetro.git",
+                "application",
+                "project",
+            )
+            .expect("save separate work group URL");
+
+        let urls = database
+            .list_repository_urls("C:/work")
+            .expect("list repository URLs");
+        assert_eq!(urls.len(), 1);
+        assert_eq!(urls[0].url, "https://github.com/CODEXSUN/devkit.git");
+
         drop(database);
         std::fs::remove_file(path).expect("remove test database");
     }

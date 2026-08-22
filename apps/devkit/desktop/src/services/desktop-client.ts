@@ -22,6 +22,7 @@ import type {
   ProjectLearningSettings,
   ProjectLearningSummary,
   PythonEnvironment,
+  WorkGroupScan,
   TerminalResult,
   TerminalShell,
   Workspace
@@ -42,28 +43,27 @@ export class DesktopClient {
     return invoke<number>("start_agent_thread");
   }
 
-  async resumeAgentThread(threadId: string) {
-    return invoke<number>("resume_agent_thread", { threadId });
+  async resumeAgentThread(taskId: number, threadId: string) {
+    return invoke<number>("resume_agent_thread", { taskId, threadId });
   }
 
   async listAgentTasks() {
     return invoke<AgentTask[]>("list_agent_tasks");
   }
 
-  async saveAgentTask(threadId: string, title: string, access: AgentAccess) {
-    return invoke<AgentTask>("save_agent_task", { access, threadId, title });
+  async saveAgentTask(threadId: string, title: string, access: AgentAccess, surface: "chat" | "runner" = "chat", localTaskId?: number) {
+    return invoke<AgentTask>("save_agent_task", { access, localTaskId, surface, threadId, title });
+  }
+
+  async getRunnerTask(localTaskId: number) {
+    return invoke<AgentTask | null>("get_runner_task", { localTaskId });
   }
 
   async listAgentMessages(taskId: number) {
     return invoke<AgentMessage[]>("list_agent_messages", { taskId });
   }
 
-  async saveAgentMessage(
-    taskId: number,
-    id: string,
-    role: AgentMessage["role"],
-    content: string
-  ) {
+  async saveAgentMessage(taskId: number, id: string, role: AgentMessage["role"], content: string) {
     return invoke<AgentMessage>("save_agent_message", { content, id, role, taskId });
   }
 
@@ -71,8 +71,24 @@ export class DesktopClient {
     return invoke<boolean>("delete_agent_message", { id, taskId });
   }
 
-  async sendAgentTurn(threadId: string, prompt: string, access: AgentAccess) {
-    return invoke<number>("send_agent_turn", { access, prompt, threadId });
+  async archiveAgentTask(taskId: number) {
+    return invoke<boolean>("archive_agent_task", { taskId });
+  }
+
+  async deleteAgentTask(taskId: number) {
+    return invoke<boolean>("delete_agent_task", { taskId });
+  }
+
+  async requestAgentTaskReview(taskId: number) {
+    return invoke<AgentTask>("request_agent_task_review", { taskId });
+  }
+
+  async setAgentTaskStatus(taskId: number, status: AgentTask["runStatus"]) {
+    return invoke<AgentTask>("set_agent_task_status", { status, taskId });
+  }
+
+  async sendAgentTurn(taskId: number, threadId: string, prompt: string, access: AgentAccess) {
+    return invoke<number>("send_agent_turn", { access, prompt, taskId, threadId });
   }
 
   async interruptAgentTurn(threadId: string, turnId: string) {
@@ -87,6 +103,10 @@ export class DesktopClient {
     return invoke<Workspace>("open_workspace", { path: path ?? null });
   }
 
+  async openWorkspaceFolder(path: string) {
+    return invoke<void>("open_workspace_folder", { path });
+  }
+
   async getDesktopSetup() {
     return invoke<DesktopSetup>("get_desktop_setup");
   }
@@ -97,6 +117,38 @@ export class DesktopClient {
 
   async saveDesktopWorkspace(workspace: DesktopWorkspace) {
     return invoke<DesktopWorkspace>("save_desktop_workspace", { workspace });
+  }
+
+  async setDesktopWorkspacePinned(path: string, pinned: boolean) {
+    return invoke<DesktopWorkspace>("set_desktop_workspace_pinned", { path, pinned });
+  }
+
+  async removeDesktopWorkspace(path: string) {
+    return invoke<boolean>("remove_desktop_workspace", { path });
+  }
+
+  async resetDesktopWorkGroup() {
+    return invoke<DesktopProfile>("reset_desktop_work_group");
+  }
+
+  async chooseWorkGroup() {
+    return invoke<WorkGroupScan>("choose_work_group");
+  }
+
+  async scanWorkGroup(path?: string) {
+    return invoke<WorkGroupScan>("scan_work_group", { path: path ?? null });
+  }
+
+  async cloneGitHubRepository(url: string, kind: string, relationship: string) {
+    return invoke<WorkGroupScan>("clone_github_repository", {
+      request: { kind, relationship, url }
+    });
+  }
+
+  async saveRepositoryUrl(url: string, kind: string, relationship: string) {
+    return invoke<WorkGroupScan>("save_repository_url", {
+      request: { kind, relationship, url }
+    });
   }
 
   async listFiles(path = ".") {
@@ -225,8 +277,12 @@ export class DesktopClient {
     return invoke<LocalTask[]>("list_local_tasks");
   }
 
-  async saveTask(title: string) {
-    return invoke<LocalTask>("save_local_task", { title });
+  async saveTask(title: string, execution: string) {
+    return invoke<LocalTask>("save_local_task", { execution, title });
+  }
+
+  async setTaskStatus(taskId: number, status: LocalTask["status"]) {
+    return invoke<LocalTask>("set_local_task_status", { status, taskId });
   }
 
   async sync(apiUrl: string, accessToken: string) {
@@ -241,20 +297,28 @@ export class DesktopClient {
       }
       return res as AgentConfig;
     } catch (error) {
-      console.warn("[desktopClient] get_agent_config IPC unavailable, using fallback scaffolding:", error);
+      console.warn(
+        "[desktopClient] get_agent_config IPC unavailable, using fallback scaffolding:",
+        error
+      );
       return getFallbackAgentConfig();
     }
   }
 
   async saveAgentConfig(config: AgentConfig): Promise<AgentConfig> {
     try {
-      const res = await invoke<AgentConfig | { config: AgentConfig }>("save_agent_config", { config });
+      const res = await invoke<AgentConfig | { config: AgentConfig }>("save_agent_config", {
+        config
+      });
       if (res && typeof res === "object" && "config" in res && res.config) {
         return res.config;
       }
       return res as AgentConfig;
     } catch (error) {
-      console.warn("[desktopClient] save_agent_config IPC unavailable, returning saved scaffolding config:", error);
+      console.warn(
+        "[desktopClient] save_agent_config IPC unavailable, returning saved scaffolding config:",
+        error
+      );
       return config;
     }
   }
@@ -272,13 +336,18 @@ export function getFallbackAgentConfig(): AgentConfig {
     idleTimeout: 180,
     defaultProvider: "codex",
     providers: {
-      codex: { enabled: true, isDefault: true },
+      codex: { enabled: true, isDefault: true, model: "gpt-5.6-terra", reasoningEffort: "low" },
       openrouter: { enabled: false, isDefault: false },
       opencode: { enabled: false, isDefault: false },
       claude: { enabled: false, isDefault: false },
-      gemini: { enabled: false, isDefault: false, baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-2.0-flash" },
-      ollama: { enabled: true, isDefault: false, baseUrl: "http://localhost:11434" },
-    },
+      gemini: {
+        enabled: false,
+        isDefault: false,
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        model: "gemini-2.0-flash"
+      },
+      ollama: { enabled: true, isDefault: false, baseUrl: "http://localhost:11434" }
+    }
   };
 }
 

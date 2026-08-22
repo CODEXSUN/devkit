@@ -81,11 +81,25 @@ pub fn start_terminal(
 
 fn terminal_command(shell: TerminalShell) -> DesktopResult<CommandBuilder> {
     match shell {
-        TerminalShell::Powershell => Ok(CommandBuilder::new(if cfg!(windows) {
-            "powershell.exe"
-        } else {
-            "sh"
-        })),
+        TerminalShell::Powershell => {
+            let mut command = CommandBuilder::new(if cfg!(windows) {
+                "powershell.exe"
+            } else {
+                "sh"
+            });
+            if cfg!(windows) {
+                command.args([
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NoExit",
+                    "-Command",
+                    "Write-Host 'DevKit PowerShell terminal connected.'",
+                ]);
+            } else {
+                command.arg("-i");
+            }
+            Ok(command)
+        }
         TerminalShell::GitBash => {
             if !cfg!(windows) {
                 return Err(DesktopError::Policy(

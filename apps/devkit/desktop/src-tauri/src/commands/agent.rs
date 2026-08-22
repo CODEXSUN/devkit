@@ -164,23 +164,61 @@ fn codex_binary_name() -> &'static str {
 #[tauri::command]
 pub fn start_agent_thread(state: State<'_, DesktopState>) -> DesktopResult<u64> {
     let root = workspace_root(&state)?;
-    send_request(&state, "thread/start", json!({
-        "cwd": root,
-        "approvalPolicy": "on-request",
-        "sandbox": "workspace-write",
-        "serviceName": "devkit_desktop"
-    }))
+    let (model, reasoning_effort) = state.with_database(|database| {
+        let config = database.get_agent_config()?;
+        if config.default_provider != "codex" {
+            return Err(DesktopError::Policy(format!(
+                "{} is selected, but its execution adapter is not configured. Select Codex or configure the provider bridge first.",
+                config.default_provider
+            )));
+        }
+        Ok((config.default_provider == "codex")
+            .then(|| {
+                let provider = config.providers.get("codex");
+                (
+                    provider
+                        .and_then(|item| item.model.clone())
+                        .map(normalize_codex_model)
+                        .unwrap_or_else(|| "gpt-5.6-terra".into()),
+                    provider
+                        .and_then(|item| item.reasoning_effort.clone())
+                        .unwrap_or_else(|| "low".into()),
+                )
+            })
+            .unzip())
+    })?;
+    send_request(
+        &state,
+        "thread/start",
+        json!({
+            "cwd": root,
+            "model": model,
+            "config": reasoning_effort.map(|value| json!({ "model_reasoning_effort": value })),
+            "approvalPolicy": "on-request",
+            "sandbox": "workspace-write",
+            "serviceName": "devkit_desktop"
+        }),
+    )
+}
+
+fn normalize_codex_model(model: String) -> String {
+    if model == "gpt-5.6-sol" {
+        "gpt-5.6-terra".into()
+    } else {
+        model
+    }
 }
 
 #[tauri::command]
 pub fn resume_agent_thread(
+    task_id: i64,
     thread_id: String,
     state: State<'_, DesktopState>,
 ) -> DesktopResult<u64> {
     if thread_id.trim().is_empty() {
         return Err(DesktopError::Policy("Codex thread is required.".into()));
     }
-    let root = workspace_root(&state)?;
+    let root = task_execution_root(&state, task_id)?;
     send_request(
         &state,
         "thread/resume",
@@ -194,6 +232,7 @@ pub fn resume_agent_thread(
 
 #[tauri::command]
 pub fn send_agent_turn(
+    task_id: i64,
     thread_id: String,
     prompt: String,
     access: String,
@@ -204,7 +243,7 @@ pub fn send_agent_turn(
             "Enter an instruction for the agent.".into(),
         ));
     }
-    let root = workspace_root(&state)?;
+    let root = task_execution_root(&state, task_id)?;
     let sandbox = if access == "readOnly" {
         json!({ "type": "readOnly" })
     } else {
@@ -215,13 +254,38 @@ pub fn send_agent_turn(
         })
     };
 
-    send_request(&state, "turn/start", json!({
-        "threadId": thread_id,
-        "input": [{ "type": "text", "text": prompt.trim() }],
-        "cwd": root,
-        "approvalPolicy": "on-request",
-        "sandboxPolicy": sandbox
-    }))
+    send_request(
+        &state,
+        "turn/start",
+        json!({
+            "threadId": thread_id,
+            "input": [{ "type": "text", "text": prompt.trim() }],
+            "cwd": root,
+            "approvalPolicy": "on-request",
+            "sandboxPolicy": sandbox
+        }),
+    )
+}
+
+fn task_execution_root(state: &State<'_, DesktopState>, task_id: i64) -> DesktopResult<PathBuf> {
+    let workspace = workspace_root(state)?;
+    let workspace_path = workspace.to_string_lossy().into_owned();
+    let configured_path = state
+        .with_database(|database| database.agent_task_execution_path(&workspace_path, task_id))?;
+    let root = PathBuf::from(configured_path).canonicalize()?;
+    if root == workspace {
+        return Ok(root);
+    }
+    let parent = workspace
+        .parent()
+        .ok_or_else(|| DesktopError::Policy("The workspace has no parent directory.".into()))?;
+    let managed_root = parent.join(".devkit-worktrees").canonicalize()?;
+    if !root.starts_with(&managed_root) {
+        return Err(DesktopError::Policy(
+            "The task execution path is outside its managed worktree root.".into(),
+        ));
+    }
+    Ok(root)
 }
 
 #[tauri::command]

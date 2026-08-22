@@ -3,7 +3,7 @@ use std::process::Command;
 use serde::Serialize;
 use tauri::State;
 
-use crate::commands::{workspace_path, workspace_root};
+use crate::commands::{background_command, workspace_path, workspace_root};
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::DesktopState;
 
@@ -106,7 +106,7 @@ pub fn open_in_external_editor(
 }
 
 fn command_exists(command: &str) -> bool {
-    Command::new("where.exe")
+    background_command("where.exe")
         .arg(command)
         .output()
         .map(|output| output.status.success())

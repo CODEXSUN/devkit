@@ -63,6 +63,9 @@ export type SettingsSection =
   | "provider-gemini"
   | "advanced";
 
+type GeminiSafety = "none" | "few" | "standard";
+type GeminiThinking = "disabled" | "dynamic" | "max";
+
 export const PROVIDERS_META: {
   id: AgentProvider;
   name: string;
@@ -78,19 +81,7 @@ export const PROVIDERS_META: {
     icon: <TerminalSquare size={16} />,
     description: "OpenAI Codex CLI runtime (Local native engine)",
     requiresApiKey: false,
-    models: [
-      "gpt-4o",
-      "gpt-4o-mini",
-      "o1",
-      "o1-preview",
-      "o1-mini",
-      "o3-mini",
-      "gpt-4o-2024-11-20",
-      "gpt-4-turbo",
-      "gpt-4",
-      "gpt-3.5-turbo",
-      "codex-davinci-002"
-    ]
+    models: ["gpt-5.6-terra", "gpt-5.6-luna"]
   },
   {
     id: "openrouter",
@@ -199,7 +190,8 @@ export function getDefaultProviders(): Record<AgentProvider, ProviderConfig> {
       isDefault: true,
       apiKey: undefined,
       baseUrl: undefined,
-      model: undefined,
+      model: "gpt-5.6-terra",
+      reasoningEffort: "low",
       temperature: 0.2,
       maxTokens: 4096,
       systemPrompt: ""
@@ -409,7 +401,10 @@ export function SettingsPanel({
 
           {activeSection === "general" && <GeneralSettingsTab />}
           {activeSection === "workspace-identity" && (
-            <WorkspaceIdentitySettings currentWorkspace={currentWorkspace} onOpenWorkspace={onOpenWorkspace} />
+            <WorkspaceIdentitySettings
+              currentWorkspace={currentWorkspace}
+              onOpenWorkspace={onOpenWorkspace}
+            />
           )}
           {activeSection === "agent-overview" && (
             <AgentOverviewTab
@@ -763,6 +758,7 @@ function DedicatedProviderTab({
   const handleSaveThisProvider = () => {
     const updatedProviders = { ...currentProviders };
     updatedProviders[providerId] = {
+      ...updatedProviders[providerId],
       enabled: isDefault ? true : enabled,
       isDefault,
       apiKey: apiKey.trim() || undefined,
@@ -934,8 +930,8 @@ function DedicatedProviderTab({
   };
 
   // Gemini Auto-Connect & Safety states
-  const [geminiSafety, setGeminiSafety] = useState<"none" | "few" | "standard">("none");
-  const [geminiThinking, setGeminiThinking] = useState<"disabled" | "dynamic" | "max">("dynamic");
+  const [geminiSafety, setGeminiSafety] = useState<GeminiSafety>("none");
+  const [geminiThinking, setGeminiThinking] = useState<GeminiThinking>("dynamic");
   const [autoDetectingGemini, setAutoDetectingGemini] = useState(false);
 
   const handleAutoConnectGemini = async () => {
@@ -1412,7 +1408,7 @@ function DedicatedProviderTab({
               <select
                 id="gemini-safety-threshold"
                 value={geminiSafety}
-                onChange={(e) => setGeminiSafety(e.target.value as any)}
+                onChange={(event) => setGeminiSafety(event.currentTarget.value as GeminiSafety)}
                 className="setting-select"
               >
                 <option value="none">Block None (Recommended for coding tasks)</option>
@@ -1429,7 +1425,7 @@ function DedicatedProviderTab({
               <select
                 id="gemini-thinking-budget"
                 value={geminiThinking}
-                onChange={(e) => setGeminiThinking(e.target.value as any)}
+                onChange={(event) => setGeminiThinking(event.currentTarget.value as GeminiThinking)}
                 className="setting-select"
               >
                 <option value="dynamic">Dynamic Reasoning (Auto-allocate thinking tokens)</option>

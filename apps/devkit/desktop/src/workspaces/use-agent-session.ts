@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
-import type { AgentAccess, AgentMessage, AgentProtocolMessage, AgentTask } from "../contracts/desktop";
+import type { AgentAccess, AgentConfig, AgentMessage, AgentProtocolMessage, AgentProvider, AgentReasoningEffort, AgentTask } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 import type { Approval, RunItem } from "./agent-workspace-parts";
 import {
@@ -13,6 +13,7 @@ import {
 } from "./agent-protocol";
 import { AgentTurnWatchdog } from "./agent-turn-watchdog";
 import { afterFirstPaint } from "../shell/startup-scheduler";
+import { measureDesktopOperation, recordDesktopPerformance } from "../shell/desktop-performance";
 
 export type ChatMessage = {
   id: string;
@@ -22,11 +23,19 @@ export type ChatMessage = {
 };
 export type SubmissionPhase = "idle" | "preparing" | "sending";
 
+export type AgentConnection = {
+  effort: AgentReasoningEffort;
+  id: AgentProvider;
+  model: string;
+  provider: string;
+};
+
 export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => Promise<void> }) {
   const [access, setAccess] = useState<AgentAccess>("workspaceWrite");
   const [activeTaskId, setActiveTaskId] = useState<number>();
   const [approval, setApproval] = useState<Approval>();
   const [composer, setComposer] = useState("");
+  const [connection, setConnection] = useState<AgentConnection>({ effort: "low", id: "codex", model: "gpt-5.6-terra", provider: "Codex" });
   const [diff, setDiff] = useState("");
   const [error, setError] = useState<string>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -42,10 +51,17 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
   const activeTaskIdRef = useRef<number | undefined>(undefined);
   const threadIdRef = useRef<string | undefined>(undefined);
   const turnIdRef = useRef<string | undefined>(undefined);
+  const pendingAgentTextRef = useRef("");
+  const pendingAgentTextFrameRef = useRef<number | undefined>(undefined);
+  const renderedAgentTextBatchesRef = useRef(0);
+  const runtimeRef = useRef<"idle" | "connecting" | "ready" | "unavailable">("idle");
+  const runtimeRequestRef = useRef<Promise<void> | undefined>(undefined);
   const threadRequestRef = useRef<Promise<string> | undefined>(undefined);
   const resolveThreadRef = useRef<((threadId: string) => void) | undefined>(undefined);
   const threadTimeoutRef = useRef<number | undefined>(undefined);
   const transcript = useRef<HTMLDivElement>(null);
+  const turnEventCountRef = useRef(0);
+  const turnStartedAtRef = useRef<number | undefined>(undefined);
   const watchdogRef = useRef<AgentTurnWatchdog | undefined>(undefined);
   const busy = running || submissionPhase !== "idle";
 
@@ -90,8 +106,12 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       }
       stopEvents = events;
       stopErrors = errors;
-      void ensureRuntime().catch(() => undefined);
       cancelHistoryLoad = afterFirstPaint(() => {
+        void measureDesktopOperation("agent", "Load agent configuration", () =>
+          desktopClient.getAgentConfig()
+        )
+          .then((config) => setConnection(connectionFrom(config)))
+          .catch(() => undefined);
         void loadTaskHistory();
       });
     });
@@ -99,6 +119,9 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     return () => {
       disposed = true;
       cancelHistoryLoad?.();
+      if (pendingAgentTextFrameRef.current !== undefined) {
+        window.cancelAnimationFrame(pendingAgentTextFrameRef.current);
+      }
       watchdogRef.current?.stop();
       stopEvents?.();
       stopErrors?.();
@@ -106,11 +129,17 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
   }, []);
 
   useEffect(() => {
-    transcript.current?.scrollTo({ behavior: "smooth", top: transcript.current.scrollHeight });
-  }, [messages, runItems]);
+    const frame = window.requestAnimationFrame(() => {
+      const element = transcript.current;
+      if (!element) return;
+      element.scrollTo({ behavior: running ? "auto" : "smooth", top: element.scrollHeight });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, runItems, running]);
 
   function handleAgentEvent(message: AgentProtocolMessage) {
     watchdogRef.current?.touch();
+    if (turnStartedAtRef.current !== undefined) turnEventCountRef.current += 1;
     const nextThread = threadIdFrom(message);
     if (nextThread) {
       threadIdRef.current = nextThread;
@@ -122,6 +151,9 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       threadTimeoutRef.current = undefined;
     }
     if (message.method === "turn/started") {
+      turnStartedAtRef.current = performance.now();
+      turnEventCountRef.current = 1;
+      renderedAgentTextBatchesRef.current = 0;
       const nextTurnId = textAt(message, "params", "turn", "id");
       turnIdRef.current = nextTurnId;
       setTurnId(nextTurnId);
@@ -159,6 +191,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
           extractTextAt(message, "params", "item", "delta") ||
           extractTextAt(message, "params", "item", "formattedText");
         if (text) {
+          flushAgentText();
           const itemId = textAt(message, "params", "item", "id") ?? crypto.randomUUID();
           setAgentText(itemId, text);
           if (activeTaskIdRef.current) {
@@ -186,6 +219,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       });
     }
     if (message.method === "turn/completed") {
+      flushAgentText();
       watchdogRef.current?.stop();
       setRunning(false);
       turnIdRef.current = undefined;
@@ -208,14 +242,25 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       }
 
       void onRefreshChanges();
+      if (activeTaskIdRef.current) {
+        void desktopClient.setAgentTaskStatus(activeTaskIdRef.current, "completed").then(updateTask);
+      }
+      recordTurnPerformance("Completed");
     }
-    if (message.error?.message) setError(message.error.message);
+    if (message.error?.message) {
+      flushAgentText();
+      setError(message.error.message);
+      if (activeTaskIdRef.current) {
+        void desktopClient.setAgentTaskStatus(activeTaskIdRef.current, "failed").then(updateTask);
+      }
+      recordTurnPerformance("Failed");
+    }
   }
 
-  async function send() {
-    const prompt = composer.trim();
+  async function send(submittedPrompt?: string) {
+    const prompt = (submittedPrompt ?? composer).trim();
     if (!prompt || busy) return;
-    setComposer("");
+    if (!submittedPrompt) setComposer("");
     setError(undefined);
     setRunItems([]);
     setDiff("");
@@ -236,13 +281,17 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       setMessages((current) => [...current, toChatMessage(persistedMessage)]);
       setRunning(true);
       setSubmissionPhase("sending");
-      await desktopClient.sendAgentTurn(currentThreadId, prompt, access);
+      const savedTask = await desktopClient.setAgentTaskStatus(task.id, "running");
+      updateTask(savedTask);
+      await measureDesktopOperation("agent", "Submit agent turn", () =>
+        desktopClient.sendAgentTurn(task.id, currentThreadId, prompt, access)
+      );
     } catch (reason) {
       setRunning(false);
       const rollbackError = savedMessage
         ? await rollbackMessage(savedMessage.taskId, savedMessage.id)
         : undefined;
-      setComposer((current) => current || prompt);
+      if (!submittedPrompt) setComposer((current) => current || prompt);
       setError(
         rollbackError
           ? `The prompt was not sent, and its saved draft could not be removed. ${rollbackError}`
@@ -264,6 +313,13 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     }
   }
 
+  async function runTask(prompt: string) {
+    if (busy) return;
+    setActiveTask(undefined);
+    resetConversation();
+    await send(prompt);
+  }
+
   async function openTask(task: AgentTask) {
     if (busy || task.id === activeTaskIdRef.current) return;
     setError(undefined);
@@ -276,15 +332,42 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
 
     try {
       await ensureRuntime();
-      const savedMessages = await desktopClient.listAgentMessages(task.id);
+      const savedMessages = await measureDesktopOperation("agent", "Load chat history", () =>
+        desktopClient.listAgentMessages(task.id)
+      );
       if (task.id !== activeTaskIdRef.current) return;
       setMessages(savedMessages.map(toChatMessage));
-      await desktopClient.resumeAgentThread(task.threadId);
+      await measureDesktopOperation("agent", "Resume agent thread", () =>
+        desktopClient.resumeAgentThread(task.id, task.threadId)
+      );
       threadIdRef.current = task.threadId;
       setThreadId(task.threadId);
     } catch (reason) {
       setError(String(reason));
     }
+  }
+
+  async function archiveTask(task: AgentTask) {
+    if (busy) return;
+    await desktopClient.archiveAgentTask(task.id);
+    removeTaskFromSession(task.id);
+  }
+
+  async function deleteTask(task: AgentTask) {
+    if (busy) return;
+    try {
+      await desktopClient.deleteAgentTask(task.id);
+      removeTaskFromSession(task.id);
+    } catch (reason) {
+      setError(`The chat could not be deleted. ${String(reason)}`);
+      throw reason;
+    }
+  }
+
+  async function requestTaskReview(task: AgentTask) {
+    if (busy || task.reviewRequested) return;
+    const saved = await desktopClient.requestAgentTaskReview(task.id);
+    setTasks((current) => current.map((item) => item.id === saved.id ? saved : item));
   }
 
   async function interrupt() {
@@ -307,16 +390,60 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     }
   }
 
-  async function ensureRuntime() {
-    if (runtime === "ready") return;
-    setRuntime("connecting");
+  async function updateAgentPreferences(provider: AgentProvider, model: string, effort: AgentReasoningEffort) {
+    if (busy) return;
     try {
-      await desktopClient.startAgentRuntime();
-      setRuntime("ready");
+      const config = await desktopClient.getAgentConfig();
+      const providers = (Object.keys(config.providers) as AgentProvider[]).reduce<AgentConfig["providers"]>(
+        (current, key) => ({
+          ...current,
+          [key]: { ...config.providers[key], isDefault: key === provider }
+        }),
+        {} as AgentConfig["providers"]
+      );
+      const saved = await desktopClient.saveAgentConfig({
+        ...config,
+        defaultProvider: provider,
+        providers: {
+          ...providers,
+          [provider]: {
+            ...providers[provider],
+            enabled: true,
+            isDefault: true,
+            model,
+            reasoningEffort: effort
+          }
+        }
+      });
+      setConnection(connectionFrom(saved));
     } catch (reason) {
-      setRuntime("unavailable");
-      throw new Error(`The local agent engine could not start. ${String(reason)}`, { cause: reason });
+      setError(`The provider preference could not be saved. ${String(reason)}`);
     }
+  }
+
+  async function ensureRuntime() {
+    if (runtimeRef.current === "ready") return;
+    if (runtimeRequestRef.current) return runtimeRequestRef.current;
+
+    runtimeRef.current = "connecting";
+    setRuntime("connecting");
+    const request = measureDesktopOperation("agent", "Start local agent runtime", () =>
+      desktopClient.startAgentRuntime()
+    )
+      .then(() => {
+        runtimeRef.current = "ready";
+        setRuntime("ready");
+      })
+      .catch((reason) => {
+        runtimeRef.current = "unavailable";
+        setRuntime("unavailable");
+        throw new Error(`The local agent engine could not start. ${String(reason)}`, { cause: reason });
+      })
+      .finally(() => {
+        runtimeRequestRef.current = undefined;
+      });
+    runtimeRequestRef.current = request;
+    return request;
   }
 
   async function ensureThread() {
@@ -333,7 +460,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       }, 10000);
     });
 
-    void desktopClient.startAgentThread().catch((reason) => {
+    void measureDesktopOperation("agent", "Create agent thread", () => desktopClient.startAgentThread()).catch((reason) => {
       threadRequestRef.current = undefined;
       resolveThreadRef.current = undefined;
       window.clearTimeout(threadTimeoutRef.current);
@@ -349,7 +476,9 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       const activeTask = tasks.find((item) => item.id === activeTaskIdRef.current);
       if (activeTask) return activeTask;
     }
-    const created = await desktopClient.saveAgentTask(currentThreadId, titleFrom(prompt), access);
+    const created = await measureDesktopOperation("agent", "Create isolated task worktree", () =>
+      desktopClient.saveAgentTask(currentThreadId, titleFrom(prompt), access)
+    );
     setActiveTask(created.id);
     setTasks((current) => [created, ...current.filter((item) => item.id !== created.id)]);
     return created;
@@ -357,7 +486,9 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
 
   async function loadTaskHistory() {
     try {
-      const existingTasks = await desktopClient.listAgentTasks();
+      const existingTasks = await measureDesktopOperation("agent", "Load chat list", () =>
+        desktopClient.listAgentTasks()
+      );
       setTasks(existingTasks);
     } catch {
       // Keep UI active even if history is unavailable
@@ -371,6 +502,20 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
 
   function appendAgentText(delta: string) {
     if (!delta) return;
+    pendingAgentTextRef.current += delta;
+    if (pendingAgentTextFrameRef.current !== undefined) return;
+    pendingAgentTextFrameRef.current = window.requestAnimationFrame(flushAgentText);
+  }
+
+  function flushAgentText() {
+    if (pendingAgentTextFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(pendingAgentTextFrameRef.current);
+    }
+    pendingAgentTextFrameRef.current = undefined;
+    const delta = pendingAgentTextRef.current;
+    pendingAgentTextRef.current = "";
+    if (!delta) return;
+    renderedAgentTextBatchesRef.current += 1;
     setMessages((current) => {
       const last = current[current.length - 1];
       if (last?.role === "agent") {
@@ -420,6 +565,31 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     turnIdRef.current = undefined;
   }
 
+  function removeTaskFromSession(taskId: number) {
+    setTasks((current) => current.filter((task) => task.id !== taskId));
+    if (activeTaskIdRef.current === taskId) {
+      setActiveTask(undefined);
+      resetConversation();
+    }
+  }
+
+  function updateTask(saved: AgentTask) {
+    setTasks((current) => current.map((task) => task.id === saved.id ? saved : task));
+  }
+
+  function recordTurnPerformance(outcome: string) {
+    const startedAt = turnStartedAtRef.current;
+    if (startedAt === undefined) return;
+    recordDesktopPerformance({
+      at: new Date().toISOString(),
+      detail: `${outcome} · ${turnEventCountRef.current} events · ${renderedAgentTextBatchesRef.current} render batches`,
+      durationMs: performance.now() - startedAt,
+      operation: "Agent turn stream",
+      phase: "agent"
+    });
+    turnStartedAtRef.current = undefined;
+  }
+
   async function rollbackMessage(taskId: number, id: string) {
     setMessages((current) => current.filter((item) => item.id !== id));
     try {
@@ -433,10 +603,13 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
   return {
     access,
     activeTaskId,
+    archiveTask,
     approval,
     answerApproval,
     busy,
     composer,
+    connection,
+    deleteTask,
     diff,
     error,
     interrupt,
@@ -445,6 +618,8 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     openTask,
     runItems,
     running,
+    requestTaskReview,
+    runTask,
     runtime,
     send,
     setAccess,
@@ -453,7 +628,8 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     submissionPhase,
     tasks,
     threadId,
-    transcript
+    transcript,
+    updateAgentPreferences
   };
 }
 
@@ -464,6 +640,28 @@ function toChatMessage(saved: AgentMessage): ChatMessage {
     role: saved.role,
     text: saved.content
   };
+}
+
+function connectionFrom(config: AgentConfig): AgentConnection {
+  const provider = config.defaultProvider;
+  const model = config.providers[provider]?.model?.trim() || defaultModel(provider);
+  const effort = config.providers[provider]?.reasoningEffort;
+  return { effort: effort === "medium" || effort === "high" ? effort : "low", id: provider, model, provider: providerName(provider) };
+}
+
+function defaultModel(provider: AgentConfig["defaultProvider"]) {
+  return provider === "codex" ? "gpt-5.6-terra" : "Provider default";
+}
+
+function providerName(provider: AgentConfig["defaultProvider"]) {
+  return {
+    claude: "Claude",
+    codex: "Codex",
+    gemini: "Gemini",
+    ollama: "Ollama",
+    opencode: "OpenCode",
+    openrouter: "OpenRouter"
+  }[provider];
 }
 
 function titleFrom(prompt: string) {

@@ -32,13 +32,43 @@ export function agentErrorFrom(value: unknown) {
   if (!message) return undefined;
   const protocolError = message.error?.message?.trim();
   if (protocolError) return protocolError;
+  const nestedError =
+    textAt(message, "params", "error", "message") ??
+    textAt(message, "params", "turn", "error", "message");
+  if (nestedError?.trim()) return nestedError.trim();
   if (message.method !== "runtime/error") return undefined;
   const runtimeError = textAt(message, "params", "message")?.trim();
   return runtimeError || undefined;
 }
 
 export function threadIdFrom(message: AgentProtocolMessage) {
-  return textAt(message, "result", "thread", "id") ?? textAt(message, "params", "thread", "id");
+  return textAt(message, "result", "thread", "id") ?? textAt(message, "params", "thread", "id") ?? textAt(message, "params", "threadId");
+}
+
+export function actionChoicesFrom(text: string | undefined) {
+  if (!text?.includes("?")) return [];
+  const choices = text
+    .split("\n")
+    .map((line) => line.match(/^\s*(?:[-*]|\d+[.)])\s+(.+?)\s*$/)?.[1])
+    .filter((choice): choice is string => Boolean(choice))
+    .map((choice) => choice.replace(/[*_`]/g, "").trim())
+    .filter((choice) => choice.length > 0 && choice.length <= 80);
+  const unique = [...new Set(choices)];
+  if (unique.length >= 2 && unique.length <= 6) return unique;
+  return booleanChoicesFrom(text);
+}
+
+export function choiceQuestionFrom(text: string | undefined) {
+  if (!actionChoicesFrom(text).length) return text ?? "";
+  return text
+    ?.split("\n")
+    .filter((line) => !/^\s*(?:[-*]|\d+[.)])\s+.+?\s*$/.test(line))
+    .join("\n")
+    .trim() ?? "";
+}
+
+export function asksForTextInput(text: string | undefined) {
+  return Boolean(text && /\?\s*$/.test(choiceQuestionFrom(text)));
 }
 
 export function textAt(value: unknown, ...path: string[]) {
@@ -69,6 +99,9 @@ export function extractTextFromAny(value: unknown): string {
     if (obj.delta) return extractTextFromAny(obj.delta);
     if (obj.content) return extractTextFromAny(obj.content);
     if (obj.message) return extractTextFromAny(obj.message);
+    if (obj.output) return extractTextFromAny(obj.output);
+    if (obj.result) return extractTextFromAny(obj.result);
+    if (obj.items) return extractTextFromAny(obj.items);
   }
   return "";
 }
@@ -113,6 +146,14 @@ function valueAt(value: unknown, ...path: string[]): Record<string, unknown> | u
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : undefined;
+}
+
+function booleanChoicesFrom(text: string) {
+  const normalized = text.toLowerCase();
+  if (/\byes\b\s*(?:or|\/)\s*\bno\b/.test(normalized)) return ["Yes", "No"];
+  if (/\btrue\b\s*(?:or|\/)\s*\bfalse\b/.test(normalized)) return ["True", "False"];
+  if (/\by\b\s*(?:or|\/)\s*\bn\b/.test(normalized)) return ["Y", "N"];
+  return [];
 }
 
 function labelFor(type: string) {

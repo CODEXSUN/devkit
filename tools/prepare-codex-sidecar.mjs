@@ -11,14 +11,32 @@ const binaries = [
   { name: "codex-code-mode-host", sourceDirectory: "bin" },
   { name: "codex-command-runner", sourceDirectory: "codex-resources" },
   { name: "codex-windows-sandbox-setup", sourceDirectory: "codex-resources" },
-  { name: "rg", sourceDirectory: "codex-path" },
+  { name: "rg", sourceDirectory: "codex-path" }
 ];
 
 for (const binary of binaries) {
   copyBinary(binary.name, binary.sourceDirectory);
 }
 
+copyOpenCodeBinary();
+
 console.log(`Prepared Codex ${target} sidecars.`);
+
+function copyOpenCodeBinary() {
+  const source = resolve(repositoryRoot, "node_modules", "opencode-ai", "bin", "opencode.exe");
+  const destination = resolve(
+    repositoryRoot,
+    "apps/devkit/desktop/src-tauri/binaries",
+    `opencode-${target}${executableSuffix}`
+  );
+  if (!existsSync(source) || statSync(source).size < 1_000_000) {
+    throw new Error("OpenCode CLI is unavailable. Run npm install from the repository root.");
+  }
+  mkdirSync(dirname(destination), { recursive: true });
+  if (!existsSync(destination) || statSync(destination).size !== statSync(source).size) {
+    copyFileSync(source, destination);
+  }
+}
 
 function copyBinary(binary, sourceDirectory) {
   const source = resolve(
@@ -29,24 +47,24 @@ function copyBinary(binary, sourceDirectory) {
     "vendor",
     target,
     sourceDirectory,
-    `${binary}${executableSuffix}`,
+    `${binary}${executableSuffix}`
   );
   const destination = resolve(
     repositoryRoot,
     "apps/devkit/desktop/src-tauri/binaries",
-    `${binary}-${target}${executableSuffix}`,
+    `${binary}-${target}${executableSuffix}`
   );
 
   if (!existsSync(source)) {
     if (!process.env.CI && existsSync(destination) && statSync(destination).size > 0) {
       console.warn(
-        `Using the existing ${binary} sidecar for ${target}; run npm install from the repository root to restore its vendor source.`,
+        `Using the existing ${binary} sidecar for ${target}; run npm install from the repository root to restore its vendor source.`
       );
       return;
     }
 
     throw new Error(
-      `${binary} is unavailable for ${target}. Run npm install from the repository root.`,
+      `${binary} is unavailable for ${target}. Run npm install from the repository root.`
     );
   }
 
@@ -63,7 +81,7 @@ function detectTargetTriple() {
     "linux-arm64": "aarch64-unknown-linux-musl",
     "linux-x64": "x86_64-unknown-linux-musl",
     "win32-arm64": "aarch64-pc-windows-msvc",
-    "win32-x64": "x86_64-pc-windows-msvc",
+    "win32-x64": "x86_64-pc-windows-msvc"
   };
   const targetTriple = targets[`${process.platform}-${process.arch}`];
   if (!targetTriple) {
@@ -79,7 +97,7 @@ function packageForTarget(targetTriple) {
     "aarch64-unknown-linux-musl": "codex-linux-arm64",
     "x86_64-apple-darwin": "codex-darwin-x64",
     "x86_64-pc-windows-msvc": "codex-win32-x64",
-    "x86_64-unknown-linux-musl": "codex-linux-x64",
+    "x86_64-unknown-linux-musl": "codex-linux-x64"
   };
   const packageName = packages[targetTriple];
   if (!packageName) {

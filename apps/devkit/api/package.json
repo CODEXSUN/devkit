@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit-api",
-  "version": "1.0.71",
+  "version": "1.0.77",
   "private": true,
   "type": "module",
   "exports": {
@@ -16,11 +16,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
-    "@codexsun/framework": "1.0.71",
+    "@codexsun/framework": "1.0.77",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/agents": "^0.17.0",
     "@openai/codex": "^0.148.0",
-    "@opencode-ai/sdk": "^1.18.18",
+    "@opencode-ai/sdk": "^1.18.21",
     "@openrouter/sdk": "^1.2.47",
     "@types/nodemailer": "^8.0.1",
     "bullmq": "^6.1.2",
@@ -29,7 +29,6 @@
     "kysely": "^0.29.5",
     "nodemailer": "^9.0.5",
     "openai": "^7.5.0",
-    "opencode-ai": "^1.18.18",
     "teleproto": "^1.228.5",
     "zod": "^4.4.3"
   }

@@ -37,9 +37,12 @@ export function formatMessageTime(value: string, locale?: string, timeZone?: str
   const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
     hour: "2-digit",
     hour12: false,
     minute: "2-digit",
-    timeZone
+    month: "short",
+    timeZone,
+    year: "numeric"
   }).format(date);
 }

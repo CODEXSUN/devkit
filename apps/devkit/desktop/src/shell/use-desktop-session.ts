@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopSetup, FileEntry, GitChange, SystemStatus, Workspace } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 import { afterFirstPaint } from "./startup-scheduler";
+import { measureDesktopOperation } from "./desktop-performance";
 
 export type ResourceState = "idle" | "loading" | "ready" | "unavailable";
 export type AgentRuntimeState = "idle" | "connecting" | "ready" | "unavailable";
@@ -22,7 +23,7 @@ export function useDesktopSession() {
   const refreshChanges = useCallback(async () => {
     setChangesState("loading");
     try {
-      setChanges(await desktopClient.gitStatus());
+      setChanges(await measureDesktopOperation("git", "Git status", () => desktopClient.gitStatus()));
       setChangesState("ready");
     } catch (reason) {
       setChangesState("unavailable");
@@ -34,7 +35,7 @@ export function useDesktopSession() {
     const generation = requestGeneration.current;
     setFilesState("loading");
     try {
-      const nextFiles = await desktopClient.listFiles();
+      const nextFiles = await measureDesktopOperation("files", "List workspace files", () => desktopClient.listFiles());
       if (requestGeneration.current !== generation) return;
       setFiles(nextFiles);
       setFilesState("ready");
@@ -46,14 +47,14 @@ export function useDesktopSession() {
 
   const loadSystem = useCallback(async () => {
     try {
-      setSystem(await desktopClient.systemStatus());
+      setSystem(await measureDesktopOperation("workspace", "Read system status", () => desktopClient.systemStatus()));
     } catch {
       setSystem(undefined);
     }
   }, []);
 
   const refreshDesktopSetup = useCallback(async () => {
-    const next = await desktopClient.getDesktopSetup();
+    const next = await measureDesktopOperation("startup", "Load desktop setup", () => desktopClient.getDesktopSetup());
     setDesktopSetup(next);
     return next;
   }, []);
@@ -65,7 +66,7 @@ export function useDesktopSession() {
       setOpening(true);
       setError(undefined);
       try {
-        const next = await desktopClient.openWorkspace(path);
+        const next = await measureDesktopOperation("workspace", "Open workspace", () => desktopClient.openWorkspace(path));
         if (requestGeneration.current !== generation) return;
         setWorkspace(next);
         setFiles([]);
@@ -96,6 +97,7 @@ export function useDesktopSession() {
         !profile ||
         !profile.rememberIdentity ||
         profile.confirmOnStartup ||
+        !profile.defaultWorkGroupPath ||
         !profile.lastWorkspacePath
       ) return;
       const lastWorkspacePath = profile.lastWorkspacePath;

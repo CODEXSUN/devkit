@@ -1,14 +1,18 @@
 import {
   Download,
+  Blocks,
+  FolderGit2,
   FolderOpen,
   PanelBottom,
+  Puzzle,
   Search,
   Settings,
   SlidersHorizontal,
   X
 } from "lucide-react";
 import { useEffect } from "react";
-import codeItIcon from "../../src-tauri/icons/icon.png";
+import devKitLogo from "../../src-tauri/icons/icon.png";
+import type { DesktopWorkspace } from "../contracts/desktop";
 
 type Theme = "dark" | "light" | "system";
 
@@ -17,23 +21,29 @@ export function AppDrawer({
   onOpenCommands,
   onOpenSettings,
   onOpenUpdates,
+  onOpenWorkGroup,
   onOpenWorkspace,
+  onSelectWorkspace,
   onThemeChange,
   onToggleTerminal,
   open,
   terminalOpen,
-  theme
+  theme,
+  workspaces
 }: {
   onClose: () => void;
   onOpenCommands: () => void;
   onOpenSettings: () => void;
   onOpenUpdates: () => void;
+  onOpenWorkGroup: () => void;
   onOpenWorkspace: () => void;
+  onSelectWorkspace: (path: string) => void;
   onThemeChange: (theme: Theme) => void;
   onToggleTerminal: () => void;
   open: boolean;
   terminalOpen: boolean;
   theme: Theme;
+  workspaces: DesktopWorkspace[];
 }) {
   useEffect(() => {
     if (!open) return;
@@ -47,7 +57,8 @@ export function AppDrawer({
   if (!open) return null;
 
   const actions = [
-    { icon: FolderOpen, label: "Open workspace", onSelect: onOpenWorkspace },
+    { icon: FolderGit2, label: "Folders & repositories", onSelect: onOpenWorkGroup },
+    { icon: FolderOpen, label: "Open any folder", onSelect: onOpenWorkspace },
     { icon: Search, label: "Command palette", onSelect: onOpenCommands },
     { icon: SlidersHorizontal, label: "Settings", onSelect: onOpenSettings },
     {
@@ -74,7 +85,7 @@ export function AppDrawer({
       <aside aria-label="DevKit menu" aria-modal="true" className="app-drawer" role="dialog">
         <header>
           <span>
-            <img alt="" className="product-icon" src={codeItIcon} /> DevKit
+            <img alt="" className="product-icon" src={devKitLogo} /> DevKit
           </span>
           <button aria-label="Close menu" onClick={onClose} type="button">
             <X size={18} />
@@ -88,6 +99,7 @@ export function AppDrawer({
             </button>
           ))}
         </nav>
+        <RepositoryGroups onSelectWorkspace={(path) => select(() => onSelectWorkspace(path))} workspaces={workspaces} />
         <section className="drawer-settings">
           <h2>
             <Settings size={16} /> Settings
@@ -108,6 +120,52 @@ export function AppDrawer({
           </div>
         </section>
       </aside>
+    </div>
+  );
+}
+
+function RepositoryGroups({
+  onSelectWorkspace,
+  workspaces
+}: {
+  onSelectWorkspace: (path: string) => void;
+  workspaces: DesktopWorkspace[];
+}) {
+  const projects = workspaces.filter((workspace) => workspace.relationship === "project");
+  const addOnProjects = workspaces.filter((workspace) => workspace.relationship === "addOn");
+  const plugins = workspaces.filter((workspace) => workspace.kind === "plugin" && workspace.relationship !== "addOn");
+  if (projects.length === 0 && addOnProjects.length === 0 && plugins.length === 0) return null;
+
+  return (
+    <section className="drawer-repositories">
+      <RepositoryGroup icon={FolderGit2} label="Projects" onSelectWorkspace={onSelectWorkspace} workspaces={projects} />
+      <RepositoryGroup icon={Blocks} label="Add-on projects" onSelectWorkspace={onSelectWorkspace} workspaces={addOnProjects} />
+      <RepositoryGroup icon={Puzzle} label="Plugins" onSelectWorkspace={onSelectWorkspace} workspaces={plugins} />
+    </section>
+  );
+}
+
+function RepositoryGroup({
+  icon: Icon,
+  label,
+  onSelectWorkspace,
+  workspaces
+}: {
+  icon: typeof FolderGit2;
+  label: string;
+  onSelectWorkspace: (path: string) => void;
+  workspaces: DesktopWorkspace[];
+}) {
+  if (workspaces.length === 0) return null;
+  return (
+    <div className="drawer-repository-group">
+      <h2><Icon size={15} /> {label}</h2>
+      {workspaces.map((workspace) => (
+        <button key={workspace.path} onClick={() => onSelectWorkspace(workspace.path)} type="button">
+          <span>{workspace.name}</span>
+          <small>{workspace.kind === "plugin" ? "Plugin" : "Folder"}</small>
+        </button>
+      ))}
     </div>
   );
 }

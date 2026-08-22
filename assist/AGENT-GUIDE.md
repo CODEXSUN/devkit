@@ -33,3 +33,15 @@
 - Migrations safely upgrade existing databases and record keys in `schema_migrations`.
 - Seeds are repeatable; protected administrator creation is controlled by `INITIAL_ADMIN_*`.
 - Run check, build, and the database-backed runtime smoke before completion when available.
+
+## Release Evidence Rules
+
+1. Read `assist/documentation/release-notes-standard.md` before a version bump, commit, release, or deployment.
+2. Read the newest changelog entry before choosing a Git commit message.
+3. Use the exact subject format `#<patch> - <title>`. Derive `<patch>` and `<title>` from the newest changelog entry. For example, `v 1.0.73` uses `#73 - <title>`.
+4. Update every repository-owned version file with `npm.cmd run version:bump -- --title "<title>"`. Do not edit one manifest by hand.
+5. Record the release under `Database Changes`, `App Codebase Changes`, and `Verification`.
+6. If database update is `Yes`, list every migration, table, column, index, constraint, seed, or data transformation that changes. Do not use a generic database summary.
+7. In Verification, name every command that ran and every live check that did not run. Do not claim a pending release, GitHub mutation, model request, or VPS update succeeded.
+8. Before a commit, run `npm.cmd run release:scope`, `npm.cmd run check:versions`, the required focused checks, `git diff --check`, and `git status --short`.
+9. Treat unreviewed worktree changes as user-owned. Do not stage them with `git add -A` until the user includes them in the release scope.
