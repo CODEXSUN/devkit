@@ -1,8 +1,163 @@
 # Changelog
 
-Current version: 1.0.71
-Release tag: v-1.0.71
-Changelog label: v 1.0.71
+Current version: 1.0.77
+Release tag: v-1.0.77
+Changelog label: v 1.0.77
+
+## v-1.0.77
+
+### [v 1.0.77] 2026-08-22 3:08 pm - Factual project job release results
+
+#### Database Changes
+
+- Database update: No.
+- The factual release result is derived from existing local job events and read-only workspace metadata. It does not change SQLite schema or data.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.77.
+- Added a deterministic release-review result for the `Log` project task: current version, newest changelog heading, changed-path count, migration-path count, and the actions that did not occur.
+- Labels local model output as an unverified advisory, so it cannot be mistaken for completed validation or a written release note.
+- Reduced the local planning output budget to 160 tokens because the final release result is generated from observed evidence instead of model prose.
+- Removed the temporary repository-rules and writable-code demo tasks and their demo-only execution code before release.
+- Kept the production OpenCode planner, observed event watcher, model discovery, approval boundary, and project-job evidence flow.
+- Removed the remaining desktop ESLint warnings from the Gemini settings controls.
+
+#### Verification
+
+- Passed `npm.cmd run check`. It covered encoding, deployment, repository boundaries, artifacts, modules, databases, workspace typechecks and lints, and framework tests.
+- Passed `npm.cmd run check --workspace @devkit/desktop`: TypeScript, ESLint with no warnings, 30 desktop tests, and the production build passed.
+- Passed `cargo fmt --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml` and `cargo test --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml` with 25 tests.
+- Passed `npm.cmd audit --audit-level=moderate` with zero reported vulnerabilities.
+- Passed `npm.cmd run release:scope`; all 142 changed paths were classified with no unexplained area.
+- Passed `npm.cmd run check:versions` and `git diff --check` after finalizing this record.
+- Passed `npm.cmd run github:release:test` and the `desktop-v1.0.77` GitHub release dry run. No tag or GitHub release was created.
+- Verified a live local Ollama request to `qwen2.5-coder:7b`. It returned text but invented release claims, which this change now treats as unverified advisory output.
+
+## v-1.0.76
+
+### [v 1.0.76] 2026-08-22 3:01 pm - Project job review handoff and factual local plans
+
+#### Database Changes
+
+- Database update: No.
+- The review handoff uses the existing project-job event evidence and does not change its SQLite schema or persisted data contract.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.76.
+- Marked completed local plans as review-required instead of presenting a non-functional approval state.
+- Added a review-in-Agent-chat action that retrieves the saved planning output and inserts it into the coding-agent composer as a draft.
+- Tightened local release-log prompting: it distinguishes observed facts from pending work, uses semantic versions correctly, prohibits invented verification claims, and limits the response length.
+- Reduced local planner output from 512 to 320 generated tokens to improve response time and readability.
+
+#### Verification
+
+- Passed `npm.cmd run check --workspace @devkit/desktop`: TypeScript, 30 desktop tests, and the production build passed. ESLint reported two existing `no-explicit-any` warnings in `settings-panel.tsx` and no errors.
+- Passed `cargo fmt --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml` and `cargo check --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml`.
+- Passed `npm.cmd run check:versions` and `git diff --check` after finalizing this record.
+- Did not run a live desktop review-handoff interaction after this change.
+
+## v-1.0.75
+
+### [v 1.0.75] 2026-08-22 2:50 pm - Project job log controls and local model patience
+
+#### Database Changes
+
+- Database update: No.
+- Copying and clearing project-job log evidence does not change the database schema or data contract.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.75.
+- Added a copy control for the full text of a project-job log in both the inline task row and the dedicated log page.
+- Replaced browser `confirm()` prompts with an accessible DevKit Shadcn-styled clear-log dialog that supports backdrop dismissal and Escape.
+- Increased the local Ollama planning request timeout from 90 to 180 seconds and reduced progress events from every 4 seconds to every 12 seconds. Stop remains available while the request is running.
+
+#### Verification
+
+- Passed `npm.cmd run check --workspace @devkit/desktop`: TypeScript, 30 desktop tests, and the production build passed. ESLint reported two existing `no-explicit-any` warnings in `settings-panel.tsx` and no errors.
+- Passed `cargo fmt --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml` and `cargo check --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml`.
+- Passed `npm.cmd run check:versions` and `git diff --check` after finalizing this record.
+- Did not run a live desktop interaction or local-model request after this change.
+
+## v-1.0.74
+
+### [v 1.0.74] 2026-08-22 2:45 pm - Shared agent tools and release-log evidence
+
+#### Database Changes
+
+- Database update: No.
+- The release-log planning task reads local workspace evidence only. It does not change SQLite, MariaDB, or saved job records.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.74.
+- Defined the shared desktop agent tool vocabulary: inspect, search, plan, write, refactor, verify, and review.
+- Recorded the approval and evidence boundary for Codex, online, and local connectors. A model reply is not treated as proof that an action happened.
+- Made every repeatable project-job recipe declare the same implementation tool set and require approval before it can write, refactor, change a version, or perform external work.
+- Updated the local `Log` planning prompt with observed repository version, newest changelog heading, changed-path count, migration-path count, and a bounded path preview.
+- Added the `devkit-agent-tools` skill and the shared desktop agent-tool policy for future connector and job implementations.
+
+#### Verification
+
+- Passed `npm.cmd run check --workspace @devkit/desktop`: TypeScript, 30 desktop tests, and the production build passed. ESLint reported two existing `no-explicit-any` warnings in `settings-panel.tsx` and no errors.
+- Passed `cargo check --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml` and `cargo fmt --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml`.
+- Passed `npm.cmd run check:versions` and `git diff --check` after finalizing this record.
+- Did not run a live local-model request or a desktop UI interaction for this release record.
+
+## v-1.0.73
+
+### [v 1.0.73] 2026-08-22 12:19 pm - Local project-task runner reliability
+
+#### Database Changes
+
+- Database update: Yes.
+- Updated local desktop SQLite through additive migrations `0005` to `0011`.
+- Added `default_work_group_path` to `desktop_local_profile` with identity and startup fields retained.
+- Added `desktop_saved_repository_urls` with `work_group_path`, `url`, `kind`, `relationship`, `created_at`, and `updated_at`.
+- Added `archived`, `review_requested`, `execution_path`, and `worktree_branch` to `desktop_agent_tasks`.
+- Added `desktop_project_jobs` with workspace, recipe, title, model target, model, status, and timestamps.
+- Added `desktop_project_job_events` with job, level, message, and timestamp evidence.
+- Added `desktop_project_job_runtime` with a job key, running status, and start timestamp for restart recovery.
+- Did not modify an existing user SQLite data file during this release preparation.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.73.
+- Added project overview task rows, per-job logs, local Ollama model refresh, cancellation, active-state polling, and bounded local-run retries.
+- Added local identity, work-group discovery, saved repository URLs, repository types, clone-and-connect, project cards, project overview, and project-only chat history.
+- Added isolated task worktree metadata, parallel chat tabs, task archive and review controls, model selection, action evidence, and a more accurate runtime state surface.
+- Reordered desktop startup around an early Agent view, lazy workspace loading, quiet sidecar startup, and desktop performance helpers.
+- Regenerated DevKit desktop icon assets and aligned Tauri, package, lockfile, workspace, and internal dependency versions.
+- Added the local Ollama and Qdrant Docker environment, setup scripts, and operator documentation.
+- Added observed local-job stages for model availability, prompt dispatch, elapsed response waiting, response receipt, retry, completion, failure, and cancellation. The local runner remains plan-only and does not claim file, GitHub, or VPS changes.
+- Expanded the four reusable project-job skills with explicit checkpoints, stop conditions, and evidence required for release hand-off.
+- Added release-note validation and a release-scope inventory command so a future agent reviews every changed area before it writes a concise changelog.
+
+#### Verification
+
+- Passed `npm.cmd run check`, including repository boundaries, typechecks, lint, tests, dependency checks, and package builds.
+- Passed `npm.cmd run check:versions`, `npm.cmd run desktop:release:build`, `npm.cmd run desktop:release:check`, and `git diff --check`.
+- Passed `npm.cmd run github:release:test` and `npm.cmd run github:release -- --dry-run --timeout-minutes 120`.
+- Passed `npm.cmd run check --workspace @devkit/desktop` and `cargo check --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml` after the local-job progress update.
+- Verified that the local Ollama service lists the installed `qwen2.5-coder:7b` and `nomic-embed-text:latest` models.
+- Full local generation, GitHub mutation, release publishing, and VPS deployment remain pending their dedicated gates.
+
+## v-1.0.72
+
+### [v 1.0.72] 2026-08-22 12:40 am - Chat deletion confirmation
+
+#### Database Changes
+
+- Database update: Yes.
+- The existing additive local SQLite chat-action migration continues to preserve archived and review states before a chat is permanently deleted.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.72.
+- Added a DevKit Shadcn-themed warning dialog before a chat and its local messages are permanently deleted.
+- Kept the dialog open if deletion fails and surfaced the failure in the agent workspace.
 
 ## v-1.0.71
 
