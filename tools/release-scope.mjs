@@ -26,7 +26,7 @@ function changedFiles() {
 function groupFiles(files) {
   const definitions = [
     ["Desktop database and native commands", /^apps\/devkit\/desktop\/src-tauri\/(?:migrations|src\/)/u],
-    ["Desktop workspace and agent experience", /^apps\/devkit\/desktop\/src\/(?:(?:workspaces|shell|services|contracts)\/|styles\.css$)/u],
+    ["Desktop workspace and agent experience", /^apps\/devkit\/desktop\/src\/(?:(?:workspaces|shell|services|contracts|standalone\/compass-runner)\/|styles\.css$)/u],
     ["Desktop icons and packaging", /^apps\/devkit\/desktop\/(?:src-tauri\/icons|src-tauri\/(?:Cargo|tauri\.conf)|package\.json)/u],
     ["Local AI environment", /^\.container\/local-ai\//u],
     ["Application and package versions", /^(?:package(?:-lock)?\.json|apps\/[^/]+\/[^/]+\/package\.json|packages\/[^/]+\/package\.json)$/u],

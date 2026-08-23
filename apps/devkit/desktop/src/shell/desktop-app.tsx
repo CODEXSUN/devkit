@@ -14,10 +14,12 @@ import {
   Search,
   ServerCog,
   Settings,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Workflow
 } from "lucide-react";
 import { AgentWorkspace } from "../workspaces/agent-workspace";
 import { TaskRunnerWorkspace } from "../workspaces/task-runner-workspace";
+import { CompassRunnerWorkspace } from "../workspaces/compass-runner-workspace";
 import { DesktopSetup } from "../workspaces/desktop-setup";
 import { WorkGroupSetup } from "../workspaces/work-group-setup";
 import { AppDrawer } from "./app-drawer";
@@ -61,13 +63,14 @@ const ProjectOverview = lazy(() =>
 const ProjectSummary = lazy(() =>
   import("../workspaces/project-summary").then((module) => ({ default: module.ProjectSummary }))
 );
-const activities = [
+export const activities = [
   { icon: Bot, id: "assist", label: "Agent" },
   { icon: FolderKanban, id: "projects", label: "Projects" },
   { icon: Files, id: "files", label: "Explorer" },
   { icon: Search, id: "search", label: "Search" },
   { icon: GitBranch, id: "git", label: "Source control" },
   { icon: ListTodo, id: "tasks", label: "Tasks" },
+  { icon: Workflow, id: "compass", label: "Compass Runner" },
   { icon: BrainCircuit, id: "learning", label: "Project learning" },
   { icon: Box, id: "docker", label: "Docker" },
   { icon: SlidersHorizontal, id: "settings", label: "Settings" },
@@ -178,7 +181,7 @@ export function DesktopApp() {
     () => activities.find((item) => item.id === ui.activity)?.label ?? "Explorer",
     [ui.activity]
   );
-  const titlebarLabel = ui.activity === "tasks" ? "Task orchestration" : panelTitle;
+  const titlebarLabel = ui.activity === "tasks" ? "Task orchestration" : ui.activity === "compass" ? "Compass Runner" : panelTitle;
 
   const paletteCommands = useMemo<PaletteCommand[]>(
     () => [
@@ -287,6 +290,7 @@ export function DesktopApp() {
         className={
           ui.activity === "assist" ||
           ui.activity === "tasks" ||
+          ui.activity === "compass" ||
           ui.activity === "overview" ||
           ui.activity === "projects" ||
           ui.activity === "settings" ||
@@ -356,6 +360,7 @@ export function DesktopApp() {
             />
           </div> : null}
           {ui.activity === "tasks" ? <div className="workspace-surface"><TaskRunnerWorkspace onRefreshChanges={session.refreshChanges} /></div> : null}
+          {ui.activity === "compass" ? <div className="workspace-surface"><CompassRunnerWorkspace /></div> : null}
           {ui.activity === "projects" ? (
             <div className="workspace-surface">
               <Suspense fallback={<div className="workspace-loading">Loading projects...</div>}>
@@ -491,5 +496,5 @@ export function DesktopApp() {
 }
 
 function isFullWorkspace(activity: string) {
-  return ["assist", "tasks", "hostinger", "overview", "projects", "settings", "sync"].includes(activity);
+  return ["assist", "tasks", "compass", "hostinger", "overview", "projects", "settings", "sync"].includes(activity);
 }

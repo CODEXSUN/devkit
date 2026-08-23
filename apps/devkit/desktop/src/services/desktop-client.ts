@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AgentAccess,
   AgentConfig,
+  CompassReleaseEvent,
   AgentMessage,
   AgentRuntimeStatus,
   AgentTask,
@@ -269,6 +270,9 @@ export class DesktopClient {
 
   async run(command: string, args: string[] = []) {
     return invoke<TerminalResult>("run_workspace_command", { args, command });
+  }
+  async runCompassReleaseStep(action: "inspect" | "validate" | "version-bump" | "commit-push" | "publish-release", title?: string, message?: string) {
+    return invoke<CompassReleaseEvent[]>("run_compass_release_step", { action, message: message ?? null, title: title ?? null });
   }
 
   async systemStatus() {

@@ -1,0 +1,13 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { CompassRunnerWorkspace } from "./compass-runner-workspace";
+
+describe("Compass Runner workspace", () => {
+  it("renders the standalone release worker without requiring desktop services", () => {
+    const page = renderToStaticMarkup(<CompassRunnerWorkspace />);
+    expect(page).toContain("Compass Runner");
+    expect(page).toContain("DevKit release readiness");
+    expect(page).toContain("Inspect repository");
+    expect(page).toContain("separate from DevKit Tasks, Projects, chat, and the database");
+  });
+});

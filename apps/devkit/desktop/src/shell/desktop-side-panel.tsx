@@ -18,6 +18,7 @@ export type Activity =
   | "projects"
   | "search"
   | "settings"
+  | "compass"
   | "sync"
   | "tasks";
 
@@ -112,6 +113,7 @@ function PanelProgress({ label }: { label: string }) {
 function EmptyPanel({ activity }: { activity: Activity }) {
   const descriptions: Record<Activity, string> = {
     assist: "Connect Assist to plan, edit, review, and verify this workspace.",
+    compass: "Run standalone sales and CRM workflow prototypes without connecting to DevKit tasks.",
     docker: "Inspect services and run approved Docker operations.",
     files: "Open a workspace to browse files.",
     git: "Open a Git repository to review changes.",

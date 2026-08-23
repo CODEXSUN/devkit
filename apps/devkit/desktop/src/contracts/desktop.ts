@@ -121,6 +121,7 @@ export type TerminalResult = {
   stderr: string;
   stdout: string;
 };
+export type CompassReleaseEvent = { kind: "log" | "result" | "error"; message: string; data?: Record<string, unknown> };
 
 export type LocalTask = {
   execution: string;

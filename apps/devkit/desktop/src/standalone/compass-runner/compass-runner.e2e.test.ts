@@ -5,42 +5,31 @@ import { CompassRunner } from "./runner";
 const at = () => new Date("2026-08-23T10:00:00.000Z");
 
 describe("Compass Runner standalone E2E", () => {
-  it("runs a multimodal sales lead task through approval, interaction, result, and artifact", async () => {
-    const task = makeTask("sales-lead", "Score an inbound lead from a call recording and product screenshot.", "openhands", [
-      { kind: "audio", name: "discovery-call.mp3", value: "artifact://call" },
-      { kind: "image", name: "requirements.png", value: "artifact://requirements" }
-    ]);
-    const runner = new CompassRunner(task, scripted("openhands", (context) => {
-      if (!context.approved) return approval("Sending a follow-up email will contact a prospect.");
-      if (!context.response) return choice("Is the lead qualified?", ["Qualified", "Nurture", "Disqualify"]);
-      return result(`Lead marked ${context.response}. Owner: sales-west.`, "lead-score.json");
-    }), at);
-
-    expect((await runner.start()).status).toBe("awaiting-approval");
-    expect((await runner.decideApproval("approve")).interaction?.choices).toContain("Qualified");
-    const completed = await runner.respond("Qualified");
-    expect(completed).toMatchObject({ status: "completed", result: "Lead marked Qualified. Owner: sales-west." });
-    expect(completed.artifacts).toEqual([{ name: "lead-score.json", mediaType: "application/json", uri: "artifact://lead-score.json" }]);
-  });
-
-  it("runs a CRM cleanup task with typed input and keeps execution isolated", async () => {
-    const runner = new CompassRunner(makeTask("crm-dedupe", "Resolve duplicate contacts without changing the CRM until confirmed.", "ollama"), scripted("ollama", (context) => {
-      if (!context.response) return { kind: "interaction", interaction: { id: "merge", question: "Which contact should remain?", acceptsText: true }, log: "Two probable duplicates found." };
-      return result(`Prepared merge plan retaining ${context.response}.`, "merge-plan.md");
-    }), at);
-
-    expect((await runner.start()).status).toBe("awaiting-input");
-    const completed = await runner.respond("CRM-1024");
-    expect(completed.result).toBe("Prepared merge plan retaining CRM-1024.");
-    expect(completed.events.map((event) => event.type)).toEqual(["planned", "log", "input-requested", "log", "completed"]);
-  });
-
   it("does not execute when the operator declines approval", async () => {
     let calls = 0;
     const runner = new CompassRunner(makeTask("renewal", "Send renewal quote.", "codex"), { id: "codex", async execute() { calls += 1; return approval("Quote sends an external email."); } }, at);
     await runner.start();
     expect((await runner.decideApproval("decline")).status).toBe("cancelled");
     expect(calls).toBe(1);
+  });
+
+  it("keeps every DevKit release mutation behind an interactive approval", async () => {
+    let phase = 0;
+    const runner = new CompassRunner(makeTask("release", "Prepare the next DevKit IDE release.", "opencode"), scripted("opencode", (_context) => {
+      if (phase === 0) { phase = 1; return choice("Bump 1.0.77 to the next version?", ["Bump", "Cancel"]); }
+      if (phase === 1) { phase = 2; return approval("Update package manifests and changelog evidence."); }
+      if (phase === 2) { phase = 3; return choice("Remote changes were analysed. Continue to protected Git actions?", ["Continue", "Stop"]); }
+      if (phase === 3) { phase = 4; return approval("Commit, push, tag, and publish the release."); }
+      return result("Release evidence prepared; live mutation remains gated.", "release-evidence.md");
+    }), at);
+
+    expect((await runner.start()).interaction?.choices).toContain("Bump");
+    expect((await runner.respond("Bump")).approval?.summary).toContain("package manifests");
+    expect((await runner.decideApproval("approve")).interaction?.question).toContain("Remote changes");
+    expect((await runner.respond("Continue")).approval?.summary).toContain("Commit, push, tag");
+    const complete = await runner.decideApproval("approve");
+    expect(complete).toMatchObject({ status: "completed", result: "Release evidence prepared; live mutation remains gated." });
+    expect(complete.artifacts[0]?.name).toBe("release-evidence.md");
   });
 });
 

@@ -1,8 +1,66 @@
 # Changelog
 
-Current version: 1.0.77
-Release tag: v-1.0.77
-Changelog label: v 1.0.77
+Current version: 1.0.81
+Release tag: v-1.0.81
+Changelog label: v 1.0.81
+
+## v-1.0.81
+
+### [v 1.0.81] 2026-08-23 9:53 am - Compass Runner live release flow
+
+#### Database Changes
+
+- Database update: No.
+- No migration, seed, or persisted data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.81.
+- Added the standalone Compass Runner release worker, its Tauri command bridge, and the desktop workspace entry point.
+- Added explicit, approval-gated stages for version and changelog updates, Git synchronisation, commit and push, and release publication.
+- Added observed worker-event streaming, release-scope classification, and focused Compass Runner tests.
+- Corrected porcelain-status parsing and added bounded retries with captured stderr for staging failures.
+- Removed the unrelated sales and CRM sample scenarios from the standalone runner tests.
+
+#### Verification
+
+- Passed `npm.cmd run test --workspace @devkit/desktop -- compass-runner` (3 tests).
+- Passed `npm.cmd run typecheck --workspace @devkit/desktop`.
+- Passed `cargo check --manifest-path apps/devkit/desktop/src-tauri/Cargo.toml`.
+- Passed `npm.cmd run check:versions`, `npm.cmd run release:scope`, and `git diff --check`.
+- Live desktop preflight and the approved version update were observed. In `tauri dev`, changing `tauri.conf.json` restarts the development desktop; the remaining protected stages are resumed after that restart.
+
+## v-1.0.79
+
+### [v 1.0.79] 2026-08-23 9:39 am - Compass release update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.79.
+
+#### Verification
+
+- Not yet run. Add the exact commands and live checks before commit.
+
+## v-1.0.78
+
+### [v 1.0.78] 2026-08-23 9:39 am - Compass release update
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.78.
+
+#### Verification
+
+- Not yet run. Add the exact commands and live checks before commit.
 
 ## v-1.0.77
 

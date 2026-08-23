@@ -32,6 +32,7 @@ pub fn run() {
             commands::agent::send_agent_turn,
             commands::agent::interrupt_agent_turn,
             commands::agent::answer_agent_approval,
+            commands::compass_release::run_compass_release_step,
             commands::tasks::list_local_tasks,
             commands::tasks::save_local_task,
             commands::tasks::set_local_task_status,

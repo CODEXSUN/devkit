@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DevKit",
-  "version": "1.0.77",
+  "version": "1.0.81",
   "identifier": "com.codelogicx.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -47,7 +47,9 @@
     ],
     "publisher": "CODEXSUN",
     "shortDescription": "DevKit engineering IDE",
-    "targets": ["msi"],
+    "targets": [
+      "msi"
+    ],
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"
@@ -60,7 +62,9 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://github.com/CODEXSUN/devkit/releases/latest/download/latest.json"],
+      "endpoints": [
+        "https://github.com/CODEXSUN/devkit/releases/latest/download/latest.json"
+      ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc1MDQzREREREQ4NUI5MjkKUldRcHVZWGQzVDBFZFhrdE9HZHcwOU11S1p1R1MyVVJQdkpibStvNlRJL0NpRFA3UTBhaTN1dkkK",
       "windows": {
         "installMode": "passive"
