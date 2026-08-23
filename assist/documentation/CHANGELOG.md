@@ -1,8 +1,30 @@
 # Changelog
 
-Current version: 1.0.83
-Release tag: v-1.0.83
-Changelog label: v 1.0.83
+Current version: 1.0.84
+Release tag: v-1.0.84
+Changelog label: v 1.0.84
+
+## v-1.0.84
+
+### [v 1.0.84] 2026-08-23 11:13 am - Compass Runner release evidence and live console
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.84.
+- Updated the standalone Compass Runner to persist release sessions and local history, expose true preflight, version, commit, and publish stages, and show a final report only after verified publication evidence.
+- Streamed the repository release publisher output through the worker so the desktop console receives live release and workflow progress.
+- Added per-stage event idempotency, safe recovery of legacy saved sessions, explicit stop-monitoring semantics, report copying, workflow and release links, and a slim independently scrolling console.
+
+#### Verification
+
+- Passed `npm.cmd run typecheck --workspace @devkit/desktop`, `npm.cmd run test --workspace @devkit/desktop -- compass-runner` (3 tests), `npm.cmd run lint --workspace @devkit/desktop`, and `npm.cmd run build --workspace @devkit/desktop`.
+- Passed `npm.cmd run github:release:test` (6 tests), `npm.cmd run check:versions`, `npm.cmd run release:scope`, and `git diff --check`.
+- Live desktop verification completed a read-only Compass preflight. The stage became completed and the console rendered one record for each of the four worker events.
 
 ## v-1.0.83
 

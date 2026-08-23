@@ -1,6 +1,6 @@
 [package]
 name = "devkit-desktop"
-version = "1.0.83"
+version = "1.0.84"
 description = "DevKit IDE runtime"
 edition = "2021"
 

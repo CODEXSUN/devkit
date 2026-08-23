@@ -1,22 +1,27 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createInterface } from "node:readline";
 
 const root = resolve(import.meta.dirname, "..");
 const action = process.argv[2] ?? "inspect";
 const title = valueAfter("--title") ?? "Compass release update";
 
-try {
-  if (action === "inspect") inspect();
-  else if (action === "validate") validate();
-  else if (action === "version-bump") bump();
-  else if (action === "commit-push") commitPush();
-  else if (action === "publish-release") publish();
-  else throw new Error(`Unknown Compass release action: ${action}`);
-} catch (error) {
-  event("error", error instanceof Error ? error.message : "Unknown release worker failure.");
-  process.exitCode = 1;
+await main();
+
+async function main() {
+  try {
+    if (action === "inspect") inspect();
+    else if (action === "validate") validate();
+    else if (action === "version-bump") bump();
+    else if (action === "commit-push") commitPush();
+    else if (action === "publish-release") await publish();
+    else throw new Error(`Unknown Compass release action: ${action}`);
+  } catch (error) {
+    event("error", error instanceof Error ? error.message : "Unknown release worker failure.");
+    process.exitCode = 1;
+  }
 }
 
 function inspect() {
@@ -110,10 +115,16 @@ function releaseCommitSubject() {
   return `#${Number(String(version).split(".")[2])} - ${title}`;
 }
 
-function publish() {
+async function publish() {
   event("log", "Starting the repository-owned release publisher after final approval and waiting for public release verification.");
-  run(process.execPath, ["tools/github-release.mjs", "--yes"]);
-  event("result", "Release workflow completed and its public assets were verified.");
+  await runStreaming(process.execPath, ["tools/github-release.mjs", "--yes"]);
+  const version = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
+  const tag = `desktop-v${version}`;
+  event("result", "Release workflow completed and its public assets were verified.", {
+    releaseUrl: `https://github.com/CODEXSUN/devkit/releases/tag/${tag}`,
+    tag,
+    workflowUrl: "https://github.com/CODEXSUN/devkit/actions/workflows/desktop-release.yml"
+  });
 }
 
 function npm(args) { run(process.platform === "win32" ? process.env.ComSpec ?? "cmd.exe" : "npm", process.platform === "win32" ? ["/d", "/s", "/c", "npm.cmd", ...args] : args); }
@@ -126,6 +137,16 @@ function changedFiles() {
 function sleep(milliseconds) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds); }
 function commandFailure(error) { const stderr = error && typeof error === "object" && "stderr" in error ? String(error.stderr).trim() : ""; return stderr || (error instanceof Error ? error.message : "Unknown command failure."); }
 function run(command, args, quiet = false) { const output = execFileSync(command, args, { cwd: root, encoding: "utf8", stdio: quiet ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "pipe"] }); const text = output?.trim() ?? ""; if (!quiet && text) event("log", text); return text; }
+function runStreaming(command, args) {
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn(command, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    streamLines(child.stdout, (line) => event("log", line));
+    streamLines(child.stderr, (line) => event("log", `publisher: ${line}`));
+    child.once("error", rejectRun);
+    child.once("close", (code) => code === 0 ? resolveRun() : rejectRun(new Error(`Repository release publisher exited with code ${code ?? "unknown"}.`)));
+  });
+}
+function streamLines(stream, write) { createInterface({ input: stream }).on("line", (line) => { if (line.trim()) write(line); }); }
 function lines(value) { return value.split(/\r?\n/u).filter(Boolean); }
 function valueAfter(flag) { const index = process.argv.indexOf(flag); return index >= 0 ? process.argv[index + 1] : undefined; }
 function event(type, message, data) { process.stdout.write(`${JSON.stringify({ type, message, ...(data ? { data } : {}) })}\n`); }
