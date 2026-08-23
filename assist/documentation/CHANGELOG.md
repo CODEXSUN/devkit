@@ -1,8 +1,33 @@
 # Changelog
 
-Current version: 1.0.81
-Release tag: v-1.0.81
-Changelog label: v 1.0.81
+Current version: 1.0.83
+Release tag: v-1.0.83
+Changelog label: v 1.0.83
+
+## v-1.0.83
+
+### [v 1.0.83] 2026-08-23 10:33 am - Compass Runner live release flow
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.83.
+- Updated Compass Runner so each live release stage records pending, awaiting approval, running, completed, or failed status and cannot display final success before release publication has been verified.
+- Made the version stage idempotent after a Tauri development restart, preventing a duplicate version bump when a previously approved update already exists.
+- Preserved release-stage state in the local desktop session so a configuration-triggered desktop restart can recover safely into the next protected approval.
+- Added desktop development start guards that reuse the active Vite and DevKit process together, but relaunch Tauri when Vite remains available after the desktop process exits.
+
+#### Verification
+
+- Passed `npm.cmd run typecheck --workspace @devkit/desktop`.
+- Passed `npm.cmd run test --workspace @devkit/desktop -- compass-runner` (3 tests).
+- Passed `npm.cmd run lint --workspace @devkit/desktop`, `npm.cmd run release:scope`, `npm.cmd run check:versions`, and `git diff --check`.
+- Live desktop preflight and validation completed. The live version-stage recovery verified the existing approved update without creating a second version.
+- Commit, push, GitHub workflow, public release assets, and packaged release verification are pending the following protected stages.
 
 ## v-1.0.81
 

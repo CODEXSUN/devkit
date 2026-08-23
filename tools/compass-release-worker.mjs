@@ -37,6 +37,13 @@ function validate() {
 }
 
 function bump() {
+  const currentVersion = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
+  const committedVersion = JSON.parse(git(["show", "HEAD:package.json"])).version;
+  if (currentVersion !== committedVersion) {
+    event("log", `An uncommitted version update to ${currentVersion} is already present; avoiding a duplicate bump.`);
+    event("result", "Existing version references and changelog update were verified. No duplicate version was created.");
+    return;
+  }
   event("log", `Applying approved version bump: ${title}`);
   npm(["run", "version:bump", "--", "--title", title]);
   event("result", "Version references and changelog were updated by the repository release tool.");
@@ -104,9 +111,9 @@ function releaseCommitSubject() {
 }
 
 function publish() {
-  event("log", "Starting the repository-owned release publisher after final approval.");
-  run(process.execPath, ["tools/github-release.mjs", "--yes", "--no-wait"]);
-  event("result", "Release tag was requested. Follow the published workflow for build evidence.");
+  event("log", "Starting the repository-owned release publisher after final approval and waiting for public release verification.");
+  run(process.execPath, ["tools/github-release.mjs", "--yes"]);
+  event("result", "Release workflow completed and its public assets were verified.");
 }
 
 function npm(args) { run(process.platform === "win32" ? process.env.ComSpec ?? "cmd.exe" : "npm", process.platform === "win32" ? ["/d", "/s", "/c", "npm.cmd", ...args] : args); }

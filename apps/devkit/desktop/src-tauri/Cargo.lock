@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "devkit-desktop"
-version = "1.0.81"
+version = "1.0.83"
 dependencies = [
  "portable-pty",
  "reqwest 0.12.28",

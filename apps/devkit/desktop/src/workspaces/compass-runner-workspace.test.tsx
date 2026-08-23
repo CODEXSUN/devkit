@@ -7,6 +7,8 @@ describe("Compass Runner workspace", () => {
     const page = renderToStaticMarkup(<CompassRunnerWorkspace />);
     expect(page).toContain("Compass Runner");
     expect(page).toContain("DevKit release readiness");
+    expect(page).toContain("Preflight");
+    expect(page).toContain("Publish and verify");
     expect(page).toContain("Inspect repository");
     expect(page).toContain("separate from DevKit Tasks, Projects, chat, and the database");
   });

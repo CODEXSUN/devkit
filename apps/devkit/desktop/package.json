@@ -1,12 +1,12 @@
 {
   "name": "@devkit/desktop",
-  "version": "1.0.81",
+  "version": "1.0.83",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "dev": "vite --host 127.0.0.1 --port 1420",
+    "dev": "node ../../../tools/start-desktop-vite.mjs",
     "lint": "eslint src --ext .ts,.tsx",
     "tauri": "tauri",
     "tauri:build": "node ../../../tools/prepare-codex-sidecar.mjs && tauri build",

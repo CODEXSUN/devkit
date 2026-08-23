@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Check, CircleDotDashed, FileOutput, ShieldCheck } from "lucide-react";
 import type { CompassDirective, CompassExecutionContext, CompassExecutorAdapter, CompassSnapshot, CompassTask } from "../standalone/compass-runner/contracts";
@@ -8,6 +8,19 @@ import { desktopClient } from "../services/desktop-client";
 
 type ScenarioId = "devkit-release";
 type Scenario = { id: ScenarioId; label: string; description: string; task: CompassTask; execute: (context: CompassExecutionContext) => CompassDirective };
+type ReleasePhase = "idle" | "version-bump" | "commit-push" | "publish-release" | "completed";
+type ReleaseStageId = "preflight" | "version" | "commit" | "publish";
+type ReleaseStageStatus = "pending" | "running" | "awaiting-approval" | "completed" | "failed";
+type ReleaseSession = { phase: ReleasePhase; stages: Record<ReleaseStageId, ReleaseStageStatus> };
+
+const releaseSessionKey = "devkit.compass-release-session";
+
+const releaseStages: readonly { id: ReleaseStageId; label: string }[] = [
+  { id: "preflight", label: "Preflight" },
+  { id: "version", label: "Version and changelog" },
+  { id: "commit", label: "Commit and push" },
+  { id: "publish", label: "Publish and verify" }
+];
 
 const scenarios: readonly Scenario[] = [
   createDevKitReleaseScenario()
@@ -39,7 +52,9 @@ function LiveReleaseWorker() {
   const [events, setEvents] = useState<CompassReleaseEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [phase, setPhase] = useState<"idle" | "version-bump" | "commit-push" | "publish-release" | "completed">("idle");
+  const [session, setSession] = useState<ReleaseSession>(() => readReleaseSession());
+  const sessionRef = useRef(session);
+  const { phase, stages } = session;
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
@@ -49,11 +64,96 @@ function LiveReleaseWorker() {
     });
     return () => { disposed = true; unlisten?.(); };
   }, []);
-  async function execute(action: "inspect" | "validate" | "version-bump" | "commit-push" | "publish-release") { setBusy(true); setError(undefined); try { await desktopClient.runCompassReleaseStep(action, "Compass Runner live release flow"); return true; } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); return false; } finally { setBusy(false); } }
-  async function start() { setEvents([]); if (!await execute("inspect")) return; if (!await execute("validate")) return; setPhase("version-bump"); }
-  async function approve() { if (phase === "version-bump") { if (await execute("version-bump")) setPhase("commit-push"); return; } if (phase === "commit-push") { if (await execute("commit-push")) setPhase("publish-release"); return; } if (phase === "publish-release" && await execute("publish-release")) setPhase("completed"); }
-  return <section className="compass-live-worker"><p>One guided release process performs live inspection and validation first; stage controls remain available for review or recovery.</p><footer><button className="compass-release-start" disabled={busy} onClick={() => void start()} type="button">{busy ? "Running preflight…" : "Run release process"}</button><button disabled={busy} onClick={() => void execute("inspect")} type="button">Inspect repository</button><button disabled={busy} onClick={() => void execute("validate")} type="button">Run checks</button><button disabled={busy} onClick={() => setPhase("version-bump")} type="button">Version + changelog</button><button disabled={busy} onClick={() => setPhase("commit-push")} type="button">Commit + push</button><button disabled={busy} onClick={() => setPhase("publish-release")} type="button">Publish release</button></footer>{phase === "completed" ? <section className="compass-result"><Check size={19} /><div><strong>Release worker completed</strong><p>Review the console evidence and external release workflow before treating publication as complete.</p></div></section> : null}{["version-bump", "commit-push", "publish-release"].includes(phase) ? <section className="compass-decision"><ShieldCheck size={19} /><div><strong>Live approval required</strong><p>{phase === "version-bump" ? "Write repository version references and changelog." : phase === "commit-push" ? "Stage non-ignored changed files, commit, and push." : "Create and push the release tag, then start the release workflow."}</p><footer><button onClick={() => setPhase("idle")} type="button">Stop process</button><button className="compass-primary" disabled={busy} onClick={() => void approve()} type="button">{busy ? "Running…" : "Approve and continue"}</button></footer></div></section> : null}{error ? <p className="compass-error">{error}</p> : null}<ol className="compass-log">{events.map((event, index) => <li key={`${event.kind}-${index}`}><time>{event.kind}</time><span>{event.message}</span></li>)}</ol></section>;
+  function setStage(stage: ReleaseStageId, status: ReleaseStageStatus) {
+    updateSession((current) => ({ ...current, stages: { ...current.stages, [stage]: status } }));
+  }
+  function setPhase(phase: ReleasePhase) {
+    updateSession((current) => ({ ...current, phase }));
+  }
+  function updateSession(update: (current: ReleaseSession) => ReleaseSession) {
+    const next = update(sessionRef.current);
+    sessionRef.current = next;
+    saveReleaseSession(next);
+    setSession(next);
+  }
+  function resetSession() {
+    const next = { phase: "idle" as const, stages: createReleaseStages() };
+    sessionRef.current = next;
+    clearReleaseSession();
+    setSession(next);
+  }
+
+  async function execute(action: "inspect" | "validate" | "version-bump" | "commit-push" | "publish-release", stage: ReleaseStageId) {
+    setBusy(true);
+    setError(undefined);
+    setStage(stage, "running");
+    try {
+      await desktopClient.runCompassReleaseStep(action, "Compass Runner live release flow");
+      setStage(stage, "completed");
+      return true;
+    } catch (cause) {
+      setStage(stage, "failed");
+      setError(cause instanceof Error ? cause.message : String(cause));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function requestApproval(next: Exclude<ReleasePhase, "idle" | "completed">) {
+    setPhase(next);
+    setStage(stageForPhase(next), "awaiting-approval");
+  }
+
+  async function start() {
+    setEvents([]);
+    resetSession();
+    if (!await execute("inspect", "preflight")) return;
+    if (!await execute("validate", "preflight")) return;
+    requestApproval("version-bump");
+  }
+
+  async function approve() {
+    if (phase === "version-bump") {
+      if (await execute("version-bump", "version")) requestApproval("commit-push");
+      return;
+    }
+    if (phase === "commit-push") {
+      if (await execute("commit-push", "commit")) requestApproval("publish-release");
+      return;
+    }
+    if (phase === "publish-release" && await execute("publish-release", "publish")) setPhase("completed");
+  }
+
+  return <section className="compass-live-worker">
+    <p>Every release stage remains pending, running, awaiting approval, completed, or failed. Publication completes only after GitHub verifies the public release assets.</p>
+    <ol className="compass-release-stages" aria-label="Release stage status">{releaseStages.map((stage) => <li className={stages[stage.id]} key={stage.id}><strong>{stage.label}</strong><span>{stageStatusLabel(stages[stage.id])}</span></li>)}</ol>
+    <footer><button className="compass-release-start" disabled={busy} onClick={() => void start()} type="button">{busy ? "Running release stage…" : "Run release process"}</button><button disabled={busy} onClick={() => void execute("inspect", "preflight")} type="button">Inspect repository</button><button disabled={busy} onClick={() => void execute("validate", "preflight")} type="button">Run checks</button><button disabled={busy} onClick={() => requestApproval("version-bump")} type="button">Version + changelog</button><button disabled={busy} onClick={() => requestApproval("commit-push")} type="button">Commit + push</button><button disabled={busy} onClick={() => requestApproval("publish-release")} type="button">Publish release</button></footer>
+    {phase === "completed" ? <section className="compass-result"><Check size={19} /><div><strong>Release published and verified</strong><p>GitHub completed the release workflow and the repository publisher verified the required public assets.</p></div></section> : null}
+    {needsRestartRecovery(phase, stages, busy) ? <section className="compass-decision"><ShieldCheck size={19} /><div><strong>Version update needs recovery</strong><p>The desktop restarted while the approved version update changed its Tauri configuration. Inspect the version and changelog, then request the next approval only if the update is present.</p><footer><button onClick={resetSession} type="button">Reset process</button><button className="compass-primary" onClick={() => requestApproval("commit-push")} type="button">Continue to commit approval</button></footer></div></section> : null}
+    {isAwaitingApproval(phase, stages) ? <section className="compass-decision"><ShieldCheck size={19} /><div><strong>Live approval required</strong><p>{approvalSummary(phase)}</p><footer><button onClick={resetSession} type="button">Stop process</button><button className="compass-primary" disabled={busy} onClick={() => void approve()} type="button">{busy ? "Running…" : "Approve and continue"}</button></footer></div></section> : null}
+    {error ? <p className="compass-error">{error}</p> : null}
+    <ol className="compass-log">{events.map((event, index) => <li key={`${event.kind}-${index}`}><time>{event.kind}</time><span>{event.message}</span></li>)}</ol>
+  </section>;
 }
+
+function createReleaseStages(): Record<ReleaseStageId, ReleaseStageStatus> { return { preflight: "pending", version: "pending", commit: "pending", publish: "pending" }; }
+function readReleaseSession(): ReleaseSession {
+  if (typeof window === "undefined") return { phase: "idle", stages: createReleaseStages() };
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(releaseSessionKey) ?? "") as Partial<ReleaseSession>;
+    if (!parsed.phase || !parsed.stages) return { phase: "idle", stages: createReleaseStages() };
+    return { phase: parsed.phase, stages: { ...createReleaseStages(), ...parsed.stages } };
+  } catch { return { phase: "idle", stages: createReleaseStages() }; }
+}
+function saveReleaseSession(session: ReleaseSession) { if (typeof window !== "undefined") window.localStorage.setItem(releaseSessionKey, JSON.stringify(session)); }
+function clearReleaseSession() { if (typeof window !== "undefined") window.localStorage.removeItem(releaseSessionKey); }
+function stageForPhase(phase: Exclude<ReleasePhase, "idle" | "completed">): ReleaseStageId { return phase === "version-bump" ? "version" : phase === "commit-push" ? "commit" : "publish"; }
+function isApprovalPhase(phase: ReleasePhase): phase is Exclude<ReleasePhase, "idle" | "completed"> { return phase === "version-bump" || phase === "commit-push" || phase === "publish-release"; }
+function isAwaitingApproval(phase: ReleasePhase, stages: Record<ReleaseStageId, ReleaseStageStatus>) { return isApprovalPhase(phase) && stages[stageForPhase(phase)] === "awaiting-approval"; }
+function needsRestartRecovery(phase: ReleasePhase, stages: Record<ReleaseStageId, ReleaseStageStatus>, busy: boolean) { return !busy && phase === "version-bump" && stages.version === "running"; }
+function approvalSummary(phase: ReleasePhase) { return phase === "version-bump" ? "Write repository version references and the release changelog." : phase === "commit-push" ? "Synchronise Git, stage reviewed files, commit, and push." : "Create the release tag, wait for GitHub, and verify the public release assets."; }
+function stageStatusLabel(status: ReleaseStageStatus) { return status.replaceAll("-", " "); }
 
 
 function makeRunner(scenario: Scenario) { const adapter: CompassExecutorAdapter = { id: scenario.task.adapter, async execute(context) { return scenario.execute(context); } }; return new CompassRunner(scenario.task, adapter); }
