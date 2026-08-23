@@ -14,6 +14,8 @@ import type {
   GitFileDiff,
   GitWorktree,
   LocalTask,
+  ProjectTask,
+  ProjectTaskRun,
   SyncResult,
   SystemStatus,
   SearchMatch,
@@ -43,6 +45,10 @@ export class DesktopClient {
     return invoke<number>("start_agent_thread");
   }
 
+  async runOpenCodeTask(taskId: number, model: string, prompt: string) {
+    return invoke<string>("run_opencode_task", { model, prompt, taskId });
+  }
+
   async resumeAgentThread(taskId: number, threadId: string) {
     return invoke<number>("resume_agent_thread", { taskId, threadId });
   }
@@ -51,7 +57,11 @@ export class DesktopClient {
     return invoke<AgentTask[]>("list_agent_tasks");
   }
 
-  async saveAgentTask(threadId: string, title: string, access: AgentAccess, surface: "chat" | "runner" = "chat", localTaskId?: number) {
+  async getAgentTask(taskId: number) {
+    return invoke<AgentTask>("get_agent_task", { taskId });
+  }
+
+  async saveAgentTask(threadId: string, title: string, access: AgentAccess, surface: "chat" | "runner" | "project" = "chat", localTaskId?: number) {
     return invoke<AgentTask>("save_agent_task", { access, localTaskId, surface, threadId, title });
   }
 
@@ -279,6 +289,58 @@ export class DesktopClient {
 
   async saveTask(title: string, execution: string) {
     return invoke<LocalTask>("save_local_task", { execution, title });
+  }
+
+  async updateTask(taskId: number, title: string, execution: string, status: LocalTask["status"], scheduledAt?: string | null) {
+    return invoke<LocalTask>("update_local_task", { execution, scheduledAt: scheduledAt ?? null, status, taskId, title });
+  }
+
+  async forceDeleteTask(taskId: number) {
+    return invoke<boolean>("force_delete_local_task", { taskId });
+  }
+
+  async listProjectTasks() {
+    return invoke<ProjectTask[]>("list_project_tasks");
+  }
+
+  async saveProjectTask(title: string, instructions: string, schedule: ProjectTask["schedule"], agentModel: ProjectTask["agentModel"], skillPath?: string | null) {
+    return invoke<ProjectTask>("save_project_task", { agentModel, instructions, schedule, skillPath: skillPath ?? null, title });
+  }
+
+  async updateProjectTask(taskId: number, title: string, instructions: string, schedule: ProjectTask["schedule"], agentModel: ProjectTask["agentModel"], status: ProjectTask["status"], skillPath?: string | null) {
+    return invoke<ProjectTask>("update_project_task", { agentModel, instructions, schedule, skillPath: skillPath ?? null, status, taskId, title });
+  }
+
+  async deleteProjectTask(taskId: number) {
+    return invoke<boolean>("delete_project_task", { taskId });
+  }
+
+  async copyProjectTaskToWorkspace(taskId: number, destinationWorkspacePath: string) {
+    return invoke<ProjectTask>("copy_project_task_to_workspace", { destinationWorkspacePath, taskId });
+  }
+
+  async moveProjectTask(taskId: number, direction: "up" | "down") {
+    return invoke<ProjectTask[]>("move_project_task", { direction, taskId });
+  }
+
+  async queueProjectTaskRun(taskId: number) {
+    return invoke<ProjectTaskRun>("queue_project_task_run", { taskId });
+  }
+
+  async listProjectTaskRuns(taskId: number) {
+    return invoke<ProjectTaskRun[]>("list_project_task_runs", { taskId });
+  }
+
+  async updateProjectTaskRun(runId: number, status: "running" | "awaiting-input" | "completed" | "failed" | "stopped", summary: string) {
+    return invoke<ProjectTaskRun>("update_project_task_run", { runId, status, summary });
+  }
+
+  async bindProjectTaskRunAgentTask(runId: number, agentTaskId: number) {
+    return invoke<ProjectTaskRun>("bind_project_task_run_agent_task", { agentTaskId, runId });
+  }
+
+  async deleteProjectTaskRun(runId: number) {
+    return invoke<boolean>("delete_project_task_run", { runId });
   }
 
   async setTaskStatus(taskId: number, status: LocalTask["status"]) {

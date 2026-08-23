@@ -5,6 +5,7 @@ pub mod git;
 pub mod integrations;
 pub mod learning;
 pub mod process;
+pub mod project_tasks;
 pub mod python;
 pub mod search;
 pub mod settings;

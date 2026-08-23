@@ -125,8 +125,29 @@ export type TerminalResult = {
 export type LocalTask = {
   execution: string;
   id: number;
+  scheduledAt?: string | null;
   title: string;
-  status: "todo" | "active" | "done";
+  status: "todo" | "active" | "done" | "paused" | "scheduled";
+};
+
+export type ProjectTask = {
+  agentModel: string;
+  id: number;
+  instructions: string;
+  position: number;
+  schedule: "manual" | "every-monday" | "before-commit" | "on-version-update";
+  skillPath?: string | null;
+  status: "active" | "paused";
+  title: string;
+};
+
+export type ProjectTaskRun = {
+  agentTaskId?: number | null;
+  createdAt: string;
+  id: number;
+  projectTaskId: number;
+  status: "queued" | "requested" | "running" | "awaiting-input" | "completed" | "failed" | "stopped";
+  summary: string;
 };
 
 export type SyncResult = {

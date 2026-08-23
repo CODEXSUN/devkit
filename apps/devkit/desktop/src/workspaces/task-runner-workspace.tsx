@@ -3,7 +3,7 @@ import type { AgentConfig, AgentProvider, AgentReasoningEffort } from "../contra
 import { desktopClient } from "../services/desktop-client";
 import { TaskRunnerPanel } from "./task-runner-panel";
 
-export function TaskRunnerWorkspace({ onRefreshChanges }: { onRefreshChanges: () => Promise<void> }) {
+export function TaskRunnerWorkspace({ initialTaskId, onRefreshChanges }: { initialTaskId?: number; onRefreshChanges: () => Promise<void> }) {
   const [connection, setConnection] = useState({ effort: "low" as AgentReasoningEffort, id: "codex" as AgentProvider, model: "gpt-5.6-terra", provider: "Codex" });
   useEffect(() => { void desktopClient.getAgentConfig().then((config) => setConnection(fromConfig(config))); }, []);
   async function update(provider: AgentProvider, model: string) {
@@ -12,7 +12,7 @@ export function TaskRunnerWorkspace({ onRefreshChanges }: { onRefreshChanges: ()
     const saved = await desktopClient.saveAgentConfig({ ...config, defaultProvider: provider, providers: { ...providers, [provider]: { ...providers[provider], enabled: true, isDefault: true, model, reasoningEffort: connection.effort } } });
     setConnection(fromConfig(saved));
   }
-  return <TaskRunnerPanel connection={connection} onPreferenceChange={update} onRefreshChanges={onRefreshChanges} />;
+  return <TaskRunnerPanel connection={connection} {...(initialTaskId ? { initialTaskId } : {})} onPreferenceChange={update} onRefreshChanges={onRefreshChanges} />;
 }
 
 function fromConfig(config: AgentConfig) {

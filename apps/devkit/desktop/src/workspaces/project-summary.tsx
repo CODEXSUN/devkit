@@ -1,5 +1,6 @@
 import { Bot, FolderOpen, GitBranch, Info, Link2, type LucideIcon } from "lucide-react";
 import type { DesktopWorkspace, Workspace } from "../contracts/desktop";
+import { ProjectTaskControl } from "./project-task-control";
 
 export function ProjectSummary({
   onBrowseFiles,
@@ -59,6 +60,7 @@ export function ProjectSummary({
             <FolderOpen size={15} /> Browse files
           </button>
         </footer>
+        <ProjectTaskControl workspacePath={workspace.path} />
     </section>
   );
 }

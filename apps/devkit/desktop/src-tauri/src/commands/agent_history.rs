@@ -13,6 +13,12 @@ pub fn list_agent_tasks(state: State<'_, DesktopState>) -> DesktopResult<Vec<Age
 }
 
 #[tauri::command]
+pub fn get_agent_task(task_id: i64, state: State<'_, DesktopState>) -> DesktopResult<AgentTask> {
+    let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
+    state.with_database(|database| database.get_agent_task(&workspace, task_id))
+}
+
+#[tauri::command]
 pub fn save_agent_task(
     thread_id: String,
     title: String,
@@ -34,11 +40,11 @@ pub fn save_agent_task(
     let root = workspace_root(&state)?;
     let workspace = root.to_string_lossy().into_owned();
     let surface = surface.unwrap_or_else(|| "chat".into());
-    if !["chat", "runner"].contains(&surface.as_str()) {
+    if !["chat", "runner", "project"].contains(&surface.as_str()) {
         return Err(DesktopError::Policy("Unknown task surface.".into()));
     }
-    if surface == "runner" && local_task_id.is_none() {
-        return Err(DesktopError::Policy("Runner tasks need a local task reference.".into()));
+    if ["runner", "project"].contains(&surface.as_str()) && local_task_id.is_none() {
+        return Err(DesktopError::Policy("Runnable tasks need a task reference.".into()));
     }
     let task = state.with_database(|database| {
         database.save_agent_task(&workspace, thread_id, title, &access, &surface, local_task_id)

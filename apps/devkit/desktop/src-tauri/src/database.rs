@@ -135,8 +135,33 @@ pub struct AgentMessage {
 pub struct LocalTask {
     pub execution: String,
     pub id: i64,
+    pub scheduled_at: Option<String>,
     pub title: String,
     pub status: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTask {
+    pub agent_model: String,
+    pub id: i64,
+    pub instructions: String,
+    pub position: i64,
+    pub schedule: String,
+    pub skill_path: Option<String>,
+    pub status: String,
+    pub title: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTaskRun {
+    pub agent_task_id: Option<i64>,
+    pub created_at: String,
+    pub id: i64,
+    pub project_task_id: i64,
+    pub status: String,
+    pub summary: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -193,38 +218,201 @@ impl DesktopDatabase {
         Ok(database)
     }
 
-    pub fn list_local_tasks(&self) -> DesktopResult<Vec<LocalTask>> {
+    pub fn list_local_tasks(&self, workspace_path: &str) -> DesktopResult<Vec<LocalTask>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, title, COALESCE(execution, title), status FROM desktop_tasks ORDER BY updated_at DESC, id DESC",
+            "SELECT id, title, COALESCE(execution, title), status, scheduled_at FROM desktop_tasks WHERE workspace_path = ?1 OR workspace_path IS NULL ORDER BY updated_at DESC, id DESC",
         )?;
-        let rows = statement.query_map([], |row| {
-            Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)? })
+        let rows = statement.query_map(params![workspace_path], |row| {
+            Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)?, scheduled_at: row.get(4)? })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
-    pub fn save_local_task(&self, title: &str, execution: &str) -> DesktopResult<LocalTask> {
+    pub fn save_local_task(&self, workspace_path: &str, title: &str, execution: &str) -> DesktopResult<LocalTask> {
         self.connection.execute(
-            "INSERT INTO desktop_tasks (title, execution) VALUES (?1, ?2)",
-            params![title, execution],
+            "INSERT INTO desktop_tasks (workspace_path, title, execution) VALUES (?1, ?2, ?3)",
+            params![workspace_path, title, execution],
         )?;
         let id = self.connection.last_insert_rowid();
         self.connection.query_row(
-            "SELECT id, title, COALESCE(execution, title), status FROM desktop_tasks WHERE id = ?1",
+            "SELECT id, title, COALESCE(execution, title), status, scheduled_at FROM desktop_tasks WHERE id = ?1",
             params![id],
-            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)? }),
+            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)?, scheduled_at: row.get(4)? }),
         ).map_err(Into::into)
     }
 
     pub fn set_local_task_status(&self, task_id: i64, status: &str) -> DesktopResult<LocalTask> {
         self.connection.execute(
-            "UPDATE desktop_tasks SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            "UPDATE desktop_tasks SET status = ?1, scheduled_at = CASE WHEN ?1 = 'scheduled' THEN scheduled_at ELSE NULL END, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
             params![status, task_id],
         )?;
         self.connection.query_row(
-            "SELECT id, title, COALESCE(execution, title), status FROM desktop_tasks WHERE id = ?1",
+            "SELECT id, title, COALESCE(execution, title), status, scheduled_at FROM desktop_tasks WHERE id = ?1",
             params![task_id],
-            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)? }),
+            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)?, scheduled_at: row.get(4)? }),
+        ).map_err(Into::into)
+    }
+
+    pub fn update_local_task(&self, workspace_path: &str, task_id: i64, title: &str, execution: &str, status: &str, scheduled_at: Option<&str>) -> DesktopResult<LocalTask> {
+        self.connection.execute(
+            "UPDATE desktop_tasks SET title = ?1, execution = ?2, status = ?3, scheduled_at = ?4, updated_at = CURRENT_TIMESTAMP WHERE id = ?5 AND (workspace_path = ?6 OR workspace_path IS NULL)",
+            params![title, execution, status, scheduled_at, task_id, workspace_path],
+        )?;
+        self.connection.query_row(
+            "SELECT id, title, COALESCE(execution, title), status, scheduled_at FROM desktop_tasks WHERE id = ?1 AND (workspace_path = ?2 OR workspace_path IS NULL)",
+            params![task_id, workspace_path],
+            |row| Ok(LocalTask { id: row.get(0)?, title: row.get(1)?, execution: row.get(2)?, status: row.get(3)?, scheduled_at: row.get(4)? }),
+        ).map_err(Into::into)
+    }
+
+    pub fn force_delete_local_task(&mut self, workspace_path: &str, task_id: i64) -> DesktopResult<bool> {
+        let transaction = self.connection.transaction()?;
+        transaction.execute(
+            "DELETE FROM desktop_agent_messages WHERE task_id IN (SELECT id FROM desktop_agent_tasks WHERE workspace_path = ?1 AND local_task_id = ?2)",
+            params![workspace_path, task_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM desktop_agent_tasks WHERE workspace_path = ?1 AND local_task_id = ?2",
+            params![workspace_path, task_id],
+        )?;
+        let deleted = transaction.execute(
+            "DELETE FROM desktop_tasks WHERE id = ?1 AND (workspace_path = ?2 OR workspace_path IS NULL)",
+            params![task_id, workspace_path],
+        )?;
+        transaction.commit()?;
+        Ok(deleted > 0)
+    }
+
+    pub fn list_project_tasks(&self, workspace_path: &str) -> DesktopResult<Vec<ProjectTask>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, title, instructions, position, schedule, agent_model, status, skill_path FROM desktop_project_tasks WHERE workspace_path = ?1 ORDER BY position, id",
+        )?;
+        let rows = statement.query_map(params![workspace_path], project_task_from_row)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn save_project_task(&self, workspace_path: &str, title: &str, instructions: &str, schedule: &str, agent_model: &str, skill_path: Option<&str>) -> DesktopResult<ProjectTask> {
+        self.connection.execute(
+            "INSERT INTO desktop_project_tasks (workspace_path, title, instructions, schedule, agent_model, skill_path, position) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![workspace_path, title, instructions, schedule, agent_model, skill_path, self.next_project_task_position(workspace_path)?],
+        )?;
+        self.project_task(self.connection.last_insert_rowid(), workspace_path)
+    }
+
+    pub fn update_project_task(&self, workspace_path: &str, task_id: i64, title: &str, instructions: &str, schedule: &str, agent_model: &str, skill_path: Option<&str>, status: &str) -> DesktopResult<ProjectTask> {
+        self.connection.execute(
+            "UPDATE desktop_project_tasks SET title = ?1, instructions = ?2, schedule = ?3, agent_model = ?4, skill_path = ?5, status = ?6, updated_at = CURRENT_TIMESTAMP WHERE id = ?7 AND workspace_path = ?8",
+            params![title, instructions, schedule, agent_model, skill_path, status, task_id, workspace_path],
+        )?;
+        self.project_task(task_id, workspace_path)
+    }
+
+    pub fn delete_project_task(&self, workspace_path: &str, task_id: i64) -> DesktopResult<bool> {
+        self.connection.execute(
+            "DELETE FROM desktop_project_task_runs WHERE workspace_path = ?1 AND project_task_id = ?2",
+            params![workspace_path, task_id],
+        )?;
+        let deleted = self.connection.execute(
+            "DELETE FROM desktop_project_tasks WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+        )?;
+        Ok(deleted > 0)
+    }
+
+    pub fn copy_project_task_to_workspace(
+        &self,
+        source_workspace_path: &str,
+        task_id: i64,
+        destination_workspace_path: &str,
+    ) -> DesktopResult<ProjectTask> {
+        if source_workspace_path == destination_workspace_path {
+            return Err(DesktopError::Policy(
+                "Choose a different project to copy this task.".into(),
+            ));
+        }
+        let task = self.project_task(task_id, source_workspace_path)?;
+        self.workspace_by_path(destination_workspace_path)?;
+        self.connection.execute(
+            "INSERT INTO desktop_project_tasks (workspace_path, title, instructions, schedule, agent_model, skill_path, status, position) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![destination_workspace_path, task.title, task.instructions, task.schedule, task.agent_model, task.skill_path, task.status, self.next_project_task_position(destination_workspace_path)?],
+        )?;
+        self.project_task(self.connection.last_insert_rowid(), destination_workspace_path)
+    }
+
+    pub fn move_project_task(&self, workspace_path: &str, task_id: i64, direction: &str) -> DesktopResult<Vec<ProjectTask>> {
+        let task = self.project_task(task_id, workspace_path)?;
+        let operator = if direction == "up" { "<" } else { ">" };
+        let order = if direction == "up" { "DESC" } else { "ASC" };
+        let sql = format!("SELECT id, position FROM desktop_project_tasks WHERE workspace_path = ?1 AND position {operator} ?2 ORDER BY position {order}, id {order} LIMIT 1");
+        let adjacent = self.connection.query_row(&sql, params![workspace_path, task.position], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))).ok();
+        if let Some((adjacent_id, adjacent_position)) = adjacent {
+            self.connection.execute("UPDATE desktop_project_tasks SET position = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND workspace_path = ?3", params![adjacent_position, task.id, workspace_path])?;
+            self.connection.execute("UPDATE desktop_project_tasks SET position = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND workspace_path = ?3", params![task.position, adjacent_id, workspace_path])?;
+        }
+        self.list_project_tasks(workspace_path)
+    }
+
+    pub fn queue_project_task_run(&self, workspace_path: &str, task_id: i64) -> DesktopResult<ProjectTaskRun> {
+        self.project_task(task_id, workspace_path)?;
+        let status = "requested";
+        let summary = "Run requested. The selected provider will start in this task's isolated worktree.";
+        self.connection.execute(
+            "INSERT INTO desktop_project_task_runs (workspace_path, project_task_id, status, summary) VALUES (?1, ?2, ?3, ?4)",
+            params![workspace_path, task_id, status, summary],
+        )?;
+        self.project_task_run(self.connection.last_insert_rowid(), workspace_path)
+    }
+
+    pub fn list_project_task_runs(&self, workspace_path: &str, task_id: i64) -> DesktopResult<Vec<ProjectTaskRun>> {
+        self.project_task(task_id, workspace_path)?;
+        let mut statement = self.connection.prepare(
+            "SELECT id, project_task_id, agent_task_id, status, summary, created_at FROM desktop_project_task_runs WHERE workspace_path = ?1 AND project_task_id = ?2 ORDER BY created_at DESC, id DESC",
+        )?;
+        let rows = statement.query_map(params![workspace_path, task_id], project_task_run_from_row)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn update_project_task_run(&self, workspace_path: &str, run_id: i64, status: &str, summary: &str) -> DesktopResult<ProjectTaskRun> {
+        self.connection.execute(
+            "UPDATE desktop_project_task_runs SET status = ?1, summary = ?2 WHERE id = ?3 AND workspace_path = ?4",
+            params![status, summary, run_id, workspace_path],
+        )?;
+        self.project_task_run(run_id, workspace_path)
+    }
+
+    pub fn bind_project_task_run_agent_task(&self, workspace_path: &str, run_id: i64, agent_task_id: i64) -> DesktopResult<ProjectTaskRun> {
+        self.connection.execute(
+            "UPDATE desktop_project_task_runs SET agent_task_id = ?1 WHERE id = ?2 AND workspace_path = ?3",
+            params![agent_task_id, run_id, workspace_path],
+        )?;
+        self.project_task_run(run_id, workspace_path)
+    }
+
+    pub fn delete_project_task_run(&self, workspace_path: &str, run_id: i64) -> DesktopResult<bool> {
+        let deleted = self.connection.execute(
+            "DELETE FROM desktop_project_task_runs WHERE id = ?1 AND workspace_path = ?2",
+            params![run_id, workspace_path],
+        )?;
+        Ok(deleted > 0)
+    }
+
+    fn project_task(&self, task_id: i64, workspace_path: &str) -> DesktopResult<ProjectTask> {
+        self.connection.query_row(
+            "SELECT id, title, instructions, position, schedule, agent_model, status, skill_path FROM desktop_project_tasks WHERE id = ?1 AND workspace_path = ?2",
+            params![task_id, workspace_path],
+            project_task_from_row,
+        ).map_err(Into::into)
+    }
+
+    fn next_project_task_position(&self, workspace_path: &str) -> DesktopResult<i64> {
+        Ok(self.connection.query_row("SELECT COALESCE(MAX(position), 0) + 1 FROM desktop_project_tasks WHERE workspace_path = ?1", params![workspace_path], |row| row.get(0))?)
+    }
+
+    fn project_task_run(&self, run_id: i64, workspace_path: &str) -> DesktopResult<ProjectTaskRun> {
+        self.connection.query_row(
+            "SELECT id, project_task_id, agent_task_id, status, summary, created_at FROM desktop_project_task_runs WHERE id = ?1 AND workspace_path = ?2",
+            params![run_id, workspace_path],
+            project_task_run_from_row,
         ).map_err(Into::into)
     }
 
@@ -237,6 +425,10 @@ impl DesktopDatabase {
         )?;
         let rows = statement.query_map(params![workspace_path], agent_task_from_row)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub fn get_agent_task(&self, workspace_path: &str, task_id: i64) -> DesktopResult<AgentTask> {
+        self.agent_task(workspace_path, task_id)
     }
 
     pub fn save_agent_task(
@@ -745,8 +937,27 @@ impl DesktopDatabase {
         self.connection
             .execute_batch(include_str!("../migrations/0010_task_runner_isolation.sql"))?;
         self.ensure_local_task_column("execution", "TEXT")?;
+        self.ensure_local_task_column("workspace_path", "TEXT")?;
+        self.ensure_local_task_column("scheduled_at", "TEXT")?;
         self.connection
             .execute_batch(include_str!("../migrations/0011_task_runner_task_execution.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0012_task_runner_workspace_scope.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0013_task_runner_task_controls.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0014_project_task_schedules.sql"))?;
+        self.ensure_project_task_column("skill_path", "TEXT")?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0015_project_task_skill_binding.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0016_project_task_run_history.sql"))?;
+        self.ensure_project_task_run_column("agent_task_id", "INTEGER")?;
+        self.ensure_project_task_column("position", "INTEGER NOT NULL DEFAULT 0")?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0017_project_task_positions.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0018_project_task_run_interactions.sql"))?;
         self.connection.execute_batch(
             "CREATE INDEX IF NOT EXISTS desktop_agent_tasks_workspace_status
              ON desktop_agent_tasks (workspace_path, run_status, updated_at DESC);",
@@ -813,6 +1024,29 @@ impl DesktopDatabase {
             self.connection
                 .execute_batch(&format!("ALTER TABLE desktop_tasks ADD COLUMN {column} {definition}"))?;
         }
+        Ok(())
+    }
+
+    fn ensure_project_task_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
+        let mut statement = self.connection.prepare("PRAGMA table_info(desktop_project_tasks)")?;
+        let columns = statement.query_map([], |row| row.get::<_, String>(1))?.collect::<Result<Vec<_>, _>>()?;
+        if !columns.iter().any(|existing| existing == column) {
+            self.connection.execute_batch(&format!("ALTER TABLE desktop_project_tasks ADD COLUMN {column} {definition}"))?;
+        }
+        Ok(())
+    }
+
+    fn ensure_project_task_run_column(&self, column: &str, definition: &str) -> DesktopResult<()> {
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA table_info(desktop_project_task_runs)")?;
+        let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+        if columns.filter_map(Result::ok).any(|name| name == column) {
+            return Ok(());
+        }
+        self.connection.execute_batch(&format!(
+            "ALTER TABLE desktop_project_task_runs ADD COLUMN {column} {definition}"
+        ))?;
         Ok(())
     }
 
@@ -885,6 +1119,30 @@ fn saved_repository_url_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sa
         kind: row.get(3)?,
         relationship: row.get(4)?,
         updated_at: row.get(5)?,
+    })
+}
+
+fn project_task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectTask> {
+    Ok(ProjectTask {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        instructions: row.get(2)?,
+        position: row.get(3)?,
+        schedule: row.get(4)?,
+        agent_model: row.get(5)?,
+        status: row.get(6)?,
+        skill_path: row.get(7)?,
+    })
+}
+
+fn project_task_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectTaskRun> {
+    Ok(ProjectTaskRun {
+        id: row.get(0)?,
+        project_task_id: row.get(1)?,
+        agent_task_id: row.get(2)?,
+        status: row.get(3)?,
+        summary: row.get(4)?,
+        created_at: row.get(5)?,
     })
 }
 
@@ -1156,6 +1414,50 @@ mod tests {
             .expect("list repository URLs");
         assert_eq!(urls.len(), 1);
         assert_eq!(urls[0].url, "https://github.com/CODEXSUN/devkit.git");
+
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn copies_project_tasks_only_to_registered_projects() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-project-task-copy-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        let source = database
+            .save_project_task(
+                "C:/work/source",
+                "Review changes",
+                "Run the release checklist.",
+                "every-monday",
+                "codex:gpt-5.6-terra",
+                Some("C:/skills/release/SKILL.md"),
+            )
+            .expect("save source task");
+        database
+            .save_desktop_workspace(&DesktopWorkspace {
+                path: "C:/work/target".into(),
+                name: "target".into(),
+                kind: "application".into(),
+                relationship: "project".into(),
+                project_name: None,
+                pinned: false,
+                last_opened_at: String::new(),
+            })
+            .expect("register target project");
+
+        let copied = database
+            .copy_project_task_to_workspace("C:/work/source", source.id, "C:/work/target")
+            .expect("copy task");
+        assert_eq!(copied.title, "Review changes");
+        assert_eq!(copied.skill_path.as_deref(), Some("C:/skills/release/SKILL.md"));
+        assert_eq!(database.list_project_tasks("C:/work/source").unwrap().len(), 1);
+        assert_eq!(database.list_project_tasks("C:/work/target").unwrap().len(), 1);
+        assert!(database
+            .copy_project_task_to_workspace("C:/work/source", source.id, "C:/work/missing")
+            .is_err());
 
         drop(database);
         std::fs::remove_file(path).expect("remove test database");

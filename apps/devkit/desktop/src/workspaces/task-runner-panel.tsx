@@ -20,7 +20,7 @@ const providerModels: Record<AgentProvider, readonly string[]> = {
 };
 const providerLabels: Record<AgentProvider, string> = { claude: "Claude", codex: "Codex", gemini: "Gemini", ollama: "Local Ollama", opencode: "OpenCode", openrouter: "OpenRouter" };
 
-export function TaskRunnerPanel({ connection, onPreferenceChange, onRefreshChanges }: { connection: { id: AgentProvider; model: string; provider: string }; onPreferenceChange: (provider: AgentProvider, model: string) => Promise<void>; onRefreshChanges: () => Promise<void> }) {
+export function TaskRunnerPanel({ connection, initialTaskId, onPreferenceChange, onRefreshChanges }: { connection: { id: AgentProvider; model: string; provider: string }; initialTaskId?: number; onPreferenceChange: (provider: AgentProvider, model: string) => Promise<void>; onRefreshChanges: () => Promise<void> }) {
   const [draft, setDraft] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [createError, setCreateError] = useState<string | undefined>(undefined);
@@ -32,6 +32,7 @@ export function TaskRunnerPanel({ connection, onPreferenceChange, onRefreshChang
   const runner = useTaskRunnerSession(onRefreshChanges);
 
   useEffect(() => { void loadTasks(); }, []);
+  useEffect(() => { if (initialTaskId) setSelectedId(initialTaskId); }, [initialTaskId]);
   useEffect(() => { if (selected) void runner.select(selected); }, [selected?.id]);
 
   async function loadTasks() {
@@ -92,7 +93,7 @@ function Runner({ connection, onApproval, onChoice, onPreferenceChange, onRun, o
   const [confirmRun, setConfirmRun] = useState(false);
   const [copied, setCopied] = useState(false);
   const [responseText, setResponseText] = useState("");
-  const canRun = connection.id === "codex";
+  const canRun = connection.id === "codex" && task.status !== "paused";
   const choices = state.completed ? actionChoicesFrom(state.finalReply) : [];
   const needsResponse = state.completed && (choices.length > 0 || asksForTextInput(state.finalReply));
 
@@ -144,7 +145,7 @@ function Runner({ connection, onApproval, onChoice, onPreferenceChange, onRun, o
     {state.approval ? <div className="task-runner-notice"><ShieldCheck size={18} /><span><strong>Approval requested</strong><small>{state.approval.command}: {state.approval.reason}</small><footer><button onClick={() => void onApproval("decline")} type="button">Decline</button><button onClick={() => void onApproval("acceptForSession")} type="button">Allow for task</button><button className="primary" onClick={() => void onApproval("accept")} type="button">Allow once</button></footer></span></div> : null}
     {runItems.length ? <div className="task-runner-activity"><strong>Live activity</strong>{runItems.slice(-6).map((item) => <div key={item.id}><span>{item.label}</span><small>{item.status}</small></div>)}</div> : null}
     {state.error ? <div className="task-runner-error"><span>{state.error}</span><button onClick={() => void copyOutcome()} type="button"><Copy size={14} />{copied ? "Copied" : "Copy error"}</button></div> : null}
-    {!canRun ? <p className="task-runner-requirement">{providerRequirement(connection.id)}</p> : null}
+    {!canRun ? <p className="task-runner-requirement">{task.status === "paused" ? "This task is paused. Resume it from Project tasks before running." : providerRequirement(connection.id)}</p> : null}
     <button className="task-runner-start" disabled={state.busy || !canRun} onClick={() => setConfirmRun(true)} type="button">
       {state.running ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />}{state.running ? "Running task" : "Run task"}
     </button>

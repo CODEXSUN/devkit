@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import type { AgentTask, LocalTask } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
+import { buildAgentPrompt } from "./agent-context";
 import { agentErrorFrom, extractTextAt, parseAgentProtocolMessage, textAt, threadIdFrom } from "./agent-protocol";
 import type { Approval, RunItem } from "./agent-workspace-parts";
 
@@ -105,7 +106,19 @@ export function useTaskRunnerSession(onRefreshChanges: () => Promise<void>) {
       const saved = await desktopClient.saveAgentTask(threadId, task.title, "workspaceWrite", "runner", task.id);
       taskRef.current = saved; threadRef.current = threadId; setRunnerTask(saved);
       await desktopClient.setAgentTaskStatus(saved.id, "running");
-      await desktopClient.sendAgentTurn(saved.id, threadId, `Complete this local task in the isolated task-runner worktree. Return a clear final response with the actual result.\n\nTask title: ${task.title}\n\nExecution instructions:\n${task.execution}`, "workspaceWrite");
+      const [learningContext, skills] = await Promise.all([
+        desktopClient.projectLearningContext(),
+        desktopClient.listProjectSkills()
+      ]);
+      const skillContext = skills.length
+        ? `<project_skills>Read only the relevant project skill instructions before acting:\n${skills.map((skill) => `- ${skill.path}`).join("\n")}\n</project_skills>`
+        : "";
+      const prompt = buildAgentPrompt(
+        `Complete this local task in the isolated task-runner worktree. Return a clear final response with the actual result.\n\nTask title: ${task.title}\n\nExecution instructions:\n${task.execution}`,
+        [learningContext, skillContext].filter(Boolean).join("\n\n"),
+        []
+      );
+      await desktopClient.sendAgentTurn(saved.id, threadId, prompt, "workspaceWrite");
     } catch (reason) { setRunning(false); setError(String(reason)); }
   }
 

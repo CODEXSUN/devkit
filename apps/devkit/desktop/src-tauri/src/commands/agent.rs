@@ -210,6 +210,42 @@ fn normalize_codex_model(model: String) -> String {
 }
 
 #[tauri::command]
+pub fn run_opencode_task(
+    task_id: i64,
+    model: String,
+    prompt: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<String> {
+    if model != "opencode/nemotron-3-ultra-free" {
+        return Err(DesktopError::Policy("OpenCode Project Tasks currently support Nematron 3 Ultra Free only.".into()));
+    }
+    if prompt.trim().is_empty() {
+        return Err(DesktopError::Policy("Enter an instruction for the OpenCode task.".into()));
+    }
+
+    let root = task_execution_root(&state, task_id)?;
+    let executable = std::env::var("DEVKIT_OPENCODE_BIN").unwrap_or_else(|_| "opencode".into());
+    let output = Command::new(&executable)
+        .arg("run")
+        .arg("--model")
+        .arg(model)
+        .arg(prompt.trim())
+        .current_dir(root)
+        .env("OPENCODE_DISABLE_AUTOUPDATE", "true")
+        .output()
+        .map_err(|error| DesktopError::Policy(format!("DevKit could not start OpenCode. Install opencode-ai or set DEVKIT_OPENCODE_BIN. {error}")))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    if !output.status.success() {
+        return Err(DesktopError::Policy(if stderr.is_empty() { "OpenCode exited without a result.".into() } else { stderr }));
+    }
+    if stdout.is_empty() {
+        return Err(DesktopError::Policy("OpenCode completed without a final text response.".into()));
+    }
+    Ok(stdout)
+}
+
+#[tauri::command]
 pub fn resume_agent_thread(
     task_id: i64,
     thread_id: String,
