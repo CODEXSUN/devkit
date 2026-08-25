@@ -20,10 +20,24 @@ export type DesktopWorkspace = {
   kind: WorkspaceKind;
   relationship: WorkspaceRelationship;
   projectName?: string | null;
+  tagline?: string | null;
+  changelogPath?: string | null;
+  ownerName?: string | null;
+  startedOn?: string | null;
+  dueOn?: string | null;
+  projectType?: string | null;
+  priority: "low" | "normal" | "high" | "critical";
+  projectId?: number | null;
   pinned: boolean;
   lastOpenedAt: string;
 };
-export type DesktopSetup = { profile?: DesktopProfile | null; workspaces: DesktopWorkspace[] };
+export type DesktopWorkGroup = { path: string; name: string; isDefault: boolean; updatedAt: string };
+export type DesktopSetup = {
+  defaultWorkspacePath?: string | null;
+  profile?: DesktopProfile | null;
+  workGroups: DesktopWorkGroup[];
+  workspaces: DesktopWorkspace[];
+};
 export type WorkGroup = { name: string; path: string };
 export type SavedRepositoryUrl = {
   id: number;
@@ -32,6 +46,13 @@ export type SavedRepositoryUrl = {
   kind: WorkspaceKind;
   relationship: WorkspaceRelationship;
   updatedAt: string;
+  discussionCount: number;
+};
+export type ProjectIdeaDiscussion = {
+  id: number;
+  ideaId: number;
+  content: string;
+  createdAt: string;
 };
 export type RepositoryCandidate = {
   path: string;
@@ -57,6 +78,15 @@ export type GitChange = {
   originalPath?: string;
   path: string;
   status: string;
+};
+export type ProjectGitOverview = {
+  branch: string;
+  changedFiles: GitChange[];
+  changelogVersion?: string | null;
+  committedAt: string;
+  latestCommit: string;
+  packageVersion?: string | null;
+  revision: string;
 };
 
 export type GitFileDiff = {
@@ -149,6 +179,18 @@ export type ProjectTaskRun = {
   projectTaskId: number;
   status: "queued" | "requested" | "running" | "awaiting-input" | "completed" | "failed" | "stopped";
   summary: string;
+};
+export type ProjectIdea = {
+  id: number;
+  workspacePath: string;
+  title: string;
+  context: string;
+  discussion: string;
+  status: "draft" | "converted";
+  convertedTaskId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  discussionCount: number;
 };
 
 export type SyncResult = {

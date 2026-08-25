@@ -16,6 +16,8 @@ import type {
   GitWorktree,
   LocalTask,
   ProjectTask,
+  ProjectIdea,
+  ProjectIdeaDiscussion,
   ProjectTaskRun,
   SyncResult,
   SystemStatus,
@@ -24,6 +26,7 @@ import type {
   ProjectLearning,
   ProjectLearningSettings,
   ProjectLearningSummary,
+  ProjectGitOverview,
   PythonEnvironment,
   WorkGroupScan,
   TerminalResult,
@@ -86,6 +89,10 @@ export class DesktopClient {
     return invoke<boolean>("archive_agent_task", { taskId });
   }
 
+  async renameAgentTask(taskId: number, title: string) {
+    return invoke<AgentTask>("rename_agent_task", { taskId, title });
+  }
+
   async deleteAgentTask(taskId: number) {
     return invoke<boolean>("delete_agent_task", { taskId });
   }
@@ -132,6 +139,36 @@ export class DesktopClient {
 
   async setDesktopWorkspacePinned(path: string, pinned: boolean) {
     return invoke<DesktopWorkspace>("set_desktop_workspace_pinned", { path, pinned });
+  }
+
+  async saveDesktopProjectDetails(workspace: DesktopWorkspace) {
+    return invoke<DesktopWorkspace>("save_desktop_project_details", { workspace });
+  }
+
+  async listDesktopProjectIdeas(path: string) { return invoke<ProjectIdea[]>("list_desktop_project_ideas", { path }); }
+  async saveDesktopProjectIdea(path: string, title: string, context: string, discussion: string) { return invoke<ProjectIdea>("save_desktop_project_idea", { context, discussion, path, title }); }
+  async convertDesktopProjectIdea(path: string, ideaId: number) { return invoke<ProjectIdea>("convert_desktop_project_idea", { ideaId, path }); }
+  async listDesktopProjectIdeaDiscussions(path: string, ideaId: number) { return invoke<ProjectIdeaDiscussion[]>("list_desktop_project_idea_discussions", { ideaId, path }); }
+  async saveDesktopProjectIdeaDiscussion(path: string, ideaId: number, content: string) { return invoke<ProjectIdeaDiscussion>("save_desktop_project_idea_discussion", { content, ideaId, path }); }
+
+  async readDesktopProjectChangelog(path: string, changelogPath?: string) {
+    return invoke<string>("read_desktop_project_changelog", { changelogPath: changelogPath ?? null, path });
+  }
+
+  async chooseDesktopProjectChangelog(path: string) {
+    return invoke<string | null>("choose_desktop_project_changelog", { path });
+  }
+
+  async getDesktopProjectGitOverview(path: string) {
+    return invoke<ProjectGitOverview>("desktop_project_git_overview", { path });
+  }
+
+  async setDefaultDesktopWorkspace(path: string) {
+    return invoke<string>("set_default_desktop_workspace", { path });
+  }
+
+  async clearDefaultDesktopWorkspace() {
+    return invoke<void>("clear_default_desktop_workspace");
   }
 
   async removeDesktopWorkspace(path: string) {

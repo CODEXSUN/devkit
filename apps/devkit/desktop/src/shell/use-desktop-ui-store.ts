@@ -17,7 +17,7 @@ type DesktopUiState = {
 };
 
 export const useDesktopUiStore = create<DesktopUiState>((set) => ({
-  activity: "assist",
+  activity: "overview",
   drawerOpen: false,
   paletteOpen: false,
   terminalOpen: false,

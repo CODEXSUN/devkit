@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
-import type { AgentAccess, AgentConfig, AgentMessage, AgentProtocolMessage, AgentProvider, AgentReasoningEffort, AgentTask } from "../contracts/desktop";
+import type { AgentConfig, AgentMessage, AgentProtocolMessage, AgentProvider, AgentReasoningEffort, AgentTask } from "../contracts/desktop";
 import { desktopClient } from "../services/desktop-client";
 import type { Approval, RunItem } from "./agent-workspace-parts";
 import {
@@ -14,13 +14,10 @@ import {
 import { AgentTurnWatchdog } from "./agent-turn-watchdog";
 import { afterFirstPaint } from "../shell/startup-scheduler";
 import { measureDesktopOperation, recordDesktopPerformance } from "../shell/desktop-performance";
+import { AGENT_DISCUSSION_ACCESS, discussionPrompt } from "./agent-discussion-policy";
+import { groupAgentMessages, mergeAgentText, type ConversationMessage } from "./agent-conversation";
 
-export type ChatMessage = {
-  id: string;
-  role: "agent" | "user";
-  text: string;
-  createdAt: string;
-};
+export type ChatMessage = ConversationMessage;
 export type SubmissionPhase = "idle" | "preparing" | "sending";
 
 export type AgentConnection = {
@@ -31,7 +28,6 @@ export type AgentConnection = {
 };
 
 export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => Promise<void> }) {
-  const [access, setAccess] = useState<AgentAccess>("workspaceWrite");
   const [activeTaskId, setActiveTaskId] = useState<number>();
   const [approval, setApproval] = useState<Approval>();
   const [composer, setComposer] = useState("");
@@ -268,6 +264,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     let savedMessage: { id: string; taskId: number } | undefined;
     try {
       setSubmissionPhase("preparing");
+      setMessages((current) => [...current, { ...message, createdAt: new Date().toISOString() }]);
       const currentThreadId = await ensureThread();
 
       const task = await ensureTask(currentThreadId, prompt);
@@ -278,19 +275,20 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
         message.text
       );
       savedMessage = { id: message.id, taskId: task.id };
-      setMessages((current) => [...current, toChatMessage(persistedMessage)]);
+      setMessages((current) => current.map((item) => item.id === message.id ? toChatMessage(persistedMessage) : item));
       setRunning(true);
       setSubmissionPhase("sending");
       const savedTask = await desktopClient.setAgentTaskStatus(task.id, "running");
       updateTask(savedTask);
       await measureDesktopOperation("agent", "Submit agent turn", () =>
-        desktopClient.sendAgentTurn(task.id, currentThreadId, prompt, access)
+        desktopClient.sendAgentTurn(task.id, currentThreadId, discussionPrompt(prompt), AGENT_DISCUSSION_ACCESS)
       );
     } catch (reason) {
       setRunning(false);
       const rollbackError = savedMessage
         ? await rollbackMessage(savedMessage.taskId, savedMessage.id)
         : undefined;
+      if (!savedMessage) setMessages((current) => current.filter((item) => item.id !== message.id));
       if (!submittedPrompt) setComposer((current) => current || prompt);
       setError(
         rollbackError
@@ -302,7 +300,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     }
   }
 
-  async function newChat() {
+  async function newDiscussion() {
     if (busy) return;
     setActiveTask(undefined);
     resetConversation();
@@ -313,13 +311,6 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     }
   }
 
-  async function runTask(prompt: string) {
-    if (busy) return;
-    setActiveTask(undefined);
-    resetConversation();
-    await send(prompt);
-  }
-
   async function openTask(task: AgentTask) {
     if (busy || task.id === activeTaskIdRef.current) return;
     setError(undefined);
@@ -327,7 +318,6 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     threadIdRef.current = undefined;
     setRunItems([]);
     setDiff("");
-    setAccess(task.access);
     setActiveTask(task.id);
 
     try {
@@ -336,7 +326,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
         desktopClient.listAgentMessages(task.id)
       );
       if (task.id !== activeTaskIdRef.current) return;
-      setMessages(savedMessages.map(toChatMessage));
+      setMessages(groupAgentMessages(savedMessages.map(toChatMessage)));
       await measureDesktopOperation("agent", "Resume agent thread", () =>
         desktopClient.resumeAgentThread(task.id, task.threadId)
       );
@@ -368,6 +358,17 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     if (busy || task.reviewRequested) return;
     const saved = await desktopClient.requestAgentTaskReview(task.id);
     setTasks((current) => current.map((item) => item.id === saved.id ? saved : item));
+  }
+
+  async function renameTask(task: AgentTask, title: string) {
+    if (busy) return;
+    try {
+      const saved = await desktopClient.renameAgentTask(task.id, title);
+      setTasks((current) => current.map((item) => item.id === saved.id ? saved : item));
+    } catch (reason) {
+      setError(`The chat could not be renamed. ${String(reason)}`);
+      throw reason;
+    }
   }
 
   async function interrupt() {
@@ -476,8 +477,8 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
       const activeTask = tasks.find((item) => item.id === activeTaskIdRef.current);
       if (activeTask) return activeTask;
     }
-    const created = await measureDesktopOperation("agent", "Create isolated task worktree", () =>
-      desktopClient.saveAgentTask(currentThreadId, titleFrom(prompt), access)
+    const created = await measureDesktopOperation("agent", "Create discussion history", () =>
+      desktopClient.saveAgentTask(currentThreadId, titleFrom(prompt), AGENT_DISCUSSION_ACCESS, "chat")
     );
     setActiveTask(created.id);
     setTasks((current) => [created, ...current.filter((item) => item.id !== created.id)]);
@@ -534,9 +535,7 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
   function setAgentText(id: string, text: string) {
     setMessages((current) => {
       const last = current[current.length - 1];
-      if (last?.role === "agent") {
-        return [...current.slice(0, -1), { ...last, id, text }];
-      }
+      if (last?.role === "agent") return [...current.slice(0, -1), { ...last, text: mergeAgentText(last.text, text) }];
       return [...current, { createdAt: new Date().toISOString(), id, role: "agent", text }];
     });
   }
@@ -601,7 +600,6 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
   }
 
   return {
-    access,
     activeTaskId,
     archiveTask,
     approval,
@@ -614,15 +612,14 @@ export function useAgentSession({ onRefreshChanges }: { onRefreshChanges: () => 
     error,
     interrupt,
     messages,
-    newChat,
+    newDiscussion,
     openTask,
     runItems,
     running,
     requestTaskReview,
-    runTask,
+    renameTask,
     runtime,
     send,
-    setAccess,
     setComposer,
     stalled,
     submissionPhase,

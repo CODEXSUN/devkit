@@ -103,7 +103,7 @@ export function useDesktopSession() {
       const lastWorkspacePath = profile.lastWorkspacePath;
       if (lastWorkspacePath) afterFirstPaint(() => void openWorkspace(lastWorkspacePath));
     }).catch(() => {
-      if (active) setDesktopSetup({ workspaces: [] });
+      if (active) setDesktopSetup({ workGroups: [], workspaces: [] });
     });
     return () => {
       active = false;

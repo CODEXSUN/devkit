@@ -25,20 +25,29 @@ export function AgentWelcome({
   workspace: Workspace;
   onPrompt: (value: string) => void;
 }) {
-  const prompts = ["Explain this codebase", "Find and fix a bug", "Review the current changes"];
+  const prompts: Array<[label: string, prompt: string]> = [
+    ["Repository overview", "Explain this codebase"],
+    ["Review the current changes", "Review the current changes"],
+    ["Plan a project task", "Help me plan a project task"]
+  ];
   return (
     <div className="agent-welcome">
-      <div className="agent-mark"><Bot size={25} /></div>
-      <h1>Build in {workspace.name}</h1>
-      <p>
-        Codex can read this workspace, edit files, run commands, and verify the result with your
-        approval.
-      </p>
-      <div>
-        {prompts.map((prompt) => (
-          <button key={prompt} onClick={() => onPrompt(prompt)} type="button">{prompt}</button>
-        ))}
-      </div>
+      <section className="discussion-board" aria-label="Repository discussion starters">
+        <header>
+          <span className="discussion-board-icon"><Bot size={16} /></span>
+          <div>
+            <small>Discussion board</small>
+            <h1>{workspace.name}</h1>
+          </div>
+        </header>
+        <p>Ask about architecture, current decisions, or the next project task.</p>
+        <div className="discussion-board-prompts">
+          {prompts.map(([label, prompt]) => (
+            <button key={label} onClick={() => onPrompt(prompt)} type="button">{label}</button>
+          ))}
+        </div>
+        <footer>Read-only discussion · Use a Project Coder Agent to implement code.</footer>
+      </section>
     </div>
   );
 }

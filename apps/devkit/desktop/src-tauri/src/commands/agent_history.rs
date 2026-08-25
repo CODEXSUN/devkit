@@ -43,6 +43,12 @@ pub fn save_agent_task(
     if !["chat", "runner", "project"].contains(&surface.as_str()) {
         return Err(DesktopError::Policy("Unknown task surface.".into()));
     }
+    if surface == "chat" && access != "readOnly" {
+        return Err(DesktopError::Policy(
+            "Repository discussions are read-only. Select a project and open its Coder Agent to modify code."
+                .into(),
+        ));
+    }
     if ["runner", "project"].contains(&surface.as_str()) && local_task_id.is_none() {
         return Err(DesktopError::Policy("Runnable tasks need a task reference.".into()));
     }
@@ -126,6 +132,22 @@ pub fn delete_agent_message(
 pub fn archive_agent_task(task_id: i64, state: State<'_, DesktopState>) -> DesktopResult<bool> {
     let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
     state.with_database(|database| database.archive_agent_task(&workspace, task_id))
+}
+
+#[tauri::command]
+pub fn rename_agent_task(
+    task_id: i64,
+    title: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<AgentTask> {
+    let title = required(&title, "Chat title")?;
+    if title.len() > 180 {
+        return Err(DesktopError::Policy(
+            "Chat titles cannot exceed 180 characters.".into(),
+        ));
+    }
+    let workspace = workspace_root(&state)?.to_string_lossy().into_owned();
+    state.with_database(|database| database.rename_agent_task(&workspace, task_id, title))
 }
 
 #[tauri::command]

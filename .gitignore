@@ -164,6 +164,7 @@ vite.config.ts.timestamp-*
 
 # Rust and Tauri build output
 **/target/
+apps/devkit/desktop/src-tauri/target-*-test/
 **/.tauri/
 **/src-tauri/gen/schemas/
 **/src-tauri/binaries/codex-*

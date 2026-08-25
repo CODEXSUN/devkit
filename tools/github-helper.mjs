@@ -38,8 +38,8 @@ async function main() {
   });
 
   checkAndPull();
-  console.log("  > git add -A");
-  runGit(["add", "-A"]);
+  console.log("  > git add -A (excluding local build output)");
+  runGit(releaseStageArguments());
   console.log(`  > git commit -m "${message}"`);
   runGit(["commit", "-m", message]);
   console.log("  > git push");
@@ -58,6 +58,18 @@ function printSummary(version, subject, files) {
 function changedFiles() {
   const status = run("git status --porcelain", { silent: true });
   return status ? status.split("\n").filter(Boolean) : [];
+}
+
+function releaseStageArguments() {
+  return [
+    "add",
+    "-A",
+    "--",
+    ".",
+    ":(exclude)**/target/",
+    ":(exclude)apps/devkit/desktop/src-tauri/target-*-test/",
+    ":(exclude)**/.tauri/"
+  ];
 }
 
 function runVersionBump(title) {

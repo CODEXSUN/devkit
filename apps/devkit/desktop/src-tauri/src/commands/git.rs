@@ -21,6 +21,81 @@ pub struct GitChange {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectGitOverview {
+    pub branch: String,
+    pub changed_files: Vec<GitChange>,
+    pub changelog_version: Option<String>,
+    pub committed_at: String,
+    pub latest_commit: String,
+    pub package_version: Option<String>,
+    pub revision: String,
+}
+
+#[tauri::command]
+pub fn desktop_project_git_overview(
+    path: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<ProjectGitOverview> {
+    let workspace = state.with_database(|database| database.desktop_workspace(path.trim()))?;
+    let root = Path::new(&workspace.path);
+    if !root.is_dir() {
+        return Err(DesktopError::Policy("This registered project folder is unavailable.".into()));
+    }
+    let branch = current_branch(root)?;
+    let revision = git_output(root, ["rev-parse", "--short=8", "HEAD"])?;
+    let latest_commit = git_output(root, ["log", "-1", "--format=%s"])?;
+    let committed_at = git_output(root, ["log", "-1", "--format=%cI"])?;
+    let package_version = package_version(root);
+    let changelog_version = changelog_version(root);
+    Ok(ProjectGitOverview {
+        branch,
+        changed_files: git_status_for(root)?,
+        changelog_version,
+        committed_at,
+        latest_commit,
+        package_version,
+        revision,
+    })
+}
+
+fn git_output<const N: usize>(root: &Path, args: [&str; N]) -> DesktopResult<String> {
+    let output = background_command("git").args(args).current_dir(root).output()?;
+    if !output.status.success() {
+        return Err(DesktopError::Policy(String::from_utf8_lossy(&output.stderr).trim().to_owned()));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+fn package_version(root: &Path) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(&fs::read_to_string(root.join("package.json")).ok()?)
+        .ok()?
+        .get("version")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+fn changelog_version(root: &Path) -> Option<String> {
+    for name in ["CHANGELOG.mdx", "CHANGELOG.md", "Changelog.md", "changelog.md"] {
+        let content = fs::read_to_string(root.join(name)).ok()?;
+        if let Some(version) = content.lines().find_map(version_from_line) {
+            return Some(version);
+        }
+    }
+    None
+}
+
+fn version_from_line(line: &str) -> Option<String> {
+    let value = line.trim().trim_start_matches('#').trim();
+    let value = value.strip_prefix('v').or_else(|| value.strip_prefix('V')).unwrap_or(value);
+    let candidate = value.split_whitespace().next()?;
+    if candidate.split('.').count() >= 2 && candidate.chars().all(|item| item.is_ascii_digit() || item == '.') {
+        return Some(candidate.to_owned());
+    }
+    None
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GitFileDiff {
     original: String,
     modified: String,

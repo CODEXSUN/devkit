@@ -95,6 +95,7 @@
   background: #f8fafc;
   border-right: 1px solid #e2e8f0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
@@ -428,6 +429,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  width: 100%;
 }
 
 .history-item {
@@ -575,6 +578,8 @@
   align-content: start;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .history-row span {
@@ -630,13 +635,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.history-heading {
-  padding: 9px 10px 5px;
-  color: #817c7c;
-  font-size: 11px;
-  font-weight: 650;
+.history-new-discussion {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #2563eb;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
+.history-new-discussion:hover { background: linear-gradient(135deg, #1d4ed8, #4338ca); }
+.history-new-discussion:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+.history-new-discussion:disabled { cursor: default; opacity: 0.55; }
 .history-row {
+  box-sizing: border-box;
   display: flex;
   width: 100%;
   align-items: center;
@@ -644,10 +666,14 @@
   padding: 2px;
   border-radius: 6px;
   background: transparent;
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
-.history-row.active,
 .history-row:hover {
-  background: #dfdada;
+  background: #eff6ff;
+}
+.history-row.active {
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 1px #dbeafe;
 }
 .history-open-task {
   display: flex;
@@ -681,26 +707,37 @@
 .history-task-menu { position: relative; }
 .history-task-menu-trigger {
   display: grid;
+  flex: 0 0 27px;
   width: 27px;
   height: 27px;
   place-items: center;
   padding: 0;
+  border: 1px solid transparent;
   border-radius: 5px;
-  color: #777272;
+  background: transparent;
+  color: #64748b;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
-.history-row:hover .history-task-menu-trigger,
 .history-task-menu-trigger[aria-expanded="true"],
-.history-task-menu-trigger:focus-visible { opacity: 1; }
-.history-task-menu-trigger:hover { background: #d0cccc; color: #302e2e; }
-.history-task-menu > div {
+.history-task-menu-trigger:focus-visible {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  color: #1d4ed8;
+  outline: none;
+}
+.history-task-menu-trigger:hover {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+.history-task-menu-popover {
   display: grid;
   gap: 2px;
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 25;
+  position: fixed;
+  z-index: 1000;
   width: 150px;
   padding: 5px;
   border: 1px solid #d8d4d4;
@@ -708,7 +745,7 @@
   background: #fff;
   box-shadow: 0 8px 22px rgb(30 41 59 / 16%);
 }
-.history-task-menu > div button {
+.history-task-menu-popover button {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -723,9 +760,9 @@
   font-size: 12px;
   text-align: left;
 }
-.history-task-menu > div button:hover { background: #f0eded; }
-.history-task-menu > div button.danger { color: #a22d2d; }
-.history-task-menu > div button:disabled { cursor: default; opacity: 0.52; }
+.history-task-menu-popover button:hover { background: #f0eded; }
+.history-task-menu-popover button.danger { color: #a22d2d; }
+.history-task-menu-popover button:disabled { cursor: default; opacity: 0.52; }
 .history-empty {
   padding: 8px 10px;
   color: #777272;
@@ -1197,47 +1234,49 @@
   display: grid;
   min-height: 100%;
   place-content: center;
-  justify-items: center;
-  text-align: center;
+  padding: 24px;
 }
-.agent-mark {
+.discussion-board {
   display: grid;
-  width: 50px;
-  height: 50px;
-  place-items: center;
-  border-radius: 13px;
-  background: #1d1c1c;
-  color: #fff;
-}
-.agent-welcome h1 {
-  margin: 18px 0 7px;
-  color: #282626;
-  font-size: 20px;
-  letter-spacing: -0.02em;
-}
-.agent-welcome p {
-  max-width: 510px;
-  margin: 0;
-  color: #716d6d;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.agent-welcome > div:last-child {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 7px;
-  padding-top: 20px;
-}
-.agent-welcome button {
-  padding: 7px 10px;
-  border: 1px solid #d8d4d4;
-  border-radius: 999px;
+  width: min(460px, 100%);
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   background: #fff;
-  color: #4f4b4b;
-  font-size: 12px;
-  cursor: pointer;
+  box-shadow: 0 10px 26px rgb(15 23 42 / 5%);
 }
+.discussion-board header { align-items: center; display: flex; gap: 10px; }
+.discussion-board-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+.discussion-board header > div { display: grid; gap: 2px; }
+.discussion-board small { color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.discussion-board h1 { margin: 0; color: #172033; font-size: 17px; letter-spacing: -0.01em; }
+.discussion-board > p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.55; }
+.discussion-board-prompts { display: grid; border-top: 1px solid #e2e8f0; }
+.discussion-board-prompts button {
+  padding: 10px 2px;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  transition: color 150ms ease, padding-left 150ms ease;
+}
+.discussion-board-prompts button:hover { padding-left: 6px; color: #2563eb; }
+.discussion-board-prompts button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.discussion-board footer { color: #64748b; font-size: 11px; line-height: 1.45; }
 .agent-message {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
@@ -1658,6 +1697,10 @@
   display: flex;
   gap: 10px;
 }
+.agent-discussion-scope {
+  color: #777272;
+  font-size: 11px;
+}
 .agent-submission-state {
   display: inline-flex;
   align-items: center;
@@ -1801,7 +1844,6 @@
   background: #1f1f1f;
 }
 :root[data-theme="dark"] .new-agent-chat,
-:root[data-theme="dark"] .agent-welcome button,
 :root[data-theme="dark"] .agent-composer,
 :root[data-theme="dark"] .agent-new-chat-button {
   border-color: #3b3b3b;
@@ -1809,7 +1851,6 @@
   color: #e6e6e6;
 }
 :root[data-theme="dark"] .agent-chat-header,
-:root[data-theme="dark"] .agent-welcome h1,
 :root[data-theme="dark"] .agent-title,
 :root[data-theme="dark"] .agent-message > p,
 :root[data-theme="dark"] .agent-response,
@@ -1817,6 +1858,15 @@
 :root[data-theme="dark"] .environment-row strong {
   color: #e6e6e6;
 }
+:root[data-theme="dark"] .discussion-board { border-color: #303030; background: #1f1f1f; box-shadow: 0 10px 26px rgb(0 0 0 / 18%); }
+:root[data-theme="dark"] .discussion-board-icon { background: #1e3a5f; color: #bfdbfe; }
+:root[data-theme="dark"] .discussion-board h1 { color: #e6e6e6; }
+:root[data-theme="dark"] .discussion-board > p,
+:root[data-theme="dark"] .discussion-board footer,
+:root[data-theme="dark"] .discussion-board small { color: #a8b3c7; }
+:root[data-theme="dark"] .discussion-board-prompts { border-top-color: #303030; }
+:root[data-theme="dark"] .discussion-board-prompts button { border-bottom-color: #303030; color: #d8dee9; }
+:root[data-theme="dark"] .discussion-board-prompts button:hover { color: #93c5fd; }
 :root[data-theme="dark"] .agent-chat-header,
 :root[data-theme="dark"] .agent-environment section {
   border-color: #303030;
@@ -1828,14 +1878,19 @@
 :root[data-theme="dark"] .agent-open-chat-tab-close:hover { background: #353535; color: #fff; }
 :root[data-theme="dark"] .history-row.active,
 :root[data-theme="dark"] .history-row:hover {
-  background: #292929;
+  background: #1e293b;
 }
+:root[data-theme="dark"] .history-row.active { box-shadow: inset 0 0 0 1px #334155; }
 :root[data-theme="dark"] .history-task-menu-trigger { color: #a8b3c7; }
-:root[data-theme="dark"] .history-task-menu-trigger:hover { background: #353535; color: #e6e6e6; }
-:root[data-theme="dark"] .history-task-menu > div { border-color: #3b3b3b; background: #242424; box-shadow: 0 8px 22px rgb(0 0 0 / 38%); }
-:root[data-theme="dark"] .history-task-menu > div button { color: #e6e6e6; }
-:root[data-theme="dark"] .history-task-menu > div button:hover { background: #353535; }
-:root[data-theme="dark"] .history-task-menu > div button.danger { color: #f09b9b; }
+:root[data-theme="dark"] .history-task-menu-trigger[aria-expanded="true"],
+:root[data-theme="dark"] .history-task-menu-trigger:focus-visible,
+:root[data-theme="dark"] .history-task-menu-trigger:hover { border-color: #334155; background: #243b5d; color: #bfdbfe; }
+:root[data-theme="dark"] .history-task-menu-popover { border-color: #3b3b3b; background: #242424; box-shadow: 0 8px 22px rgb(0 0 0 / 38%); }
+:root[data-theme="dark"] .history-task-menu-popover button { color: #e6e6e6; }
+:root[data-theme="dark"] .history-task-menu-popover button:hover { background: #353535; }
+:root[data-theme="dark"] .history-task-menu-popover button.danger { color: #f09b9b; }
+:root[data-theme="dark"] .history-new-discussion { border-color: #4f6ef7; background: linear-gradient(135deg, #3155cc, #5b47c8); color: #fff; }
+:root[data-theme="dark"] .history-new-discussion:hover { background: linear-gradient(135deg, #3d61d8, #6854d4); }
 :root[data-theme="dark"] .agent-composer textarea {
   color: #e6e6e6;
 }
@@ -1868,6 +1923,7 @@
 :root[data-theme="dark"] .agent-composer .attach-context,
 :root[data-theme="dark"] .agent-composer label,
 :root[data-theme="dark"] .agent-composer select,
+:root[data-theme="dark"] .agent-discussion-scope,
 :root[data-theme="dark"] .agent-submission-state {
   color: #bdbdbd;
 }
@@ -1932,6 +1988,207 @@
   border-color: #665a3c;
   background: #302b21;
   color: #e7d8ad;
+}
+
+/* Agent controls use the same semantic token contract as the rest of the desktop. */
+.agent-layout {
+  --agent-canvas: var(--card);
+  --agent-muted-surface: var(--background);
+  --agent-hover: var(--secondary);
+  --agent-selection: color-mix(in srgb, var(--primary) 10%, var(--background));
+  --agent-selection-border: color-mix(in srgb, var(--primary) 26%, var(--border));
+  background: var(--background);
+  color: var(--foreground);
+}
+.agent-history,
+.agent-environment-container,
+.agent-environment {
+  background: var(--agent-muted-surface);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.agent-chat {
+  background: var(--agent-canvas);
+  color: var(--foreground);
+}
+.agent-chat-header,
+.agent-open-chat-tabs {
+  background: var(--agent-canvas);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.agent-open-chat-tab.active {
+  background: var(--background);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.drawer-toggle-btn,
+.history-task-menu-trigger,
+.agent-open-chat-tab-close,
+.agent-title,
+.agent-title-btn,
+.agent-state,
+.agent-model-badge,
+.history-open-task small,
+.history-empty,
+.agent-title small,
+.agent-discussion-scope,
+.agent-submission-state,
+.agent-composer label,
+.agent-composer .attach-context {
+  color: var(--muted);
+}
+.drawer-toggle-btn:hover,
+.agent-title-button:hover,
+.agent-title-btn:hover,
+.agent-open-chat-tab-close:hover,
+.agent-message-actions button:hover,
+.agent-composer .attach-context:hover:not(:disabled) {
+  background: var(--agent-hover);
+  color: var(--foreground);
+}
+.history-new-discussion,
+.history-new-discussion:hover,
+:root[data-theme="dark"] .history-new-discussion,
+:root[data-theme="dark"] .history-new-discussion:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.history-new-discussion:focus-visible,
+.history-task-menu-trigger:focus-visible,
+.discussion-board-prompts button:focus-visible {
+  outline-color: var(--ring);
+}
+.history-row:hover,
+:root[data-theme="dark"] .history-row:hover {
+  background: var(--agent-hover);
+}
+.history-row.active,
+:root[data-theme="dark"] .history-row.active {
+  background: var(--agent-selection);
+  box-shadow: inset 0 0 0 1px var(--agent-selection-border);
+}
+.history-task-menu-trigger[aria-expanded="true"],
+.history-task-menu-trigger:hover,
+:root[data-theme="dark"] .history-task-menu-trigger[aria-expanded="true"],
+:root[data-theme="dark"] .history-task-menu-trigger:hover {
+  background: var(--agent-selection);
+  border-color: var(--agent-selection-border);
+  color: var(--primary);
+}
+.history-task-menu-popover,
+:root[data-theme="dark"] .history-task-menu-popover,
+.agent-model-menu-popover,
+:root[data-theme="dark"] .agent-model-menu-popover {
+  background: var(--popover);
+  border-color: var(--border);
+  box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+}
+.history-task-menu-popover button,
+:root[data-theme="dark"] .history-task-menu-popover button,
+.agent-model-menu-popover > button,
+:root[data-theme="dark"] .agent-model-menu-popover > button {
+  color: var(--popover-foreground);
+}
+.history-task-menu-popover button:hover,
+:root[data-theme="dark"] .history-task-menu-popover button:hover,
+.agent-model-menu-popover > button:hover,
+.agent-model-menu-popover > button.selected,
+:root[data-theme="dark"] .agent-model-menu-popover > button:hover,
+:root[data-theme="dark"] .agent-model-menu-popover > button.selected {
+  background: var(--agent-hover);
+}
+.discussion-board,
+:root[data-theme="dark"] .discussion-board,
+.agent-composer,
+:root[data-theme="dark"] .agent-composer {
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: 0 10px 26px rgb(15 23 42 / 8%);
+}
+.discussion-board-icon,
+:root[data-theme="dark"] .discussion-board-icon {
+  background: var(--agent-selection);
+  color: var(--primary);
+}
+.discussion-board h1,
+:root[data-theme="dark"] .discussion-board h1,
+.discussion-board-prompts button,
+:root[data-theme="dark"] .discussion-board-prompts button,
+.agent-message > p,
+.agent-response,
+:root[data-theme="dark"] .agent-message > p,
+:root[data-theme="dark"] .agent-response {
+  color: var(--foreground);
+}
+.discussion-board > p,
+.discussion-board footer,
+.discussion-board small,
+:root[data-theme="dark"] .discussion-board > p,
+:root[data-theme="dark"] .discussion-board footer,
+:root[data-theme="dark"] .discussion-board small {
+  color: var(--muted);
+}
+.discussion-board-prompts,
+.discussion-board-prompts button,
+:root[data-theme="dark"] .discussion-board-prompts,
+:root[data-theme="dark"] .discussion-board-prompts button {
+  border-color: var(--border);
+}
+.discussion-board-prompts button:hover,
+:root[data-theme="dark"] .discussion-board-prompts button:hover {
+  color: var(--primary);
+}
+.agent-composer textarea,
+:root[data-theme="dark"] .agent-composer textarea {
+  color: var(--foreground);
+}
+.agent-composer textarea::placeholder,
+:root[data-theme="dark"] .agent-composer textarea::placeholder {
+  color: var(--muted);
+}
+.agent-composer footer > button,
+.approval-card button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.agent-composer footer > button:disabled {
+  background: var(--secondary);
+  color: var(--muted);
+}
+.agent-environment > header,
+.agent-environment h2,
+.agent-environment h2 b,
+.agent-environment section > button,
+.environment-row,
+.agent-environment p,
+.environment-row strong,
+:root[data-theme="dark"] .environment-row strong {
+  color: var(--foreground);
+}
+.agent-environment section,
+:root[data-theme="dark"] .agent-environment section {
+  border-color: var(--border);
+}
+.agent-environment section > button:hover {
+  background: var(--agent-hover);
+}
+.agent-connection-badge,
+:root[data-theme="dark"] .agent-connection-badge {
+  background: var(--secondary);
+  border-color: var(--border);
+  color: var(--secondary-foreground);
+}
+.agent-connection-badge.connected,
+:root[data-theme="dark"] .agent-connection-badge.connected {
+  background: color-mix(in srgb, #10b981 12%, var(--card));
+  border-color: color-mix(in srgb, #10b981 32%, var(--border));
+  color: #047857;
+}
+:root[data-theme="dark"] .agent-connection-badge.connected {
+  color: #6ee7b7;
 }
 
 @media (max-width: 1100px) {

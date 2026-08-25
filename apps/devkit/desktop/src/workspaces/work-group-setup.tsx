@@ -1,5 +1,5 @@
-import { ArrowLeft, ChevronDown, FolderOpen, GitBranch, Link2, LoaderCircle, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, ChevronDown, FolderOpen, GitBranch, Link2, LoaderCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type {
   DesktopProfile,
   DesktopWorkspace,
@@ -29,10 +29,17 @@ export function WorkGroupSetup({
   const [error, setError] = useState<string>();
   const [scanning, setScanning] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const didPromptForFolder = useRef(false);
 
   useEffect(() => {
     if (!profile.defaultWorkGroupPath) return;
     void loadSavedGroup();
+  }, [profile.defaultWorkGroupPath]);
+
+  useEffect(() => {
+    if (profile.defaultWorkGroupPath || didPromptForFolder.current) return;
+    didPromptForFolder.current = true;
+    void chooseGroup();
   }, [profile.defaultWorkGroupPath]);
 
   async function loadSavedGroup() {
@@ -94,6 +101,12 @@ export function WorkGroupSetup({
   return (
     <main className="desktop-setup work-group-setup">
       <section className="work-group-results" aria-live="polite">
+        <header className="work-group-page-header">
+          <div><p>Local workspace</p><h1>Folder &amp; repositories</h1><span>Manage the repositories found in this work group.</span></div>
+          <button className="work-group-outline-button" disabled={scanning || !profile.defaultWorkGroupPath} onClick={() => void loadSavedGroup()} type="button">
+            <RefreshCw className={scanning ? "setup-spinner" : undefined} size={16} /> Reload folders
+          </button>
+        </header>
         <div className="work-group-toolbar">
           {onReturn ? <button className="work-group-back-button" onClick={onReturn} type="button"><ArrowLeft size={16} /> Return to workspace</button> : null}
           <div>
@@ -204,6 +217,7 @@ function toDesktopWorkspace(candidate: RepositoryCandidate, repositoryType: Repo
     path: candidate.path,
     pinned: false,
     projectName: candidate.projectName ?? candidate.name,
+    priority: "normal",
     relationship: mapping.relationship
   };
 }

@@ -11,7 +11,7 @@ import {
   Send,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import type { AgentAccess, AgentReasoningEffort, FileEntry, GitChange, Workspace } from "../contracts/desktop";
+import type { AgentReasoningEffort, FileEntry, GitChange, Workspace } from "../contracts/desktop";
 import type { ResourceState } from "../shell/use-desktop-session";
 import { useDesktopPerformance } from "../shell/desktop-performance";
 import { AgentErrorBanner } from "./agent-error-banner";
@@ -108,8 +108,10 @@ export function AgentWorkspace({
           busy={session.busy}
           onArchive={(task) => void session.archiveTask(task)}
           onDelete={(task) => session.deleteTask(task)}
+          onNewDiscussion={() => void session.newDiscussion()}
           onOpenTask={openTask}
           onRequestReview={(task) => void session.requestTaskReview(task)}
+          onRename={(task, title) => session.renameTask(task, title)}
           tasks={session.tasks}
         />
       </aside>
@@ -134,7 +136,7 @@ export function AgentWorkspace({
               type="button"
             >
               <Bot size={16} />
-              <span><strong>{workspace.name}</strong><small className="agent-chat-tab">{activeTask?.title ?? "Project chat"}</small></span>
+              <span><strong>{workspace.name}</strong><small className="agent-chat-tab">{activeTask?.title ?? "Repository discussion"}</small></span>
             </button>
           </div>
 
@@ -222,7 +224,7 @@ export function AgentWorkspace({
 
         <div className="agent-composer">
           <textarea
-            aria-label="Message the coding agent"
+            aria-label="Message the repository discussion agent"
             onChange={(event) => session.setComposer(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -230,20 +232,13 @@ export function AgentWorkspace({
                 void session.send();
               }
             }}
-            placeholder="Ask Codex to inspect, build, fix, or review this workspace..."
+            placeholder="Discuss this repository, review an approach, or plan work..."
             rows={3}
             value={session.composer}
           />
           <footer>
             <div className="agent-composer-options">
-              <select
-                aria-label="Agent access level"
-                onChange={(event) => session.setAccess(event.target.value as AgentAccess)}
-                value={session.access}
-              >
-                <option value="workspaceWrite">Workspace Write</option>
-                <option value="readOnly">Read Only</option>
-              </select>
+              <span className="agent-discussion-scope">Discussion only · To code, open a Project Coder Agent</span>
             </div>
             <div className="agent-composer-actions">
               {session.running ? (

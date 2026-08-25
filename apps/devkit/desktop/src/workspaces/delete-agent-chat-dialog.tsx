@@ -53,7 +53,7 @@ export function DeleteAgentChatDialog({
         <header>
           <span className="agent-delete-dialog-icon"><AlertTriangle size={18} /></span>
           <div>
-            <h2 id="delete-agent-chat-title">Delete chat?</h2>
+            <h2 id="delete-agent-chat-title">Force delete chat?</h2>
             <p id="delete-agent-chat-description">
               <strong>{task.title}</strong> and its saved messages will be permanently removed from
               this device. This cannot be undone.
@@ -74,7 +74,7 @@ export function DeleteAgentChatDialog({
             Cancel
           </button>
           <button className="shadcn-button-destructive" disabled={busy} onClick={() => void confirmDeletion()} type="button">
-            {busy ? "Deleting…" : "Delete chat"}
+            {busy ? "Deleting…" : "Force delete"}
           </button>
         </footer>
       </section>

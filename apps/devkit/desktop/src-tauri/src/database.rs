@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DesktopError, DesktopResult};
@@ -164,6 +164,30 @@ pub struct ProjectTaskRun {
     pub summary: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectIdea {
+    pub id: i64,
+    pub workspace_path: String,
+    pub title: String,
+    pub context: String,
+    pub discussion: String,
+    pub status: String,
+    pub converted_task_id: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub discussion_count: i64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectIdeaDiscussion {
+    pub id: i64,
+    pub idea_id: i64,
+    pub content: String,
+    pub created_at: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopProfile {
@@ -183,8 +207,25 @@ pub struct DesktopWorkspace {
     pub kind: String,
     pub relationship: String,
     pub project_name: Option<String>,
+    pub tagline: Option<String>,
+    pub changelog_path: Option<String>,
+    pub owner_name: Option<String>,
+    pub started_on: Option<String>,
+    pub due_on: Option<String>,
+    pub project_type: Option<String>,
+    pub priority: String,
+    pub project_id: Option<i64>,
     pub pinned: bool,
     pub last_opened_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopWorkGroup {
+    pub path: String,
+    pub name: String,
+    pub is_default: bool,
+    pub updated_at: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -201,7 +242,9 @@ pub struct SavedRepositoryUrl {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopSetup {
+    pub default_workspace_path: Option<String>,
     pub profile: Option<DesktopProfile>,
+    pub work_groups: Vec<DesktopWorkGroup>,
     pub workspaces: Vec<DesktopWorkspace>,
 }
 
@@ -297,6 +340,50 @@ impl DesktopDatabase {
             params![workspace_path, title, instructions, schedule, agent_model, skill_path, self.next_project_task_position(workspace_path)?],
         )?;
         self.project_task(self.connection.last_insert_rowid(), workspace_path)
+    }
+
+    pub fn list_project_ideas(&self, workspace_path: &str) -> DesktopResult<Vec<ProjectIdea>> {
+        let mut statement = self.connection.prepare("SELECT i.id, i.workspace_path, i.title, i.context, i.discussion, i.status, i.converted_task_id, i.created_at, i.updated_at, (SELECT COUNT(*) FROM desktop_project_idea_discussions d WHERE d.idea_id = i.id) FROM desktop_project_ideas i WHERE i.workspace_path = ?1 ORDER BY i.updated_at DESC, i.id DESC")?;
+        let ideas = statement.query_map(params![workspace_path], project_idea_from_row)?.collect::<Result<Vec<_>, _>>()?;
+        Ok(ideas)
+    }
+
+    pub fn save_project_idea(&self, workspace_path: &str, title: &str, context: &str, discussion: &str) -> DesktopResult<ProjectIdea> {
+        self.workspace_by_path(workspace_path)?;
+        self.connection.execute("INSERT INTO desktop_project_ideas (workspace_path, title, context, discussion) VALUES (?1, ?2, ?3, ?4)", params![workspace_path, title, context, discussion])?;
+        self.project_idea(self.connection.last_insert_rowid(), workspace_path)
+    }
+
+    pub fn convert_project_idea(&self, workspace_path: &str, idea_id: i64) -> DesktopResult<ProjectIdea> {
+        let idea = self.project_idea(idea_id, workspace_path)?;
+        if idea.converted_task_id.is_some() { return Err(DesktopError::Policy("This idea is already linked to a project task.".into())); }
+        let instructions = format!("Idea context:\n{}\n\nDiscussion notes:\n{}", idea.context, idea.discussion);
+        let task = self.save_project_task(workspace_path, &idea.title, &instructions, "manual", "codex:gpt-5.6-terra", None)?;
+        self.connection.execute("UPDATE desktop_project_ideas SET status = 'converted', converted_task_id = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND workspace_path = ?3", params![task.id, idea_id, workspace_path])?;
+        self.project_idea(idea_id, workspace_path)
+    }
+
+    pub fn list_project_idea_discussions(&self, workspace_path: &str, idea_id: i64) -> DesktopResult<Vec<ProjectIdeaDiscussion>> {
+        self.project_idea(idea_id, workspace_path)?;
+        let mut statement = self.connection.prepare("SELECT id, idea_id, content, created_at FROM desktop_project_idea_discussions WHERE workspace_path = ?1 AND idea_id = ?2 ORDER BY created_at, id")?;
+        let items = statement.query_map(params![workspace_path, idea_id], |row| Ok(ProjectIdeaDiscussion { id: row.get(0)?, idea_id: row.get(1)?, content: row.get(2)?, created_at: row.get(3)? }))?.collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
+    pub fn save_project_idea_discussion(&self, workspace_path: &str, idea_id: i64, content: &str) -> DesktopResult<ProjectIdeaDiscussion> {
+        self.project_idea(idea_id, workspace_path)?;
+        self.connection.execute("INSERT INTO desktop_project_idea_discussions (idea_id, workspace_path, content) VALUES (?1, ?2, ?3)", params![idea_id, workspace_path, content])?;
+        self.connection.execute("UPDATE desktop_project_ideas SET discussion = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND workspace_path = ?3", params![content, idea_id, workspace_path])?;
+        let id = self.connection.last_insert_rowid();
+        self.connection.query_row("SELECT id, idea_id, content, created_at FROM desktop_project_idea_discussions WHERE id = ?1", params![id], |row| Ok(ProjectIdeaDiscussion { id: row.get(0)?, idea_id: row.get(1)?, content: row.get(2)?, created_at: row.get(3)? })).map_err(Into::into)
+    }
+
+    fn project_idea(&self, idea_id: i64, workspace_path: &str) -> DesktopResult<ProjectIdea> {
+        self.connection.query_row(
+            "SELECT i.id, i.workspace_path, i.title, i.context, i.discussion, i.status, i.converted_task_id, i.created_at, i.updated_at, (SELECT COUNT(*) FROM desktop_project_idea_discussions d WHERE d.idea_id = i.id) FROM desktop_project_ideas i WHERE i.id = ?1 AND i.workspace_path = ?2",
+            params![idea_id, workspace_path],
+            project_idea_from_row,
+        ).map_err(Into::into)
     }
 
     pub fn update_project_task(&self, workspace_path: &str, task_id: i64, title: &str, instructions: &str, schedule: &str, agent_model: &str, skill_path: Option<&str>, status: &str) -> DesktopResult<ProjectTask> {
@@ -597,6 +684,21 @@ impl DesktopDatabase {
         Ok(updated > 0)
     }
 
+    pub fn rename_agent_task(
+        &self,
+        workspace_path: &str,
+        task_id: i64,
+        title: &str,
+    ) -> DesktopResult<AgentTask> {
+        self.connection.execute(
+            "UPDATE desktop_agent_tasks
+             SET title = ?1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?2 AND workspace_path = ?3",
+            params![title, task_id, workspace_path],
+        )?;
+        self.agent_task(workspace_path, task_id)
+    }
+
     pub fn delete_agent_task(&mut self, workspace_path: &str, task_id: i64) -> DesktopResult<bool> {
         let transaction = self.connection.transaction()?;
         transaction.execute(
@@ -642,7 +744,9 @@ impl DesktopDatabase {
 
     pub fn desktop_setup(&self) -> DesktopResult<DesktopSetup> {
         Ok(DesktopSetup {
+            default_workspace_path: self.default_workspace_path()?,
             profile: self.desktop_profile()?,
+            work_groups: self.list_desktop_work_groups()?,
             workspaces: self.list_desktop_workspaces()?,
         })
     }
@@ -662,15 +766,29 @@ impl DesktopDatabase {
     }
 
     pub fn save_default_work_group(&self, path: &str) -> DesktopResult<DesktopProfile> {
-        let updated = self.connection.execute(
+        let name = std::path::Path::new(path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.is_empty())
+            .unwrap_or("Workspace");
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute("UPDATE desktop_work_groups SET is_default = 0", [])?;
+        transaction.execute(
+            "INSERT INTO desktop_work_groups (path, name, is_default) VALUES (?1, ?2, 1)
+             ON CONFLICT(path) DO UPDATE SET name = excluded.name, is_default = 1, updated_at = CURRENT_TIMESTAMP",
+            params![path, name],
+        )?;
+        let updated = transaction.execute(
             "UPDATE desktop_local_profile SET default_work_group_path = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
             params![path],
         )?;
         if updated == 0 {
+            transaction.rollback()?;
             return Err(DesktopError::Policy(
                 "Save a local identity before selecting a work group.".into(),
             ));
         }
+        transaction.commit()?;
         self.desktop_profile()?
             .ok_or_else(|| DesktopError::Policy("Work group was not saved.".into()))
     }
@@ -702,6 +820,7 @@ impl DesktopDatabase {
              relationship = excluded.relationship, project_name = excluded.project_name, updated_at = CURRENT_TIMESTAMP",
             params![workspace.path, workspace.name, workspace.kind, workspace.relationship, workspace.project_name],
         )?;
+        self.ensure_project_detail_number(&workspace.path)?;
         self.workspace_by_path(&workspace.path)
     }
 
@@ -717,7 +836,62 @@ impl DesktopDatabase {
         self.workspace_by_path(path)
     }
 
+    pub fn save_desktop_project_details(
+        &self,
+        workspace: &DesktopWorkspace,
+    ) -> DesktopResult<DesktopWorkspace> {
+        self.workspace_by_path(&workspace.path)?;
+        self.connection.execute(
+            "INSERT INTO desktop_project_details (
+                workspace_path, tagline, changelog_path, owner_name, started_on, due_on, project_type, priority, project_id, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CURRENT_TIMESTAMP)
+             ON CONFLICT(workspace_path) DO UPDATE SET
+                tagline = excluded.tagline,
+                changelog_path = excluded.changelog_path,
+                owner_name = excluded.owner_name,
+                started_on = excluded.started_on,
+                due_on = excluded.due_on,
+                project_type = excluded.project_type,
+                priority = excluded.priority,
+                updated_at = CURRENT_TIMESTAMP",
+            params![
+                workspace.path,
+                workspace.tagline,
+                workspace.changelog_path,
+                workspace.owner_name,
+                workspace.started_on,
+                workspace.due_on,
+                workspace.project_type,
+                workspace.priority,
+                workspace.project_id,
+            ],
+        )?;
+        self.workspace_by_path(&workspace.path)
+    }
+
+    pub fn set_default_desktop_workspace(&mut self, path: &str) -> DesktopResult<String> {
+        self.workspace_by_path(path)?;
+        let transaction = self.connection.transaction()?;
+        transaction.execute(
+            "INSERT INTO desktop_default_workspace (id, workspace_path, updated_at) VALUES (1, ?1, CURRENT_TIMESTAMP)
+             ON CONFLICT(id) DO UPDATE SET workspace_path = excluded.workspace_path, updated_at = CURRENT_TIMESTAMP",
+            params![path],
+        )?;
+        transaction.commit()?;
+        Ok(path.into())
+    }
+
+    pub fn clear_default_desktop_workspace(&self) -> DesktopResult<()> {
+        self.connection
+            .execute("DELETE FROM desktop_default_workspace WHERE id = 1", [])?;
+        Ok(())
+    }
+
     pub fn remove_desktop_workspace(&self, path: &str) -> DesktopResult<bool> {
+        self.connection.execute(
+            "DELETE FROM desktop_default_workspace WHERE workspace_path = ?1",
+            params![path],
+        )?;
         let removed = self.connection.execute(
             "DELETE FROM desktop_workspaces WHERE path = ?1",
             params![path],
@@ -958,6 +1132,20 @@ impl DesktopDatabase {
             .execute_batch(include_str!("../migrations/0017_project_task_positions.sql"))?;
         self.connection
             .execute_batch(include_str!("../migrations/0018_project_task_run_interactions.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0019_desktop_work_groups.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0020_default_desktop_workspace.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0021_desktop_project_details.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0022_desktop_project_id_sequence.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0024_desktop_project_ideas.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/0025_desktop_project_idea_discussions.sql"))?;
+        self.ensure_desktop_project_changelog_path()?;
+        self.ensure_project_detail_numbers()?;
         self.connection.execute_batch(
             "CREATE INDEX IF NOT EXISTS desktop_agent_tasks_workspace_status
              ON desktop_agent_tasks (workspace_path, run_status, updated_at DESC);",
@@ -1068,11 +1256,101 @@ impl DesktopDatabase {
         }))
     }
 
+    fn default_workspace_path(&self) -> DesktopResult<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT workspace_path FROM desktop_default_workspace WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn ensure_project_detail_numbers(&self) -> DesktopResult<()> {
+        let mut statement = self.connection.prepare(
+            "SELECT w.path
+             FROM desktop_workspaces w
+             LEFT JOIN desktop_project_details d ON d.workspace_path = w.path
+             WHERE d.workspace_path IS NULL OR NULLIF(CAST(d.project_id AS INTEGER), 0) IS NULL
+             ORDER BY w.path COLLATE NOCASE",
+        )?;
+        let paths = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        for path in paths {
+            self.ensure_project_detail_number(&path)?;
+        }
+        Ok(())
+    }
+
+    fn ensure_desktop_project_changelog_path(&self) -> DesktopResult<()> {
+        let mut statement = self.connection.prepare("PRAGMA table_info(desktop_project_details)")?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if !columns.iter().any(|column| column == "changelog_path") {
+            self.connection.execute_batch("ALTER TABLE desktop_project_details ADD COLUMN changelog_path TEXT;")?;
+        }
+        self.connection.execute(
+            "INSERT OR IGNORE INTO desktop_schema_migrations (version, description) VALUES (23, 'desktop project changelog location')",
+            [],
+        )?;
+        Ok(())
+    }
+
+    fn ensure_project_detail_number(&self, path: &str) -> DesktopResult<()> {
+        let has_number = self.connection.query_row(
+            "SELECT NULLIF(CAST(project_id AS INTEGER), 0)
+             FROM desktop_project_details WHERE workspace_path = ?1",
+            params![path],
+            |row| row.get::<_, Option<i64>>(0),
+        ).optional()?.flatten().is_some();
+        if has_number {
+            return Ok(());
+        }
+        let project_id = self.next_project_id()?;
+        self.connection.execute(
+            "INSERT INTO desktop_project_details (workspace_path, project_id, updated_at)
+             VALUES (?1, ?2, CURRENT_TIMESTAMP)
+             ON CONFLICT(workspace_path) DO UPDATE SET project_id = excluded.project_id, updated_at = CURRENT_TIMESTAMP",
+            params![path, project_id],
+        )?;
+        Ok(())
+    }
+
+    fn next_project_id(&self) -> DesktopResult<i64> {
+        self.connection.execute(
+            "UPDATE desktop_project_id_sequence SET last_value = last_value + 1 WHERE id = 1",
+            [],
+        )?;
+        self.connection.query_row(
+            "SELECT last_value FROM desktop_project_id_sequence WHERE id = 1",
+            [],
+            |row| row.get(0),
+        ).map_err(Into::into)
+    }
+
     fn list_desktop_workspaces(&self) -> DesktopResult<Vec<DesktopWorkspace>> {
         let mut statement = self.connection.prepare(
-            "SELECT path, name, kind, relationship, project_name, pinned, last_opened_at FROM desktop_workspaces ORDER BY pinned DESC, relationship, name COLLATE NOCASE, path COLLATE NOCASE",
+            "SELECT w.path, w.name, w.kind, w.relationship, w.project_name,
+                    d.tagline, d.changelog_path, d.owner_name, d.started_on, d.due_on, d.project_type,
+                    COALESCE(d.priority, 'normal'), NULLIF(CAST(d.project_id AS INTEGER), 0),
+                    w.pinned, w.last_opened_at
+             FROM desktop_workspaces w
+             LEFT JOIN desktop_project_details d ON d.workspace_path = w.path
+             ORDER BY NULLIF(CAST(d.project_id AS INTEGER), 0), w.name COLLATE NOCASE, w.path COLLATE NOCASE",
         )?;
         let rows = statement.query_map([], desktop_workspace_from_row)?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    fn list_desktop_work_groups(&self) -> DesktopResult<Vec<DesktopWorkGroup>> {
+        let mut statement = self.connection.prepare(
+            "SELECT path, name, is_default, updated_at FROM desktop_work_groups
+             ORDER BY is_default DESC, updated_at DESC, name COLLATE NOCASE",
+        )?;
+        let rows = statement.query_map([], desktop_work_group_from_row)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
@@ -1091,9 +1369,19 @@ impl DesktopDatabase {
             .map_err(Into::into)
     }
 
+    pub fn desktop_workspace(&self, path: &str) -> DesktopResult<DesktopWorkspace> {
+        self.workspace_by_path(path)
+    }
+
     fn workspace_by_path(&self, path: &str) -> DesktopResult<DesktopWorkspace> {
         Ok(self.connection.query_row(
-            "SELECT path, name, kind, relationship, project_name, pinned, last_opened_at FROM desktop_workspaces WHERE path = ?1",
+            "SELECT w.path, w.name, w.kind, w.relationship, w.project_name,
+                    d.tagline, d.changelog_path, d.owner_name, d.started_on, d.due_on, d.project_type,
+                    COALESCE(d.priority, 'normal'), NULLIF(CAST(d.project_id AS INTEGER), 0),
+                    w.pinned, w.last_opened_at
+             FROM desktop_workspaces w
+             LEFT JOIN desktop_project_details d ON d.workspace_path = w.path
+             WHERE w.path = ?1",
             params![path], desktop_workspace_from_row,
         )?)
     }
@@ -1106,8 +1394,25 @@ fn desktop_workspace_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Deskt
         kind: row.get(2)?,
         relationship: row.get(3)?,
         project_name: row.get(4)?,
-        pinned: row.get::<_, i64>(5)? != 0,
-        last_opened_at: row.get(6)?,
+        tagline: row.get(5)?,
+        changelog_path: row.get(6)?,
+        owner_name: row.get(7)?,
+        started_on: row.get(8)?,
+        due_on: row.get(9)?,
+        project_type: row.get(10)?,
+        priority: row.get(11)?,
+        project_id: row.get(12)?,
+        pinned: row.get::<_, i64>(13)? != 0,
+        last_opened_at: row.get(14)?,
+    })
+}
+
+fn desktop_work_group_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DesktopWorkGroup> {
+    Ok(DesktopWorkGroup {
+        path: row.get(0)?,
+        name: row.get(1)?,
+        is_default: row.get::<_, i64>(2)? != 0,
+        updated_at: row.get(3)?,
     })
 }
 
@@ -1143,6 +1448,14 @@ fn project_task_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Projec
         status: row.get(3)?,
         summary: row.get(4)?,
         created_at: row.get(5)?,
+    })
+}
+
+fn project_idea_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectIdea> {
+    Ok(ProjectIdea {
+        id: row.get(0)?, workspace_path: row.get(1)?, title: row.get(2)?, context: row.get(3)?,
+        discussion: row.get(4)?, status: row.get(5)?, converted_task_id: row.get(6)?,
+        created_at: row.get(7)?, updated_at: row.get(8)?, discussion_count: row.get(9)?,
     })
 }
 
@@ -1221,7 +1534,19 @@ mod tests {
         let messages = database.list_agent_messages(task.id).unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].id, "message-2");
+        database
+            .rename_agent_task("C:/work/devkit", task.id, "Startup discussion")
+            .expect("rename agent task");
 
+        drop(database);
+        let database = DesktopDatabase::open(path.clone()).expect("reopen test database");
+        assert_eq!(
+            database
+                .get_agent_task("C:/work/devkit", task.id)
+                .expect("load renamed task after reopen")
+                .title,
+            "Startup discussion"
+        );
         drop(database);
         std::fs::remove_file(path).expect("remove test database");
     }
@@ -1248,6 +1573,20 @@ mod tests {
             .request_agent_task_review("C:/work/devkit", task.id)
             .expect("request review");
         assert!(reviewed.review_requested);
+        let renamed = database
+            .rename_agent_task("C:/work/devkit", task.id, "Release review")
+            .expect("rename task");
+        assert_eq!(renamed.title, "Release review");
+        assert_eq!(
+            database
+                .get_agent_task("C:/work/devkit", task.id)
+                .expect("load renamed task")
+                .title,
+            "Release review"
+        );
+        assert!(database
+            .rename_agent_task("C:/work/other", task.id, "Wrong workspace")
+            .is_err());
         assert!(database
             .archive_agent_task("C:/work/devkit", task.id)
             .expect("archive task"));
@@ -1285,6 +1624,14 @@ mod tests {
                 kind: "plugin".into(),
                 relationship: "addOn".into(),
                 project_name: Some("DevKit".into()),
+                tagline: None,
+                changelog_path: None,
+                owner_name: None,
+                started_on: None,
+                due_on: None,
+                project_type: None,
+                priority: "normal".into(),
+                project_id: None,
                 pinned: false,
                 last_opened_at: String::new(),
             })
@@ -1309,6 +1656,40 @@ mod tests {
     }
 
     #[test]
+    fn persists_multiple_workspace_folders_with_one_default() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-work-group-history-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        database
+            .save_desktop_profile(&DesktopProfile {
+                display_name: "Aaran".into(),
+                email: None,
+                remember_identity: true,
+                confirm_on_startup: false,
+                default_work_group_path: None,
+                last_workspace_path: None,
+            })
+            .expect("save profile");
+        database
+            .save_default_work_group("C:/work/first")
+            .expect("save first folder");
+        database
+            .save_default_work_group("C:/work/second")
+            .expect("save second folder");
+
+        let setup = database.desktop_setup().expect("load persisted folders");
+        assert_eq!(setup.work_groups.len(), 2);
+        assert_eq!(setup.work_groups[0].path, "C:/work/second");
+        assert!(setup.work_groups[0].is_default);
+        assert!(!setup.work_groups[1].is_default);
+
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
     fn keeps_workspace_list_order_when_a_workspace_opens() {
         let path = std::env::temp_dir().join(format!(
             "devkit-workspace-order-{}.db",
@@ -1327,6 +1708,14 @@ mod tests {
                     kind: "application".into(),
                     relationship: "project".into(),
                     project_name: None,
+                    tagline: None,
+                    changelog_path: None,
+                    owner_name: None,
+                    started_on: None,
+                    due_on: None,
+                    project_type: None,
+                    priority: "normal".into(),
+                    project_id: None,
                     pinned: false,
                     last_opened_at: String::new(),
                 })
@@ -1349,6 +1738,182 @@ mod tests {
     }
 
     #[test]
+    fn persists_one_default_workspace_and_clears_it_when_removed() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-default-workspace-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let mut database = DesktopDatabase::open(path.clone()).expect("open test database");
+        for name in ["cxapp", "devkit"] {
+            database
+                .save_desktop_workspace(&DesktopWorkspace {
+                    path: format!("C:/work/{name}"),
+                    name: name.into(),
+                    kind: "application".into(),
+                    relationship: "project".into(),
+                    project_name: None,
+                    tagline: None,
+                    changelog_path: None,
+                    owner_name: None,
+                    started_on: None,
+                    due_on: None,
+                    project_type: None,
+                    priority: "normal".into(),
+                    project_id: None,
+                    pinned: false,
+                    last_opened_at: String::new(),
+                })
+                .expect("save workspace");
+        }
+
+        database
+            .set_default_desktop_workspace("C:/work/cxapp")
+            .expect("set first default");
+        database
+            .set_default_desktop_workspace("C:/work/devkit")
+            .expect("replace default");
+        assert_eq!(
+            database
+                .desktop_setup()
+                .expect("load setup")
+                .default_workspace_path
+                .as_deref(),
+            Some("C:/work/devkit")
+        );
+
+        database
+            .clear_default_desktop_workspace()
+            .expect("clear default");
+        assert_eq!(
+            database
+                .desktop_setup()
+                .expect("load setup")
+                .default_workspace_path,
+            None
+        );
+        database
+            .set_default_desktop_workspace("C:/work/devkit")
+            .expect("restore default");
+
+        database
+            .remove_desktop_workspace("C:/work/devkit")
+            .expect("remove default workspace");
+        assert_eq!(
+            database
+                .desktop_setup()
+                .expect("load setup")
+                .default_workspace_path,
+            None
+        );
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn saves_project_details_and_orders_registered_projects_by_project_id() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-project-details-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        for name in ["later", "first"] {
+            database
+                .save_desktop_workspace(&DesktopWorkspace {
+                    path: format!("C:/work/{name}"),
+                    name: name.into(),
+                    kind: "application".into(),
+                    relationship: "project".into(),
+                    project_name: Some(name.into()),
+                    tagline: None,
+                    changelog_path: None,
+                    owner_name: None,
+                    started_on: None,
+                    due_on: None,
+                    project_type: None,
+                    priority: "normal".into(),
+                    project_id: None,
+                    pinned: false,
+                    last_opened_at: String::new(),
+                })
+                .expect("save workspace");
+            database
+                .save_desktop_project_details(&DesktopWorkspace {
+                    path: format!("C:/work/{name}"),
+                    name: name.into(),
+                    kind: "application".into(),
+                    relationship: "project".into(),
+                    project_name: Some(name.into()),
+                    tagline: Some(format!("{name} project")),
+                    changelog_path: None,
+                    owner_name: Some("Sundar".into()),
+                    started_on: Some("2026-08-23".into()),
+                    due_on: Some("2026-09-01".into()),
+                    project_type: Some("Desktop application".into()),
+                    priority: "high".into(),
+                    project_id: None,
+                    pinned: false,
+                    last_opened_at: String::new(),
+                })
+                .expect("save project details");
+        }
+
+        let workspaces = database.desktop_setup().expect("load project details").workspaces;
+        assert_eq!(workspaces.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["later", "first"]);
+        assert_eq!(workspaces[0].owner_name.as_deref(), Some("Sundar"));
+        assert_eq!(workspaces[0].project_type.as_deref(), Some("Desktop application"));
+        assert_eq!(workspaces[0].project_id, Some(1));
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
+    fn upgrades_legacy_text_project_ids_without_blocking_desktop_setup() {
+        let path = std::env::temp_dir().join(format!(
+            "devkit-legacy-project-id-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let database = DesktopDatabase::open(path.clone()).expect("open test database");
+        database
+            .save_desktop_workspace(&DesktopWorkspace {
+                path: "C:/work/legacy".into(),
+                name: "legacy".into(),
+                kind: "application".into(),
+                relationship: "project".into(),
+                project_name: None,
+                tagline: None,
+                changelog_path: None,
+                owner_name: None,
+                started_on: None,
+                due_on: None,
+                project_type: None,
+                priority: "normal".into(),
+                project_id: None,
+                pinned: false,
+                last_opened_at: String::new(),
+            })
+            .expect("save workspace");
+        database
+            .connection
+            .execute(
+                "UPDATE desktop_project_details SET project_id = 'legacy-id' WHERE workspace_path = ?1",
+                ["C:/work/legacy"],
+            )
+            .expect("write legacy project ID");
+        drop(database);
+
+        let database = DesktopDatabase::open(path.clone()).expect("reopen legacy database");
+        let project = database
+            .desktop_setup()
+            .expect("load desktop setup")
+            .workspaces
+            .pop()
+            .expect("project");
+        assert!(project.project_id.is_some());
+        drop(database);
+        std::fs::remove_file(path).expect("remove test database");
+    }
+
+    #[test]
     fn pins_and_removes_workspace_mappings_without_touching_the_folder() {
         let path = std::env::temp_dir().join(format!(
             "devkit-workspace-actions-{}.db",
@@ -1362,6 +1927,14 @@ mod tests {
                 kind: "application".into(),
                 relationship: "project".into(),
                 project_name: None,
+                tagline: None,
+                changelog_path: None,
+                owner_name: None,
+                started_on: None,
+                due_on: None,
+                project_type: None,
+                priority: "normal".into(),
+                project_id: None,
                 pinned: false,
                 last_opened_at: String::new(),
             })
@@ -1443,6 +2016,14 @@ mod tests {
                 kind: "application".into(),
                 relationship: "project".into(),
                 project_name: None,
+                tagline: None,
+                changelog_path: None,
+                owner_name: None,
+                started_on: None,
+                due_on: None,
+                project_type: None,
+                priority: "normal".into(),
+                project_id: None,
                 pinned: false,
                 last_opened_at: String::new(),
             })

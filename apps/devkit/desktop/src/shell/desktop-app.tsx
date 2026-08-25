@@ -8,6 +8,7 @@ import {
   Files,
   FolderKanban,
   GitBranch,
+  LayoutDashboard,
   ListTodo,
   Menu,
   PanelBottom,
@@ -30,6 +31,7 @@ import { useDesktopUpdater } from "../updates/use-desktop-updater";
 import { useDesktopSession } from "./use-desktop-session";
 import { useDesktopUiStore } from "./use-desktop-ui-store";
 import { resourcesForActivity } from "./startup-scheduler";
+import { desktopClient } from "../services/desktop-client";
 
 type Theme = "dark" | "light" | "system";
 
@@ -63,9 +65,22 @@ const ProjectOverview = lazy(() =>
 const ProjectSummary = lazy(() =>
   import("../workspaces/project-summary").then((module) => ({ default: module.ProjectSummary }))
 );
+const ProjectDetails = lazy(() =>
+  import("../workspaces/project-details").then((module) => ({ default: module.ProjectDetails }))
+);
+const ProjectChangelog = lazy(() =>
+  import("../workspaces/project-changelog").then((module) => ({ default: module.ProjectChangelog }))
+);
+const ProjectGitStatus = lazy(() =>
+  import("../workspaces/project-git-status").then((module) => ({ default: module.ProjectGitStatus }))
+);
+const ProjectIdeas = lazy(() =>
+  import("../workspaces/project-ideas").then((module) => ({ default: module.ProjectIdeas }))
+);
 export const activities = [
-  { icon: Bot, id: "assist", label: "Agent" },
+  { icon: LayoutDashboard, id: "overview", label: "Overview" },
   { icon: FolderKanban, id: "projects", label: "Projects" },
+  { icon: Bot, id: "assist", label: "Agent" },
   { icon: Files, id: "files", label: "Explorer" },
   { icon: Search, id: "search", label: "Search" },
   { icon: GitBranch, id: "git", label: "Source control" },
@@ -90,6 +105,8 @@ export function DesktopApp() {
   );
   const [selectedPath, setSelectedPath] = useState<string>();
   const [editorStarted, setEditorStarted] = useState(false);
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string>();
+  const [selectedProjectPage, setSelectedProjectPage] = useState<"details" | "changelog" | "git" | "ideas">("details");
   const [workGroupOpen, setWorkGroupOpen] = useState(false);
   const updater = useDesktopUpdater();
   const session = useDesktopSession();
@@ -106,10 +123,7 @@ export function DesktopApp() {
   } = session;
   const selectedChange = changes.find((change) => change.path === selectedPath);
 
-  async function openProjectOverview(path: string) {
-    await session.openWorkspace(path);
-    ui.setActivity("overview");
-  }
+  const selectedProject = session.desktopSetup?.workspaces.find((item) => item.path === selectedProjectPath);
 
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
@@ -364,13 +378,24 @@ export function DesktopApp() {
           {ui.activity === "projects" ? (
             <div className="workspace-surface">
               <Suspense fallback={<div className="workspace-loading">Loading projects...</div>}>
-                <ProjectOverview
-                  currentWorkspace={workspace}
-                  onOpenProject={(path) => {
-                    void openProjectOverview(path);
+                {selectedProject && selectedProjectPage === "changelog" ? <ProjectChangelog onReturn={() => setSelectedProjectPage("details")} onSaveDetails={async (project) => { await desktopClient.saveDesktopProjectDetails(project); await session.refreshDesktopSetup(); }} workspace={selectedProject} /> : selectedProject && selectedProjectPage === "git" ? <ProjectGitStatus onOpenTaskRunner={() => { setSelectedProjectPage("details"); ui.setActivity("tasks"); }} onReturn={() => setSelectedProjectPage("details")} workspace={selectedProject} /> : selectedProject && selectedProjectPage === "ideas" ? <ProjectIdeas onReturn={() => setSelectedProjectPage("details")} workspace={selectedProject} /> : selectedProject ? <ProjectDetails defaultProjectPath={session.desktopSetup?.defaultWorkspacePath} onOpenChangelog={() => setSelectedProjectPage("changelog")} onOpenGitStatus={() => setSelectedProjectPage("git")} onOpenIdeas={() => setSelectedProjectPage("ideas")} onReturn={() => { setSelectedProjectPath(undefined); setSelectedProjectPage("details"); }} onToggleDefault={async (path, isDefault) => {
+                  if (isDefault) await desktopClient.clearDefaultDesktopWorkspace();
+                  else await desktopClient.setDefaultDesktopWorkspace(path);
+                  await session.refreshDesktopSetup();
+                }} onSaveDetails={async (project) => {
+                  await desktopClient.saveDesktopProjectDetails(project);
+                  await session.refreshDesktopSetup();
+                }} workspace={selectedProject} /> : <ProjectOverview
+                  onOpenFolderSettings={() => setWorkGroupOpen(true)}
+                  onOpenProject={(path) => { setSelectedProjectPath(path); setSelectedProjectPage("details"); }}
+                  onSetDefaultProject={async (path) => {
+                    await desktopClient.setDefaultDesktopWorkspace(path);
+                    await session.refreshDesktopSetup();
                   }}
+                  defaultProjectPath={session.desktopSetup?.defaultWorkspacePath}
+                  workspaceFolder={session.desktopSetup?.profile?.defaultWorkGroupPath}
                   workspaces={session.desktopSetup?.workspaces ?? []}
-                />
+                />}
               </Suspense>
             </div>
           ) : null}
@@ -380,10 +405,12 @@ export function DesktopApp() {
                 fallback={<div className="workspace-loading">Loading project overview...</div>}
               >
                 <ProjectSummary
-                  onBrowseFiles={() => ui.setActivity("files")}
-                  onOpenAgent={() => ui.setActivity("assist")}
-                  workspace={workspace}
-                  workspaces={session.desktopSetup?.workspaces ?? []}
+                  activeProjectCount={(session.desktopSetup?.workspaces ?? []).filter((item) => item.relationship === "project").length}
+                  addOnProjectCount={(session.desktopSetup?.workspaces ?? []).filter((item) => item.relationship === "addOn" || item.kind === "plugin").length}
+                  displayName={session.desktopSetup?.profile?.displayName}
+                  onOpenProjects={() => ui.setActivity("projects")}
+                  onWorkspaceFolderChanged={session.refreshDesktopSetup}
+                  workspaceFolder={session.desktopSetup?.profile?.defaultWorkGroupPath}
                 />
               </Suspense>
             </div>
@@ -494,6 +521,7 @@ export function DesktopApp() {
     </div>
   );
 }
+
 
 function isFullWorkspace(activity: string) {
   return ["assist", "tasks", "compass", "hostinger", "overview", "projects", "settings", "sync"].includes(activity);

@@ -1,7 +1,10 @@
 use crate::database::{AgentConfig, DesktopProfile, DesktopSetup, DesktopWorkspace};
 use crate::error::{DesktopError, DesktopResult};
+use crate::database::{ProjectIdea, ProjectIdeaDiscussion};
 use crate::state::DesktopState;
 use serde::Serialize;
+use std::fs;
+use std::path::PathBuf;
 use tauri::State;
 
 #[derive(Serialize)]
@@ -78,6 +81,171 @@ pub fn set_desktop_workspace_pinned(
         return Err(DesktopError::Policy("Workspace path is required.".into()));
     }
     state.with_database(|database| database.set_desktop_workspace_pinned(&path, pinned))
+}
+
+#[tauri::command]
+pub fn save_desktop_project_details(
+    workspace: DesktopWorkspace,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<DesktopWorkspace> {
+    validate_project_details(&workspace)?;
+    state.with_database(|database| database.save_desktop_project_details(&workspace))
+}
+
+#[tauri::command]
+pub fn list_desktop_project_ideas(path: String, state: State<'_, DesktopState>) -> DesktopResult<Vec<ProjectIdea>> {
+    state.with_database(|database| database.list_project_ideas(path.trim()))
+}
+
+#[tauri::command]
+pub fn save_desktop_project_idea(path: String, title: String, context: String, discussion: String, state: State<'_, DesktopState>) -> DesktopResult<ProjectIdea> {
+    let title = title.trim();
+    if title.is_empty() || title.len() > 180 { return Err(DesktopError::Policy("Idea title must be between 1 and 180 characters.".into())); }
+    if context.len() > 4_000 || discussion.len() > 4_000 { return Err(DesktopError::Policy("Idea notes must be at most 4,000 characters.".into())); }
+    state.with_database(|database| database.save_project_idea(path.trim(), title, context.trim(), discussion.trim()))
+}
+
+#[tauri::command]
+pub fn convert_desktop_project_idea(path: String, idea_id: i64, state: State<'_, DesktopState>) -> DesktopResult<ProjectIdea> {
+    state.with_database(|database| database.convert_project_idea(path.trim(), idea_id))
+}
+
+#[tauri::command]
+pub fn list_desktop_project_idea_discussions(path: String, idea_id: i64, state: State<'_, DesktopState>) -> DesktopResult<Vec<ProjectIdeaDiscussion>> {
+    state.with_database(|database| database.list_project_idea_discussions(path.trim(), idea_id))
+}
+
+#[tauri::command]
+pub fn save_desktop_project_idea_discussion(path: String, idea_id: i64, content: String, state: State<'_, DesktopState>) -> DesktopResult<ProjectIdeaDiscussion> {
+    let content = content.trim();
+    if content.is_empty() || content.len() > 4_000 { return Err(DesktopError::Policy("Discussion entry must be between 1 and 4,000 characters.".into())); }
+    state.with_database(|database| database.save_project_idea_discussion(path.trim(), idea_id, content))
+}
+
+#[tauri::command]
+pub fn read_desktop_project_changelog(
+    path: String,
+    changelog_path: Option<String>,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<String> {
+    let path = path.trim();
+    if path.is_empty() {
+        return Err(DesktopError::Policy("Project path is required.".to_owned()));
+    }
+
+    let workspace = state.with_database(|database| database.desktop_workspace(path))?;
+    let root = PathBuf::from(workspace.path);
+    if !root.is_dir() {
+        return Err(DesktopError::Policy(
+            "This registered project folder is unavailable.".to_owned(),
+        ));
+    }
+
+    let configured = changelog_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let names = configured.map(|value| vec![value]).unwrap_or_else(|| vec![
+        "assist/documentation/changelog.md",
+        "assist/documentation/CHANGELOG.md",
+        "CHANGELOG.mdx",
+        "CHANGELOG.md",
+        "Changelog.md",
+        "changelog.md",
+    ]);
+    for name in names {
+        if std::path::Path::new(name).is_absolute() || name.contains("..") {
+            return Err(DesktopError::Policy("Choose a changelog file inside this project.".to_owned()));
+        }
+        let candidate = root.join(name);
+        if candidate.is_file() {
+            let content = fs::read_to_string(candidate)?;
+            if content.len() > 1_000_000 {
+                return Err(DesktopError::Policy(
+                    "The changelog is too large to preview.".to_owned(),
+                ));
+            }
+            return Ok(content);
+        }
+    }
+
+    Err(DesktopError::Policy(
+        "No default assist/documentation/changelog.md, CHANGELOG.md, or CHANGELOG.mdx file was found for this registered project.".to_owned(),
+    ))
+}
+
+#[tauri::command]
+pub fn choose_desktop_project_changelog(
+    path: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<Option<String>> {
+    let workspace = state.with_database(|database| database.desktop_workspace(path.trim()))?;
+    let root = PathBuf::from(workspace.path);
+    let root = root.canonicalize()?;
+    let selected = rfd::FileDialog::new()
+        .set_directory(&root)
+        .add_filter("Changelog", &["md", "mdx"])
+        .pick_file();
+    let Some(selected) = selected else { return Ok(None); };
+    let selected = selected.canonicalize()?;
+    let relative = selected.strip_prefix(&root).map_err(|_| {
+        DesktopError::Policy("Choose a changelog file inside this project.".to_owned())
+    })?;
+    Ok(Some(relative.to_string_lossy().replace('\\', "/")))
+}
+
+#[tauri::command]
+pub fn set_default_desktop_workspace(
+    path: String,
+    state: State<'_, DesktopState>,
+) -> DesktopResult<String> {
+    if path.trim().is_empty() {
+        return Err(DesktopError::Policy("Workspace path is required.".into()));
+    }
+    state.with_database(|database| database.set_default_desktop_workspace(&path))
+}
+
+#[tauri::command]
+pub fn clear_default_desktop_workspace(state: State<'_, DesktopState>) -> DesktopResult<()> {
+    state.with_database(|database| database.clear_default_desktop_workspace())
+}
+
+fn validate_project_details(workspace: &DesktopWorkspace) -> DesktopResult<()> {
+    if workspace.path.trim().is_empty() {
+        return Err(DesktopError::Policy("Workspace path is required.".into()));
+    }
+    for (label, value, maximum) in [
+        ("Project tagline", workspace.tagline.as_deref(), 280),
+        ("Project owner", workspace.owner_name.as_deref(), 120),
+        ("Project type", workspace.project_type.as_deref(), 80),
+        ("Changelog path", workspace.changelog_path.as_deref(), 400),
+    ] {
+        if value.is_some_and(|item| item.trim().len() > maximum) {
+            return Err(DesktopError::Policy(format!("{label} must be at most {maximum} characters.")));
+        }
+    }
+    for (label, value) in [("Start date", workspace.started_on.as_deref()), ("Due date", workspace.due_on.as_deref())] {
+        if value.is_some_and(|item| !is_iso_date(item)) {
+            return Err(DesktopError::Policy(format!("{label} must use YYYY-MM-DD.")));
+        }
+    }
+    if !["low", "normal", "high", "critical"].contains(&workspace.priority.as_str()) {
+        return Err(DesktopError::Policy("Invalid project priority.".into()));
+    }
+    if workspace.project_id.is_some_and(|value| value < 1) {
+        return Err(DesktopError::Policy("Project ID must be a positive integer.".into()));
+    }
+    Ok(())
+}
+
+fn is_iso_date(value: &str) -> bool {
+    let value = value.trim();
+    value.len() == 10
+        && value.as_bytes().get(4) == Some(&b'-')
+        && value.as_bytes().get(7) == Some(&b'-')
+        && value.chars().enumerate().all(|(index, character)| {
+            matches!(index, 4 | 7) || character.is_ascii_digit()
+        })
 }
 
 #[tauri::command]
