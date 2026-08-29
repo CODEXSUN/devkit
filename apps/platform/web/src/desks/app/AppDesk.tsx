@@ -1,4 +1,7 @@
-import { Suspense, useEffect } from "react";
+import { CoworkerChat } from "@codexsun/coworker-chat";
+import { MessengerChat, MessengerConnectionPanel, type MessengerConnectionState } from "@codexsun/coworker-chat/messenger";
+import "@codexsun/coworker-chat/styles.css";
+import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import { devkitWebBundle } from "@codexsun/devkit-web";
@@ -32,6 +35,19 @@ type IdentityPage =
 type Claims = { email: string; name?: string; permissions?: string[]; role?: string };
 
 export function AppDesk() {
+  const token = getToken();
+  const [drawerCollapsed, setDrawerCollapsed] = useState(true);
+  const [connectionState, setConnectionState] = useState<MessengerConnectionState>("connecting");
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  return (
+    <AuthGate>
+      {token ? <MessengerChat apiUrl={import.meta.env.VITE_PLATFORM_API_URL} clientKind="web" drawerCollapsed={drawerCollapsed} onConnectionStateChange={setConnectionState} onDrawerCollapsedChange={setDrawerCollapsed} onOpenAi={() => setSidePanelOpen(true)} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} product="DevKit" sidePanel={<MessengerConnectionPanel client="web" state={connectionState} />} sidePanelOpen={sidePanelOpen} token={token} /> : <CoworkerChat apiUrl={import.meta.env.VITE_PLATFORM_API_URL} />}
+    </AuthGate>
+  );
+}
+
+/* Previous desk composition remains available while the chat-first product shell is validated. */
+function _LegacyAppDesk() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const claims = readClaims();
@@ -70,11 +86,11 @@ export function AppDesk() {
     <AuthGate>
       <ApplicationLayout
         brand={{
-          logoAlt: "CodeLogicX",
+          logoAlt: "DevKit",
           logoDarkSrc: "/logo/logo-dark.svg",
           logoSrc: "/logo/logo.svg",
           subtitle: "Developer DevKit",
-          title: "CodeLogicX"
+          title: "DevKit"
         }}
         companion={{
           chat: honeyChatClient,

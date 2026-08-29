@@ -17,6 +17,16 @@ Run `npm.cmd run desktop:dev` after Rust and the Tauri Windows prerequisites are
 
 Run `npm.cmd run desktop:build` to create the signed desktop bundle after signing is configured.
 
+## Shared coworker connection
+
+Desktop uses `VITE_COWORKER_API_URL` by default. This central mode shares authenticated projects,
+conversation history, and streamed replies with the web and Expo clients through the DevKit API and
+MariaDB. The Tauri shell remains native and does not embed the web application.
+
+Set `VITE_DESKTOP_CHAT_MODE=native` only when local/offline chat is required. Native mode uses the
+bundled Codex runtime, workspace folders, and desktop SQLite. Local paths and credentials never
+synchronize to the central API.
+
 ## Implemented foundation
 
 - workspace-scoped file browsing with lazy directory expansion;

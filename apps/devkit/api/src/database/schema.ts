@@ -43,6 +43,7 @@ export type DevkitDatabase = {
   devkit_honey_messages: HoneyMessagesTable;
   devkit_honey_memory: HoneyMemoryTable;
   devkit_notifications: NotificationsTable;
+  devkit_messenger_messages: MessengerMessagesTable;
   devkit_notification_jobs: NotificationJobsTable;
   devkit_sync_conflicts: DevkitSyncConflictsTable;
   devkit_sync_connections: DevkitSyncConnectionsTable;
@@ -50,6 +51,8 @@ export type DevkitDatabase = {
   devkit_sync_snapshots: DevkitSyncSnapshotsTable;
   devkit_sync_tokens: DevkitSyncTokensTable;
 };
+
+export type MessengerMessagesTable = { actor_id: string; body: string; client: string; created_at: TimestampColumn; id: Generated<number>; uuid: string };
 
 export type ModelProviderConnectionsTable = {
   actor_id: string;

@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 const STANDARD_CHUNK_LIMIT = 500_000;
 // Monaco 0.56's editor API is 2.67 MB before gzip. Language support remains split from this lazy core.
@@ -14,7 +15,7 @@ export default defineConfig({
   },
   cacheDir: "../../../node_modules/.vite/devkit-desktop",
   clearScreen: false,
-  plugins: [react(), desktopBundleBudget()],
+  plugins: [react(), tailwindcss(), desktopBundleBudget()],
   server: {
     host: "127.0.0.1",
     port: 1420,

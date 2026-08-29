@@ -6,7 +6,7 @@ const app = await createApp();
 registerGracefulShutdown(app);
 await startApiServer({
   app,
-  host: env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1",
+  host: env.NODE_ENV === "production" ? "0.0.0.0" : env.PLATFORM_API_HOST,
   port: env.PLATFORM_API_PORT,
   readyLabel: "  ok api ready: {address}"
 });

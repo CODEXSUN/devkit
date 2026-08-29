@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "DevKit",
+    "slug": "devkit-coworker",
+    "version": "1.0.84",
+    "orientation": "portrait",
+    "scheme": "devkit",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "image": "./assets/logo.png",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "bundleIdentifier": "com.codexsun.devkit.coworker",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.codexsun.devkit.coworker"
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}

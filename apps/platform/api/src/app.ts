@@ -5,8 +5,10 @@ import { registerModules } from "@codexsun/framework/modules";
 import {
   bootstrapDevkitDatabase,
   configureNotificationRuntime,
+  desktopNodeBroker,
   devkitApiModuleKeys,
   registerDevkitApiForHost,
+  subscribeMessengerEvents,
   subscribeNotificationEvents
 } from "@codexsun/devkit-api";
 import type { DevkitDatabase } from "@codexsun/devkit-api";
@@ -54,6 +56,8 @@ export async function createApp() {
     tenantContext: false
   });
   registerNotificationSocket(app);
+  registerMessengerSocket(app);
+  registerDesktopNodeSocket(app);
   const healthChecks: HealthCheck[] = [
     {
       name: "devkit-api",
@@ -125,6 +129,41 @@ export async function createApp() {
   return app;
 }
 
+function registerDesktopNodeSocket(app: Awaited<ReturnType<typeof createApiApp>>) {
+  const io = new SocketServer(app.server, {
+    cors: { credentials: true, origin: platformWebOrigins() },
+    path: "/api/devkit/orchestration/node/socket.io"
+  });
+  io.use((socket, next) => {
+    const authorization = String(socket.handshake.auth.token ?? "");
+    const actor = verifyAuthToken(authorization.replace(/^Bearer\s+/iu, ""));
+    if (!actor) return next(new Error("Desktop node authentication failed."));
+    socket.data.actorId = actor.userId;
+    next();
+  });
+  io.on("connection", (socket) => desktopNodeBroker.attach(String(socket.data.actorId), socket));
+  app.addHook("onClose", async () => io.close());
+}
+
+function registerMessengerSocket(app: Awaited<ReturnType<typeof createApiApp>>) {
+  const io = new SocketServer(app.server, {
+    cors: { credentials: true, origin: platformWebOrigins() },
+    path: "/api/devkit/messenger/socket.io"
+  });
+  io.use((socket, next) => {
+    const authorization = String(socket.handshake.auth.token ?? "");
+    const actor = verifyAuthToken(authorization.replace(/^Bearer\s+/iu, ""));
+    if (!actor) return next(new Error("Messenger authentication failed."));
+    socket.data.actorId = actor.userId;
+    socket.join(`actor:${actor.userId}`);
+    next();
+  });
+  const unsubscribe = subscribeMessengerEvents((event) => {
+    io.to(`actor:${event.actorId}`).emit("messenger.message", event.message);
+  });
+  app.addHook("onClose", async () => { unsubscribe(); await io.close(); });
+}
+
 function registerNotificationSocket(app: Awaited<ReturnType<typeof createApiApp>>) {
   const io = new SocketServer(app.server, {
     cors: { credentials: true, origin: platformWebOrigins() },
@@ -155,7 +194,13 @@ function platformWebOrigins() {
   if (env.NODE_ENV !== "production") {
     configuredOrigins.push(
       `http://127.0.0.1:${env.PLATFORM_WEB_PORT}`,
-      `http://localhost:${env.PLATFORM_WEB_PORT}`
+      `http://localhost:${env.PLATFORM_WEB_PORT}`,
+      "http://127.0.0.1:8081",
+      "http://localhost:8081",
+      "http://127.0.0.1:1420",
+      "http://localhost:1420",
+      "http://tauri.localhost",
+      "tauri://localhost"
     );
   }
 

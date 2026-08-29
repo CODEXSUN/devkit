@@ -304,18 +304,18 @@ pub fn send_agent_turn(
 }
 
 fn task_execution_root(state: &State<'_, DesktopState>, task_id: i64) -> DesktopResult<PathBuf> {
-    let workspace = workspace_root(state)?;
+    let workspace = super::sanitize_path(workspace_root(state)?.canonicalize()?);
     let workspace_path = workspace.to_string_lossy().into_owned();
     let configured_path = state
         .with_database(|database| database.agent_task_execution_path(&workspace_path, task_id))?;
-    let root = PathBuf::from(configured_path).canonicalize()?;
+    let root = super::sanitize_path(PathBuf::from(configured_path).canonicalize()?);
     if root == workspace {
         return Ok(root);
     }
     let parent = workspace
         .parent()
         .ok_or_else(|| DesktopError::Policy("The workspace has no parent directory.".into()))?;
-    let managed_root = parent.join(".devkit-worktrees").canonicalize()?;
+    let managed_root = super::sanitize_path(parent.join(".devkit-worktrees").canonicalize()?);
     if !root.starts_with(&managed_root) {
         return Err(DesktopError::Policy(
             "The task execution path is outside its managed worktree root.".into(),

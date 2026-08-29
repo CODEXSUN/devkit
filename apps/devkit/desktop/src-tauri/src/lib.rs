@@ -62,6 +62,7 @@ pub fn run() {
             commands::agent_history::request_agent_task_review,
             commands::agent_history::set_agent_task_status,
             commands::files::open_workspace,
+            commands::files::create_workspace,
             commands::files::open_workspace_folder,
             commands::files::list_files,
             commands::files::read_text_file,

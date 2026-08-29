@@ -15,21 +15,21 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.120.0",
+    "@anthropic-ai/sdk": "^0.122.0",
     "@codexsun/framework": "1.0.84",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/agents": "^0.17.0",
-    "@openai/codex": "^0.148.0",
-    "@opencode-ai/sdk": "^1.18.21",
-    "@openrouter/sdk": "^1.2.47",
+    "@openai/codex": "^0.150.1",
+    "@opencode-ai/sdk": "^1.18.25",
+    "@openrouter/sdk": "^1.2.83",
     "@types/nodemailer": "^8.0.1",
-    "bullmq": "^6.1.2",
+    "bullmq": "^6.3.1",
     "fastify": "^5.12.1",
-    "hostinger-api-mcp": "1.44.0",
+    "hostinger-api-mcp": "^1.52.0",
     "kysely": "^0.29.5",
-    "nodemailer": "^9.0.5",
-    "openai": "^7.5.0",
-    "teleproto": "^1.228.5",
-    "zod": "^4.4.3"
+    "nodemailer": "^9.0.6",
+    "openai": "^7.8.0",
+    "teleproto": "^1.229.0",
+    "zod": "^4.5.2"
   }
 }

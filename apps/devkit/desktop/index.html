@@ -3,25 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#101210" />
+    <meta name="theme-color" content="#ffffff" />
     <title>DevKit</title>
     <script>
-      (() => {
-        const saved = localStorage.getItem("devkit-theme") || "dark";
-        const theme =
-          saved === "system"
-            ? matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light"
-            : saved;
-        document.documentElement.dataset.theme = theme;
-      })();
+      document.documentElement.dataset.theme = "light";
+      document.documentElement.style.colorScheme = "light";
     </script>
     <style>
       #startup-loader {
         align-items: center;
-        background: #101210;
-        color: #e9ece9;
+        background: #ffffff;
+        color: #171717;
         display: flex;
         flex-direction: column;
         font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -40,29 +32,31 @@
       }
       .startup-loader__mark {
         align-items: center;
-        background: #f2f8f8;
-        border: 3px solid #393637;
-        border-radius: 11px;
-        color: #393637;
+        background: #ffffff;
+        border: 1px solid #e5e5e0;
+        border-radius: 14px;
         display: flex;
-        font-size: 14px;
-        font-weight: 750;
-        height: 42px;
+        height: 64px;
         justify-content: center;
-        letter-spacing: -0.08em;
-        width: 42px;
+        width: 64px;
+      }
+      .startup-loader__mark img {
+        display: block;
+        height: 42px;
+        object-fit: contain;
+        width: 50px;
       }
       .startup-loader__title {
         font-size: 17px;
         font-weight: 650;
       }
       .startup-loader__status {
-        color: #a8b0aa;
+        color: #737373;
         font-size: 13px;
         margin-top: -8px;
       }
       .startup-loader__progress {
-        background: #2b302d;
+        background: #e5e5e5;
         border-radius: 99px;
         height: 3px;
         overflow: hidden;
@@ -77,16 +71,6 @@
         height: 100%;
         transform: translateX(-100%);
         width: 60%;
-      }
-      [data-theme="light"] #startup-loader {
-        background: #f8f9f8;
-        color: #1c211e;
-      }
-      [data-theme="light"] .startup-loader__status {
-        color: #66716a;
-      }
-      [data-theme="light"] .startup-loader__progress {
-        background: #dce2dd;
       }
       @keyframes startup-loader-progress {
         to {
@@ -107,9 +91,11 @@
   <body>
     <div id="root"></div>
     <div id="startup-loader" role="status" aria-live="polite" aria-label="Starting DevKit">
-      <div class="startup-loader__mark" aria-hidden="true">C</div>
+      <div class="startup-loader__mark" aria-hidden="true">
+        <img src="/assets/logo.svg" alt="" />
+      </div>
       <div class="startup-loader__title">DevKit</div>
-      <div class="startup-loader__status">Opening local workspace</div>
+      <div class="startup-loader__status">Connecting your workspace</div>
       <div class="startup-loader__progress" aria-hidden="true"></div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

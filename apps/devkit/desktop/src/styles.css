@@ -6521,3 +6521,36 @@ button.tree-row:hover,
   border-color: #a855f7;
   color: #e9d5ff;
 }
+ .desktop-messenger-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #f7f7f4;
+  color: #20201e;
+ }
+.desktop-messenger-loading > div {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+ }
+.desktop-messenger-loading span {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #deded8;
+  border-top-color: #20201e;
+  border-radius: 50%;
+  animation: desktop-messenger-spin 800ms linear infinite;
+ }
+.desktop-messenger-loading small { color: #777770; }
+.desktop-messenger-error {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 8px;
+  background: #f7f7f4;
+  color: #20201e;
+  text-align: center;
+}
+.desktop-messenger-error p { margin: 0; color: #777770; }
+@keyframes desktop-messenger-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .desktop-messenger-loading span { animation: none; } }

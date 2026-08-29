@@ -12,6 +12,7 @@ const devkitApiOwned = new Set([
   "github-dashboard",
   "honey",
   "notification",
+  "messenger",
   "orchestration",
   "planning",
   "project-manager",

@@ -1,0 +1,32 @@
+{
+  "name": "@devkit/mobile",
+  "version": "1.0.84",
+  "private": true,
+  "main": "expo/AppEntry",
+  "scripts": {
+    "android": "expo start --android",
+    "build": "tsc --noEmit",
+    "ios": "expo start --ios",
+    "lint": "eslint . --ext .ts,.tsx",
+    "start": "expo start",
+    "typecheck": "tsc --noEmit",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@codexsun/coworker-chat": "1.0.84",
+    "@expo/vector-icons": "^15.1.1",
+    "expo": "^57.0.18",
+    "expo-constants": "~57.0.16",
+    "expo-secure-store": "^57.0.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
+    ,"socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "typescript": "~6.0.3"
+  }
+}

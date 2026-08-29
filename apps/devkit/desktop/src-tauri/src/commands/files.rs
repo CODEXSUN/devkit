@@ -61,6 +61,27 @@ pub fn open_workspace(
 }
 
 #[tauri::command]
+pub fn create_workspace(name: String, state: State<'_, DesktopState>) -> DesktopResult<Workspace> {
+    let folder_name = name.trim();
+    if folder_name.is_empty()
+        || folder_name == "."
+        || folder_name == ".."
+        || folder_name.chars().any(|character| ['<', '>', ':', '"', '/', '\\', '|', '?', '*'].contains(&character))
+    {
+        return Err(DesktopError::Policy("Enter a valid project name.".into()));
+    }
+    let parent = rfd::FileDialog::new()
+        .pick_folder()
+        .ok_or_else(|| DesktopError::Policy("Project location selection was canceled.".into()))?;
+    let project = parent.join(folder_name);
+    if project.exists() {
+        return Err(DesktopError::Policy("A folder with this project name already exists.".into()));
+    }
+    fs::create_dir(&project)?;
+    open_workspace(Some(project.display().to_string()), state)
+}
+
+#[tauri::command]
 pub fn open_workspace_folder(path: String) -> DesktopResult<()> {
     let folder = PathBuf::from(path.trim())
         .canonicalize()

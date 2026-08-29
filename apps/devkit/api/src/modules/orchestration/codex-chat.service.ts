@@ -11,6 +11,8 @@ import {
   upsertChatAction,
   type OrchestrationChatAction
 } from "./orchestration-chat.actions.js";
+import { desktopNodeBroker } from "./desktop-node.broker.js";
+import { DesktopNodeChatService } from "./desktop-node-chat.service.js";
 
 export type CodexChatEvent =
   | {
@@ -29,6 +31,10 @@ export type CodexChatEvent =
 
 export class CodexChatService {
   async *stream(input: CodexChatInput, actorId: string): AsyncGenerator<CodexChatEvent> {
+    if (desktopNodeBroker.connected(actorId)) {
+      yield* new DesktopNodeChatService().stream(input, actorId);
+      return;
+    }
     let unsubscribe: (() => boolean) | null = null;
     let conversationId = input.conversationId;
     let assistantText = "";

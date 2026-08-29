@@ -41,6 +41,7 @@ import {
   migrateModelProviders,
   modelProviderMigration
 } from "../modules/orchestration/model-provider.migration.js";
+import { messengerMigration, migrateMessengerModule } from "../modules/messenger/messenger.migration.js";
 
 const databaseContext = new AsyncLocalStorage<Kysely<DevkitDatabase>>();
 const bootstrapPromises = new WeakMap<Kysely<DevkitDatabase>, Promise<void>>();
@@ -74,6 +75,7 @@ const migrationSteps = [
   { migrate: migrateTelegramMtprotoModule, name: telegramMtprotoMigration.key },
   { migrate: migrateHoneyModule, name: honeyMigration.key },
   { migrate: migrateNotificationModule, name: notificationMigration.key },
+  { migrate: migrateMessengerModule, name: messengerMigration.key },
   { migrate: migrateOrchestrationChat, name: orchestrationChatMigration.key },
   { migrate: migrateAgentRuns, name: agentRunMigration.key },
   { migrate: migrateAgentPersonas, name: agentPersonaMigration.key },
