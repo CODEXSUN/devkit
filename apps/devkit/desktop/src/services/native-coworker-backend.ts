@@ -340,6 +340,7 @@ function toProject(workspace: DesktopWorkspace): CoworkerProject {
 function toChat(task: AgentTask, projectUuid: string) {
   return {
     codexThreadId: task.threadId,
+    pinnedAt: null,
     projectUuid,
     title: task.title,
     updatedAt: task.updatedAt,

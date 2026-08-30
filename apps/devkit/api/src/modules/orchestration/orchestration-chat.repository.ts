@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { AppError } from "@codexsun/framework/errors";
-import type { Selectable } from "kysely";
+import { sql, type Selectable } from "kysely";
 import { getDevkitDatabase } from "../../database/devkit-database.js";
 import type {
   OrchestrationChatMessagesTable,
@@ -17,8 +17,22 @@ export class OrchestrationChatRepository {
       .selectAll()
       .where("actor_id", "=", actorId)
       .where("status", "=", "active")
+      .orderBy(sql`pinned_at IS NULL`, "asc")
+      .orderBy("pinned_at", "desc")
       .orderBy("updated_at", "desc")
       .limit(50)
+      .execute();
+    return rows.map(mapThread);
+  }
+
+  async listArchived(actorId: string) {
+    const rows = await this.database
+      .selectFrom("devkit_orchestration_chat_threads")
+      .selectAll()
+      .where("actor_id", "=", actorId)
+      .where("status", "=", "archived")
+      .orderBy("updated_at", "desc")
+      .limit(200)
       .execute();
     return rows.map(mapThread);
   }
@@ -146,20 +160,67 @@ export class OrchestrationChatRepository {
     await this.requireThread(uuid, actorId);
     await this.database
       .updateTable("devkit_orchestration_chat_threads")
-      .set({ status: "archived", updated_at: new Date() })
+      .set({ pinned_at: null, status: "archived", updated_at: new Date() })
       .where("uuid", "=", uuid)
       .where("actor_id", "=", actorId)
       .executeTakeFirst();
     return { archived: true, uuid };
   }
 
+  async setPinned(uuid: string, pinned: boolean, actorId: string) {
+    await this.requireThread(uuid, actorId);
+    const pinnedAt = pinned ? new Date() : null;
+    await this.database
+      .updateTable("devkit_orchestration_chat_threads")
+      .set({ pinned_at: pinnedAt })
+      .where("uuid", "=", uuid)
+      .where("actor_id", "=", actorId)
+      .executeTakeFirst();
+    return { pinned, pinnedAt: pinnedAt?.toISOString() ?? null, uuid };
+  }
+
+  async restore(uuid: string, actorId: string) {
+    await this.requireThreadWithStatus(uuid, actorId, "archived");
+    await this.database
+      .updateTable("devkit_orchestration_chat_threads")
+      .set({ status: "active", updated_at: new Date() })
+      .where("uuid", "=", uuid)
+      .where("actor_id", "=", actorId)
+      .executeTakeFirst();
+    return { restored: true, uuid };
+  }
+
+  async forceDelete(uuid: string, actorId: string) {
+    await this.requireThreadWithStatus(uuid, actorId, "archived");
+    await this.database
+      .deleteFrom("devkit_orchestration_chat_threads")
+      .where("uuid", "=", uuid)
+      .where("actor_id", "=", actorId)
+      .where("status", "=", "archived")
+      .executeTakeFirst();
+    return { deleted: true, uuid };
+  }
+
+  async forceDeleteArchived(actorId: string) {
+    const result = await this.database
+      .deleteFrom("devkit_orchestration_chat_threads")
+      .where("actor_id", "=", actorId)
+      .where("status", "=", "archived")
+      .executeTakeFirst();
+    return { deleted: Number(result.numDeletedRows) };
+  }
+
   private async requireThread(uuid: string, actorId: string) {
+    return this.requireThreadWithStatus(uuid, actorId, "active");
+  }
+
+  private async requireThreadWithStatus(uuid: string, actorId: string, status: string) {
     const row = await this.database
       .selectFrom("devkit_orchestration_chat_threads")
       .selectAll()
       .where("uuid", "=", uuid)
       .where("actor_id", "=", actorId)
-      .where("status", "=", "active")
+      .where("status", "=", status)
       .executeTakeFirst();
     if (!row) throw AppError.notFound("Chat conversation was not found.");
     return row;
@@ -173,6 +234,7 @@ function mapThread(row: Selectable<OrchestrationChatThreadsTable>) {
     connectionId: row.connection_id,
     createdAt: new Date(row.created_at).toISOString(),
     model: row.model,
+    pinnedAt: row.pinned_at ? new Date(row.pinned_at).toISOString() : null,
     projectKey: row.project_key,
     projectTitle: row.project_title,
     projectUuid: row.project_uuid,

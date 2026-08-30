@@ -340,6 +340,7 @@ export type OrchestrationChatThreadsTable = {
   created_at: TimestampColumn;
   id: Generated<number>;
   model: string;
+  pinned_at: TimestampColumn | null;
   project_key: string;
   project_title: string;
   project_uuid: string;

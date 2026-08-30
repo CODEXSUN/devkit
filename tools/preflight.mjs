@@ -16,7 +16,13 @@ const apps = {
     envKey: "PLATFORM_API_PORT",
     host: "127.0.0.1",
     command: process.execPath,
-    args: [nodePackageBin("tsx", "dist/cli.mjs"), "watch", "apps/platform/api/src/server.ts"]
+    args: [
+      nodePackageBin("tsx", "dist/cli.mjs"),
+      "watch",
+      "--tsconfig",
+      "apps/platform/api/tsconfig.dev.json",
+      "apps/platform/api/src/server.ts"
+    ]
   },
   "platform-web": {
     displayName: "web",
@@ -130,9 +136,9 @@ function parseRequiredPort(value, envKey) {
 }
 
 function ensurePlatformApiDependencies() {
-  console.log("  - Checking API package builds");
+  console.log("  - Checking required API runtime build");
   ensureLinkedPackageBuild("@codexsun/framework", "packages/framework");
-  ensureLinkedPackageBuild("@codexsun/devkit-api", "apps/devkit/api");
+  console.log("  ok @codexsun/devkit-api will load incrementally from source");
 }
 
 function ensureLinkedPackageBuild(packageName, packagePath) {

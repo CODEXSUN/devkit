@@ -1,11 +1,16 @@
 export type CoworkerProject = {
+  active?: boolean;
   description: string;
   id: string;
   key: string;
   moduleKey: string;
   referenceId: string;
   referenceType: string;
+  repositoryName?: string;
+  repositoryUrl?: string;
+  status?: string;
   title: string;
+  updatedAt?: string;
 };
 
 export type CoworkerProjectConnector = (name?: string) => Promise<CoworkerProject | null>;
@@ -18,6 +23,7 @@ export type CoworkerMessage = {
 
 export type CoworkerChat = {
   codexThreadId: string | null;
+  pinnedAt: string | null;
   projectUuid: string;
   title: string;
   updatedAt: string;

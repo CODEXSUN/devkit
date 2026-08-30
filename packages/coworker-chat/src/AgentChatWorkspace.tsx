@@ -14,10 +14,16 @@ type AgentMessage = {
 export function AgentChatWorkspace({
   apiUrl,
   connected,
+  onConversationChange,
+  selectedProjectId,
+  selectedConversationId,
   token
 }: {
   apiUrl: string;
   connected: boolean;
+  onConversationChange?: (conversationId: string) => void;
+  selectedProjectId?: string | null;
+  selectedConversationId: string | null;
   token: string;
 }) {
   const client = useMemo(() => new CoworkerClient(apiUrl, () => token), [apiUrl, token]);
@@ -36,7 +42,9 @@ export function AgentChatWorkspace({
     void client
       .projects()
       .then((projects) => {
-        if (active) setProject(projects[0] ?? null);
+        if (active) {
+          setProject(projects.find((item) => item.id === selectedProjectId) ?? projects[0] ?? null);
+        }
       })
       .catch((reason) => {
         if (active) setError(messageFrom(reason));
@@ -44,7 +52,40 @@ export function AgentChatWorkspace({
     return () => {
       active = false;
     };
-  }, [client]);
+  }, [client, selectedProjectId]);
+  useEffect(() => {
+    if (selectedConversationId === conversationId) return;
+    if (!selectedConversationId) {
+      setConversationId(null);
+      setThreadId(null);
+      setMessages([]);
+      setError("");
+      return;
+    }
+    let active = true;
+    setError("");
+    void Promise.all([client.chat(selectedConversationId), client.projects()])
+      .then(([detail, projects]) => {
+        if (!active) return;
+        setConversationId(detail.uuid);
+        setThreadId(detail.codexThreadId);
+        setProject(projects.find((item) => item.id === detail.projectUuid) ?? projects[0] ?? null);
+        setMessages(
+          detail.messages.map((message) => ({
+            actions: [],
+            id: message.uuid,
+            role: message.role,
+            text: message.body
+          }))
+        );
+      })
+      .catch((reason) => {
+        if (active) setError(messageFrom(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, conversationId, selectedConversationId]);
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -72,6 +113,7 @@ export function AgentChatWorkspace({
           if (agentEvent.type === "chat.started") {
             setConversationId(agentEvent.conversationId);
             setThreadId(agentEvent.threadId);
+            onConversationChange?.(agentEvent.conversationId);
           } else if (agentEvent.type === "chat.delta") {
             updateAssistant(setMessages, assistantId, (message) => ({
               ...message,

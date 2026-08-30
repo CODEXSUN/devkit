@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/coworker-chat",
-  "version": "1.0.84",
+  "version": "1.0.85",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,12 +9,12 @@
     "./messenger": "./src/MessengerChat.tsx"
   },
   "dependencies": {
-    "@codexsun/ui": "1.0.84",
+    "@codexsun/ui": "1.0.85",
     "lucide-react": "^1.35.0",
     "react": "19.2.3",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
-    ,"socket.io-client": "^4.8.3"
+    "remark-gfm": "^4.0.1",
+    "socket.io-client": "^4.8.3"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

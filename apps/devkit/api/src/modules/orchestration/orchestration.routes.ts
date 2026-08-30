@@ -1,5 +1,6 @@
 import { ok } from "@codexsun/framework/http";
 import type { FastifyInstance } from "fastify";
+import { Readable } from "node:stream";
 import { z } from "zod";
 import { OrchestrationService } from "./orchestration.service.js";
 import {
@@ -120,22 +121,34 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   app.post("/orchestration/agent-ide/codex/chat/stream", async (request, reply) => {
     const input = codexChatInputSchema.parse(request.body);
     const actorId = requireDevkitActor().id;
-    reply.hijack();
-    reply.raw.writeHead(200, {
-      "content-type": "application/x-ndjson; charset=utf-8",
-      "cache-control": "no-cache, no-transform",
-      connection: "keep-alive",
-      "x-accel-buffering": "no"
-    });
-    request.raw.on("aborted", () => reply.raw.end());
-    for await (const event of codexChat.stream(input, actorId)) {
-      if (reply.raw.destroyed) break;
-      reply.raw.write(`${JSON.stringify(event)}\n`);
-    }
-    if (!reply.raw.destroyed) reply.raw.end();
+    const origin = request.headers.origin;
+    return reply
+      .headers({
+        ...(origin
+          ? {
+              "access-control-allow-credentials": "true",
+              "access-control-allow-origin": origin,
+              vary: "Origin"
+            }
+          : {}),
+        "cache-control": "no-cache, no-transform",
+        "content-type": "application/x-ndjson; charset=utf-8",
+        "x-accel-buffering": "no"
+      })
+      .send(Readable.from(codexChatLines(input, actorId)));
   });
   app.get("/orchestration/agent-ide/chats", async (request) =>
     ok(await orchestrationChatRepository.list(requireDevkitActor().id), { requestId: request.id })
+  );
+  app.get("/orchestration/agent-ide/chats/archived", async (request) =>
+    ok(await orchestrationChatRepository.listArchived(requireDevkitActor().id), {
+      requestId: request.id
+    })
+  );
+  app.delete("/orchestration/agent-ide/chats/archived", async (request) =>
+    ok(await orchestrationChatRepository.forceDeleteArchived(requireDevkitActor().id), {
+      requestId: request.id
+    })
   );
   app.get("/orchestration/agent-ide/runs", async (request) => {
     const { projectUuid } = z
@@ -332,6 +345,35 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
       requestId: request.id
     });
   });
+  app.put("/orchestration/agent-ide/chats/:uuid/pin", async (request) => {
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    const { pinned } = z.object({ pinned: z.boolean() }).strict().parse(request.body);
+    return ok(
+      await orchestrationChatRepository.setPinned(uuid, pinned, requireDevkitActor().id),
+      { requestId: request.id }
+    );
+  });
+  app.put("/orchestration/agent-ide/chats/:uuid/restore", async (request) => {
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await orchestrationChatRepository.restore(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
+  });
+  app.delete("/orchestration/agent-ide/chats/:uuid/force", async (request) => {
+    const { uuid } = z
+      .object({ uuid: z.string().length(16) })
+      .strict()
+      .parse(request.params);
+    return ok(await orchestrationChatRepository.forceDelete(uuid, requireDevkitActor().id), {
+      requestId: request.id
+    });
+  });
   app.put("/orchestration/agent-ide/chat-messages/:uuid/feedback", async (request) => {
     const { uuid } = z
       .object({ uuid: z.string().length(16) })
@@ -430,4 +472,13 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
     }
     if (!reply.raw.destroyed) reply.raw.end();
   });
+}
+
+async function* codexChatLines(
+  input: Parameters<CodexChatService["stream"]>[0],
+  actorId: string
+) {
+  for await (const event of codexChat.stream(input, actorId)) {
+    yield `${JSON.stringify(event)}\n`;
+  }
 }

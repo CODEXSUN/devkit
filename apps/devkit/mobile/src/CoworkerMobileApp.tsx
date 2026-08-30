@@ -25,6 +25,7 @@ import logoImage from "../assets/logo.png";
 import { resolveApiUrl } from "./api-url";
 import { MobileDrawer, type MobileScreen } from "./MobileDrawer";
 import { TodoPage } from "./TodoPage";
+import { ProjectsPage } from "./ProjectsPage";
 import { MessengerMobile } from "./MessengerMobile";
 
 const API_URL = resolveApiUrl();
@@ -253,9 +254,27 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
     setMenuOpen(false);
   }
 
+  async function setChatPinned(chat: CoworkerChatRecord) {
+    await client.setChatPinned(chat.uuid, !chat.pinnedAt);
+    setChats(await client.chats());
+  }
+
+  async function archiveChat(chat: CoworkerChatRecord) {
+    await client.archiveChat(chat.uuid);
+    if (conversationId === chat.uuid) newChat();
+    setChats(await client.chats());
+  }
+
   function openScreen(nextScreen: MobileScreen) {
     setScreen(nextScreen);
     setMenuOpen(false);
+  }
+
+  function addConnectedProject(connectedProject: CoworkerProject) {
+    setProjects((current) => [
+      connectedProject,
+      ...current.filter((item) => item.id !== connectedProject.id)
+    ]);
   }
 
   return (
@@ -272,7 +291,9 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
               <Text numberOfLines={1} style={styles.project}>
                 {screen === "todos"
                   ? "Task Manager"
-                  : project?.title ?? (projects.length ? "Choose project" : "No projects")}
+                  : screen === "projects"
+                    ? "Connected workspaces"
+                    : project?.title ?? (projects.length ? "Choose project" : "No projects")}
               </Text>
             </View>
           </View>
@@ -288,6 +309,13 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
         </View>
         {screen === "todos" ? (
           <TodoPage apiUrl={API_URL} token={token} />
+        ) : screen === "projects" ? (
+          <ProjectsPage
+            apiUrl={API_URL}
+            onConnect={addConnectedProject}
+            onOpen={openProject}
+            token={token}
+          />
         ) : (
           <>
             <FlatList
@@ -368,9 +396,11 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
         chats={chats}
         onClose={() => setMenuOpen(false)}
         onNewChat={newChat}
+        onArchiveChat={(chat) => void archiveChat(chat)}
         onOpenChat={(chat) => void openChat(chat)}
         onOpenProject={openProject}
         onOpenScreen={openScreen}
+        onSetChatPinned={(chat) => void setChatPinned(chat)}
         open={menuOpen}
         projects={projects}
         screen={screen}

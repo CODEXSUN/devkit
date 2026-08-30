@@ -11,11 +11,17 @@ export type CoworkerStreamInput = {
 };
 
 export interface CoworkerBackend {
+  archiveChat?(uuid: string): Promise<{ archived: boolean; uuid: string }>;
+  archivedChats?(): Promise<CoworkerChat[]>;
   chat(uuid: string): Promise<CoworkerChatDetail>;
   chats(): Promise<CoworkerChat[]>;
   login(email: string, password: string): Promise<{ accessToken: string }>;
   projects(): Promise<CoworkerProject[]>;
+  forceDeleteArchivedChats?(): Promise<{ deleted: number }>;
+  forceDeleteChat?(uuid: string): Promise<{ deleted: boolean; uuid: string }>;
+  restoreChat?(uuid: string): Promise<{ restored: boolean; uuid: string }>;
   selectProject?(project: CoworkerProject): Promise<void>;
+  setChatPinned?(uuid: string, pinned: boolean): Promise<{ pinned: boolean; uuid: string }>;
   stream(input: CoworkerStreamInput, onEvent: (event: CoworkerEvent) => void): Promise<void>;
 }
 
@@ -46,6 +52,45 @@ export class CoworkerClient implements CoworkerBackend {
 
   chats() {
     return this.request<CoworkerChat[]>("/api/devkit/orchestration/agent-ide/chats");
+  }
+
+  archiveChat(uuid: string) {
+    return this.request<{ archived: boolean; uuid: string }>(
+      `/api/devkit/orchestration/agent-ide/chats/${uuid}`,
+      { method: "DELETE" }
+    );
+  }
+
+  archivedChats() {
+    return this.request<CoworkerChat[]>("/api/devkit/orchestration/agent-ide/chats/archived");
+  }
+
+  restoreChat(uuid: string) {
+    return this.request<{ restored: boolean; uuid: string }>(
+      `/api/devkit/orchestration/agent-ide/chats/${uuid}/restore`,
+      { body: JSON.stringify({}), method: "PUT" }
+    );
+  }
+
+  forceDeleteChat(uuid: string) {
+    return this.request<{ deleted: boolean; uuid: string }>(
+      `/api/devkit/orchestration/agent-ide/chats/${uuid}/force`,
+      { method: "DELETE" }
+    );
+  }
+
+  forceDeleteArchivedChats() {
+    return this.request<{ deleted: number }>(
+      "/api/devkit/orchestration/agent-ide/chats/archived",
+      { method: "DELETE" }
+    );
+  }
+
+  setChatPinned(uuid: string, pinned: boolean) {
+    return this.request<{ pinned: boolean; uuid: string }>(
+      `/api/devkit/orchestration/agent-ide/chats/${uuid}/pin`,
+      { body: JSON.stringify({ pinned }), method: "PUT" }
+    );
   }
 
   chat(uuid: string) {

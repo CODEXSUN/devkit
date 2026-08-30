@@ -2,8 +2,8 @@ import { sql, type Kysely } from "kysely";
 import type { DevkitDatabase } from "../../database/schema.js";
 
 export const orchestrationChatMigration = {
-  description: "User-owned Agent chat conversations with isolated Codex connector routing.",
-  key: "devkit.orchestration-chat.sql.v4"
+  description: "User-owned Agent chats with isolated routing, pinning, and archiving.",
+  key: "devkit.orchestration-chat.sql.v5"
 } as const;
 
 export async function migrateOrchestrationChat(database: Kysely<DevkitDatabase>) {
@@ -25,6 +25,7 @@ export async function migrateOrchestrationChat(database: Kysely<DevkitDatabase>)
       access_mode VARCHAR(32) NOT NULL,
       model VARCHAR(80) NOT NULL,
       status VARCHAR(24) NOT NULL DEFAULT 'active',
+      pinned_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uq_devkit_chat_threads_uuid (uuid),
@@ -45,6 +46,9 @@ export async function migrateOrchestrationChat(database: Kysely<DevkitDatabase>)
     database
   );
   await sql`ALTER TABLE devkit_orchestration_chat_threads ADD COLUMN IF NOT EXISTS connection_id VARCHAR(32) NOT NULL DEFAULT 'primary' AFTER codex_thread_id`.execute(
+    database
+  );
+  await sql`ALTER TABLE devkit_orchestration_chat_threads ADD COLUMN IF NOT EXISTS pinned_at DATETIME NULL AFTER status`.execute(
     database
   );
   await sql`

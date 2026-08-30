@@ -1,6 +1,6 @@
 {
   "name": "@devkit/mobile",
-  "version": "1.0.84",
+  "version": "1.0.85",
   "private": true,
   "main": "expo/AppEntry",
   "scripts": {
@@ -13,7 +13,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@codexsun/coworker-chat": "1.0.84",
+    "@codexsun/coworker-chat": "1.0.85",
     "@expo/vector-icons": "^15.1.1",
     "expo": "^57.0.18",
     "expo-constants": "~57.0.16",
@@ -22,8 +22,8 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-web": "^0.21.2"
-    ,"socket.io-client": "^4.8.3"
+    "react-native-web": "^0.21.2",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../..",
+    "paths": {
+      "@codexsun/devkit-api": ["apps/devkit/api/src/index.ts"]
+    }
+  }
+}

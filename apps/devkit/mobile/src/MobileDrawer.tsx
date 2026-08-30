@@ -8,13 +8,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View
 } from "react-native";
 import type { CoworkerChatRecord, CoworkerProject } from "@codexsun/coworker-chat";
 import logoImage from "../assets/logo.png";
 
-export type MobileScreen = "chat" | "todos";
+export type MobileScreen = "chat" | "todos" | "projects";
 
 export function MobileDrawer({
   open,
@@ -24,10 +25,12 @@ export function MobileDrawer({
   screen,
   selectedProject,
   onClose,
+  onArchiveChat,
   onNewChat,
   onOpenChat,
   onOpenProject,
-  onOpenScreen
+  onOpenScreen,
+  onSetChatPinned
 }: {
   open: boolean;
   chats: CoworkerChatRecord[];
@@ -36,16 +39,30 @@ export function MobileDrawer({
   screen: MobileScreen;
   selectedProject?: CoworkerProject;
   onClose: () => void;
+  onArchiveChat: (chat: CoworkerChatRecord) => void;
   onNewChat: () => void;
   onOpenChat: (chat: CoworkerChatRecord) => void;
   onOpenProject: (project: CoworkerProject) => void;
   onOpenScreen: (screen: MobileScreen) => void;
+  onSetChatPinned: (chat: CoworkerChatRecord) => void;
 }) {
   const { width } = useWindowDimensions();
   const drawerWidth = Math.min(width * 0.84, 340);
   const progress = useRef(new Animated.Value(0)).current;
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [mounted, setMounted] = useState(open);
+  const [query, setQuery] = useState("");
+  const projectNames = new Map(projects.map((project) => [project.id, project.title]));
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleChats = chats.filter((chat) => {
+    const projectName = projectNames.get(chat.projectUuid) ?? "General";
+    return `${chat.title} ${projectName}`.toLocaleLowerCase().includes(normalizedQuery);
+  });
+  const pinnedChats = visibleChats.filter((chat) => chat.pinnedAt);
+  const recentChats = visibleChats.filter((chat) => !chat.pinnedAt);
+  const chatGroups = [
+    ...new Set(recentChats.map((chat) => projectNames.get(chat.projectUuid) ?? "General"))
+  ];
 
   useEffect(() => {
     if (open) setMounted(true);
@@ -89,6 +106,16 @@ export function MobileDrawer({
             <Ionicons color="#242421" name="close" size={24} />
           </Pressable>
         </View>
+        <View style={styles.searchRow}>
+          <Ionicons color="#777770" name="search-outline" size={18} />
+          <TextInput
+            onChangeText={setQuery}
+            placeholder="Search agent chats..."
+            placeholderTextColor="#919189"
+            style={styles.searchInput}
+            value={query}
+          />
+        </View>
         <ScrollView contentContainerStyle={styles.navigation}>
           <DrawerItem
             active={screen === "chat"}
@@ -102,26 +129,59 @@ export function MobileDrawer({
             label="Todos"
             onPress={() => onOpenScreen("todos")}
           />
+          <DrawerItem
+            active={screen === "projects"}
+            icon="folder-open-outline"
+            label="Projects"
+            onPress={() => onOpenScreen("projects")}
+          />
           <View style={styles.divider} />
           <DrawerItem icon="create-outline" label="New chat" onPress={onNewChat} />
-          {chats.length ? (
+          {visibleChats.length ? (
             <View style={styles.chatHistory}>
               <Text style={styles.sectionLabel}>Recent chats</Text>
-              {chats.slice(0, 12).map((chat) => (
-                <DrawerItem
-                  active={screen === "chat" && activeChatId === chat.uuid}
-                  icon="chatbox-outline"
-                  key={chat.uuid}
-                  label={chat.title}
-                  onPress={() => onOpenChat(chat)}
-                  small
-                />
+              {pinnedChats.length ? (
+                <View style={styles.chatGroup}>
+                  <Text style={styles.chatGroupLabel}>Pinned</Text>
+                  {pinnedChats.map((chat) => (
+                    <ChatDrawerItem
+                      active={screen === "chat" && activeChatId === chat.uuid}
+                      chat={chat}
+                      key={chat.uuid}
+                      onArchive={() => onArchiveChat(chat)}
+                      onOpen={() => onOpenChat(chat)}
+                      onTogglePin={() => onSetChatPinned(chat)}
+                    />
+                  ))}
+                </View>
+              ) : null}
+              {chatGroups.map((projectName) => (
+                <View key={projectName} style={styles.chatGroup}>
+                  <Text style={styles.chatGroupLabel}>{projectName}</Text>
+                  {recentChats
+                    .filter(
+                      (chat) => (projectNames.get(chat.projectUuid) ?? "General") === projectName
+                    )
+                    .slice(0, 12)
+                    .map((chat) => (
+                      <ChatDrawerItem
+                        active={screen === "chat" && activeChatId === chat.uuid}
+                        chat={chat}
+                        key={chat.uuid}
+                        onArchive={() => onArchiveChat(chat)}
+                        onOpen={() => onOpenChat(chat)}
+                        onTogglePin={() => onSetChatPinned(chat)}
+                      />
+                    ))}
+                </View>
               ))}
             </View>
+          ) : normalizedQuery ? (
+            <Text style={styles.emptySearch}>No matching agent chats</Text>
           ) : null}
           <DrawerItem
             icon={projectsOpen ? "chevron-down" : "chevron-forward"}
-            label="Projects"
+            label="Project shortcuts"
             onPress={() => setProjectsOpen((value) => !value)}
           />
           {projectsOpen ? (
@@ -141,6 +201,45 @@ export function MobileDrawer({
           <DrawerItem icon="settings-outline" label="Settings" onPress={onClose} />
         </ScrollView>
       </Animated.View>
+    </View>
+  );
+}
+
+function ChatDrawerItem({
+  active,
+  chat,
+  onArchive,
+  onOpen,
+  onTogglePin
+}: {
+  active: boolean;
+  chat: CoworkerChatRecord;
+  onArchive: () => void;
+  onOpen: () => void;
+  onTogglePin: () => void;
+}) {
+  return (
+    <View style={[styles.chatItem, active && styles.itemActive]}>
+      <Pressable onPress={onOpen} style={styles.chatItemMain}>
+        <Ionicons color={active ? "#242421" : "#696963"} name="chatbox-outline" size={18} />
+        <Text numberOfLines={1} style={[styles.itemText, active && styles.itemTextActive]}>
+          {chat.title}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={chat.pinnedAt ? `Unpin ${chat.title}` : `Pin ${chat.title}`}
+        onPress={onTogglePin}
+        style={styles.chatAction}
+      >
+        <Ionicons color="#696963" name={chat.pinnedAt ? "pin" : "pin-outline"} size={17} />
+      </Pressable>
+      <Pressable
+        accessibilityLabel={`Archive ${chat.title}`}
+        onPress={onArchive}
+        style={styles.chatAction}
+      >
+        <Ionicons color="#696963" name="archive-outline" size={17} />
+      </Pressable>
     </View>
   );
 }
@@ -188,6 +287,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   chatHistory: { gap: 2, paddingVertical: 4 },
+  chatGroup: { gap: 2, paddingBottom: 7 },
+  chatGroupLabel: { color: "#85857e", fontSize: 12, fontWeight: "600", paddingHorizontal: 13, paddingTop: 5 },
+  chatAction: { alignItems: "center", height: 36, justifyContent: "center", width: 34 },
+  chatItem: { alignItems: "center", borderRadius: 10, flexDirection: "row", minHeight: 41 },
+  chatItemMain: { alignItems: "center", flex: 1, flexDirection: "row", gap: 10, minWidth: 0, paddingLeft: 13 },
   close: { alignItems: "center", height: 40, justifyContent: "center", marginLeft: "auto", width: 40 },
   divider: { backgroundColor: "#e7e7e1", height: 1, marginVertical: 8 },
   drawer: {
@@ -216,6 +320,9 @@ const styles = StyleSheet.create({
   layer: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0, zIndex: 100 },
   logo: { height: 30, marginRight: 10, resizeMode: "contain", width: 37 },
   navigation: { padding: 12, paddingBottom: 30 },
+  emptySearch: { color: "#777770", fontSize: 13, paddingHorizontal: 13, paddingVertical: 10 },
+  searchInput: { color: "#242421", flex: 1, fontSize: 15, height: 42, paddingVertical: 0 },
+  searchRow: { alignItems: "center", borderBottomColor: "#e7e7e1", borderBottomWidth: 1, flexDirection: "row", gap: 8, height: 54, paddingHorizontal: 16 },
   sectionLabel: {
     color: "#85857e",
     fontSize: 12,

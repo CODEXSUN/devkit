@@ -1,14 +1,19 @@
 import {
+  Archive,
   Bot,
   ChevronDown,
   FolderPlus,
+  GitBranch,
   Menu,
   MessageCircle,
   PanelRightClose,
   PanelRightOpen,
+  Pin,
+  PinOff,
   Search,
   SendHorizontal,
-  Users
+  Users,
+  Plus
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import {
@@ -22,11 +27,15 @@ import {
 } from "react";
 import { WorkspaceDrawerHeader } from "./WorkspaceDrawerHeader";
 import { AgentChatWorkspace } from "./AgentChatWorkspace";
+import { ArchivedChatsPage } from "./ArchivedChatsPage";
+import { CoworkerClient } from "./client";
+import type { CoworkerChat, CoworkerProject } from "./types";
 
 export { MessengerConnectionPanel } from "./MessengerConnectionPanel";
 export type { MessengerConnectionState } from "./MessengerConnectionPanel";
 
 export type MessengerClientKind = "desktop" | "mobile" | "web";
+type WorkspaceSpace = "agent" | "archives" | "messenger" | "projects";
 type Message = {
   actorId: string;
   body: string;
@@ -73,9 +82,14 @@ export function MessengerChat({
   const baseUrl = apiUrl.replace(/\/+$/u, "");
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState("");
-  const [activeSpace, setActiveSpace] = useState<"agent" | "messenger" | "projects">("messenger");
+  const [activeSpace, setActiveSpace] = useState<WorkspaceSpace>("messenger");
   const [connected, setConnected] = useState(false);
   const [drawerQuery, setDrawerQuery] = useState("");
+  const [agentChats, setAgentChats] = useState<CoworkerChat[]>([]);
+  const [archivedAgentChats, setArchivedAgentChats] = useState<CoworkerChat[]>([]);
+  const [agentProjects, setAgentProjects] = useState<CoworkerProject[]>([]);
+  const [agentProjectId, setAgentProjectId] = useState<string | null>(null);
+  const [agentConversationId, setAgentConversationId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -84,6 +98,34 @@ export function MessengerChat({
   const headers = useMemo(
     () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }),
     [token]
+  );
+  const agentClient = useMemo(() => new CoworkerClient(baseUrl, () => token), [baseUrl, token]);
+  const refreshAgentNavigation = useCallback(async () => {
+    const [chats, projects] = await Promise.allSettled([
+      agentClient.chats(),
+      agentClient.projects()
+    ]);
+    if (chats.status === "fulfilled") setAgentChats(chats.value);
+    if (projects.status === "fulfilled") setAgentProjects(projects.value);
+    if (chats.status === "rejected" && projects.status === "rejected") throw projects.reason;
+  }, [agentClient]);
+  const refreshArchivedChats = useCallback(async () => {
+    setArchivedAgentChats(await agentClient.archivedChats());
+  }, [agentClient]);
+  const archiveAgentChat = useCallback(
+    async (conversationId: string) => {
+      await agentClient.archiveChat(conversationId);
+      if (agentConversationId === conversationId) setAgentConversationId(null);
+      await refreshAgentNavigation();
+    },
+    [agentClient, agentConversationId, refreshAgentNavigation]
+  );
+  const setAgentChatPinned = useCallback(
+    async (conversationId: string, pinned: boolean) => {
+      await agentClient.setChatPinned(conversationId, pinned);
+      await refreshAgentNavigation();
+    },
+    [agentClient, refreshAgentNavigation]
   );
   const connectionState = connected
     ? "connected"
@@ -142,6 +184,14 @@ export function MessengerChat({
   }, [activeSpace]);
 
   useEffect(() => {
+    if (activeSpace !== "agent" && activeSpace !== "archives" && activeSpace !== "projects") return;
+    const refresh = activeSpace === "archives"
+      ? Promise.all([refreshAgentNavigation(), refreshArchivedChats()])
+      : refreshAgentNavigation();
+    void refresh.catch((reason) => setError(messageFrom(reason)));
+  }, [activeSpace, refreshAgentNavigation, refreshArchivedChats]);
+
+  useEffect(() => {
     if (!onDrawerCollapsedChange) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key.toLowerCase() === "b") {
@@ -190,6 +240,11 @@ export function MessengerChat({
         onOpenProjects={() => setActiveSpace("projects")}
       />
       <MessengerDevelopmentDrawer
+        activeAgentConversationId={agentConversationId}
+        activeSpace={activeSpace}
+        agentChats={agentChats}
+        archivedChatCount={archivedAgentChats.length}
+        agentProjects={agentProjects}
         collapsed={drawerCollapsed}
         conversationName={conversationName}
         logoSrc={logoSrc}
@@ -197,6 +252,25 @@ export function MessengerChat({
         product={product}
         query={drawerQuery}
         onQueryChange={setDrawerQuery}
+        onNewAgentChat={() => {
+          setAgentConversationId(null);
+          setActiveSpace("agent");
+        }}
+        onOpenArchived={() => setActiveSpace("archives")}
+        onArchiveAgentChat={(conversationId) =>
+          void archiveAgentChat(conversationId).catch((reason) => setError(messageFrom(reason)))
+        }
+        onOpenAgentChat={setAgentConversationId}
+        onSetAgentChatPinned={(conversationId, pinned) =>
+          void setAgentChatPinned(conversationId, pinned).catch((reason) =>
+            setError(messageFrom(reason))
+          )
+        }
+        onOpenProject={(project) => {
+          setAgentProjectId(project.id);
+          setAgentConversationId(null);
+          setActiveSpace("agent");
+        }}
       />
       <section className="messenger-workspace">
         <header className="messenger-header">
@@ -207,7 +281,7 @@ export function MessengerChat({
             </button>
             <span
               className={
-                connected || activeSpace === "agent"
+                connected || activeSpace === "agent" || activeSpace === "archives"
                   ? "messenger-status active"
                   : "messenger-status"
               }
@@ -215,6 +289,8 @@ export function MessengerChat({
               <i />
               {activeSpace === "agent"
                 ? "Codex"
+                : activeSpace === "archives"
+                  ? "Archive"
                 : connected
                   ? "Ready"
                   : syncing
@@ -223,10 +299,44 @@ export function MessengerChat({
             </span>
           </div>
         </header>
-        {activeSpace === "agent" ? (
-          <AgentChatWorkspace apiUrl={baseUrl} connected={connected} token={token} />
+        {activeSpace === "archives" ? (
+          <ArchivedChatsPage
+            chats={archivedAgentChats}
+            onDelete={async (chat) => {
+              await agentClient.forceDeleteChat(chat.uuid);
+              await refreshArchivedChats();
+            }}
+            onDeleteAll={async () => {
+              await agentClient.forceDeleteArchivedChats();
+              await refreshArchivedChats();
+            }}
+            onRestore={async (chat) => {
+              await agentClient.restoreChat(chat.uuid);
+              await Promise.all([refreshAgentNavigation(), refreshArchivedChats()]);
+            }}
+            projects={agentProjects}
+          />
+        ) : activeSpace === "agent" ? (
+          <AgentChatWorkspace
+            apiUrl={baseUrl}
+            connected={connected}
+            onConversationChange={(conversationId) => {
+              setAgentConversationId(conversationId);
+              void refreshAgentNavigation();
+            }}
+            selectedConversationId={agentConversationId}
+            selectedProjectId={agentProjectId}
+            token={token}
+          />
         ) : activeSpace === "projects" ? (
-          <ProjectSpace />
+          <ProjectSpace
+            onOpen={(project) => {
+              setAgentProjectId(project.id);
+              setAgentConversationId(null);
+              setActiveSpace("agent");
+            }}
+            projects={agentProjects}
+          />
         ) : (
           <>
             <section className="messenger-thread" aria-live="polite">
@@ -314,7 +424,7 @@ function MessengerActivityBar({
   onOpenMessenger,
   onOpenProjects
 }: {
-  activeSpace: "agent" | "messenger" | "projects";
+  activeSpace: WorkspaceSpace;
   collapsed: boolean;
   onCollapsedChange?: ((collapsed: boolean) => void) | undefined;
   onOpenAgent: () => void;
@@ -343,7 +453,7 @@ function MessengerActivityBar({
         <MessageCircle size={18} />
       </button>
       <button
-        aria-current={activeSpace === "agent" ? "page" : undefined}
+        aria-current={activeSpace === "agent" || activeSpace === "archives" ? "page" : undefined}
         aria-label="Agent"
         onClick={onOpenAgent}
         title="Agent"
@@ -364,19 +474,37 @@ function MessengerActivityBar({
   );
 }
 
-function ProjectSpace() {
+function ProjectSpace({
+  onOpen,
+  projects
+}: {
+  onOpen: (project: CoworkerProject) => void;
+  projects: CoworkerProject[];
+}) {
   return (
     <section className="messenger-project-space">
-      <div>
-        <span>
-          <FolderPlus size={22} />
-        </span>
-        <h1>Projects</h1>
-        <p>Select or link a project to give the connected agent its workspace context.</p>
-        <div className="messenger-project-actions">
-          <button type="button">Create project</button>
-          <button type="button">Link folder</button>
+      <header>
+        <div>
+          <h1>Projects</h1>
+          <p>Connected repository workspaces available on mobile, desktop, and web.</p>
         </div>
+        <strong>{projects.length} connected</strong>
+      </header>
+      <div className="messenger-project-grid">
+        {projects.map((project) => (
+          <button key={project.id} onClick={() => onOpen(project)} type="button">
+            <span className="messenger-project-icon"><FolderPlus size={18} /></span>
+            <span className="messenger-project-copy">
+              <strong>{project.title}</strong>
+              <small>{plainText(project.description) || "Connected development workspace"}</small>
+              <span className="messenger-project-meta">
+                <span><GitBranch size={13} /> {project.repositoryName || project.key}</span>
+                <span>{project.status || "Active"}</span>
+              </span>
+            </span>
+          </button>
+        ))}
+        {!projects.length ? <p>No connected projects are available.</p> : null}
       </div>
     </section>
   );
@@ -399,18 +527,40 @@ function MessengerRightActivityBar({ open, onToggle }: { open: boolean; onToggle
 }
 
 function MessengerDevelopmentDrawer({
+  activeAgentConversationId,
+  activeSpace,
+  agentChats,
+  archivedChatCount,
+  agentProjects,
   collapsed,
   conversationName,
   logoSrc,
   onCollapsedChange,
+  onArchiveAgentChat,
+  onNewAgentChat,
+  onOpenArchived,
+  onOpenAgentChat,
+  onOpenProject,
+  onSetAgentChatPinned,
   onQueryChange,
   product,
   query
 }: {
+  activeAgentConversationId: string | null;
+  activeSpace: WorkspaceSpace;
+  agentChats: CoworkerChat[];
+  archivedChatCount: number;
+  agentProjects: CoworkerProject[];
   collapsed: boolean;
   conversationName: string;
   logoSrc?: string | undefined;
   onCollapsedChange?: ((collapsed: boolean) => void) | undefined;
+  onArchiveAgentChat: (conversationId: string) => void;
+  onNewAgentChat: () => void;
+  onOpenArchived: () => void;
+  onOpenAgentChat: (conversationId: string) => void;
+  onOpenProject: (project: CoworkerProject) => void;
+  onSetAgentChatPinned: (conversationId: string, pinned: boolean) => void;
   onQueryChange: (query: string) => void;
   product: string;
   query: string;
@@ -432,12 +582,35 @@ function MessengerDevelopmentDrawer({
         <Search size={16} />
         <input
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search contacts..."
+          placeholder={
+            activeSpace === "agent" || activeSpace === "archives"
+              ? "Search agent chats..."
+              : activeSpace === "projects"
+                ? "Search projects..."
+                : "Search contacts..."
+          }
           value={query}
         />
       </label>
-      <section className="messenger-contact-list" aria-label="Conversations">
-        {visible ? (
+      {activeSpace === "agent" || activeSpace === "archives" ? (
+        <AgentConversationList
+          activeConversationId={activeAgentConversationId}
+          archiveActive={activeSpace === "archives"}
+          archivedChatCount={archivedChatCount}
+          chats={agentChats}
+          onArchiveChat={onArchiveAgentChat}
+          onNewChat={onNewAgentChat}
+          onOpenArchived={onOpenArchived}
+          onOpenChat={onOpenAgentChat}
+          onSetPinned={onSetAgentChatPinned}
+          projects={agentProjects}
+          query={query}
+        />
+      ) : activeSpace === "projects" ? (
+        <ProjectNavigationList onOpen={onOpenProject} projects={agentProjects} query={query} />
+      ) : (
+        <section className="messenger-contact-list" aria-label="Conversations">
+          {visible ? (
           <button aria-current="page" type="button">
             <span>
               <Users size={16} />
@@ -447,12 +620,190 @@ function MessengerDevelopmentDrawer({
               <small>Web, desktop, and mobile</small>
             </div>
           </button>
-        ) : (
-          <p>No matching contacts</p>
-        )}
-      </section>
+          ) : (
+            <p>No matching contacts</p>
+          )}
+        </section>
+      )}
     </aside>
   );
+}
+
+function ProjectNavigationList({
+  onOpen,
+  projects,
+  query
+}: {
+  onOpen: (project: CoworkerProject) => void;
+  projects: CoworkerProject[];
+  query: string;
+}) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visible = projects.filter((project) =>
+    `${project.title} ${project.repositoryName ?? ""}`.toLocaleLowerCase().includes(normalizedQuery)
+  );
+  return (
+    <section className="project-navigation-list" aria-label="Connected projects">
+      {visible.map((project) => (
+        <button key={project.id} onClick={() => onOpen(project)} type="button">
+          <FolderPlus size={15} />
+          <span>
+            <strong>{project.title}</strong>
+            <small>{project.repositoryName || project.key}</small>
+          </span>
+        </button>
+      ))}
+      {!visible.length ? (
+        <p>{normalizedQuery ? "No matching projects" : "No connected projects"}</p>
+      ) : null}
+    </section>
+  );
+}
+
+function AgentConversationList({
+  activeConversationId,
+  archiveActive,
+  archivedChatCount,
+  chats,
+  onArchiveChat,
+  onNewChat,
+  onOpenArchived,
+  onOpenChat,
+  onSetPinned,
+  projects,
+  query
+}: {
+  activeConversationId: string | null;
+  archiveActive: boolean;
+  archivedChatCount: number;
+  chats: CoworkerChat[];
+  onArchiveChat: (conversationId: string) => void;
+  onNewChat: () => void;
+  onOpenArchived: () => void;
+  onOpenChat: (conversationId: string) => void;
+  onSetPinned: (conversationId: string, pinned: boolean) => void;
+  projects: CoworkerProject[];
+  query: string;
+}) {
+  const projectNames = new Map(projects.map((project) => [project.id, project.title]));
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleChats = chats.filter((chat) => {
+    const projectName = projectNames.get(chat.projectUuid) ?? "General";
+    return `${chat.title} ${projectName}`.toLocaleLowerCase().includes(normalizedQuery);
+  });
+  const pinnedChats = visibleChats.filter((chat) => chat.pinnedAt);
+  const recentChats = visibleChats.filter((chat) => !chat.pinnedAt);
+  return (
+    <section className="agent-conversation-list" aria-label="Agent conversations">
+      <button className="agent-new-chat" onClick={onNewChat} type="button">
+        <Plus size={16} />
+        <span>New agent chat</span>
+      </button>
+      <button
+        aria-current={archiveActive ? "page" : undefined}
+        className="agent-archive-link"
+        onClick={onOpenArchived}
+        type="button"
+      >
+        <Archive size={15} />
+        <span>Archived chats</span>
+        {archivedChatCount ? <small>{archivedChatCount}</small> : null}
+      </button>
+      {visibleChats.length ? (
+        <div className="agent-history-groups">
+          {pinnedChats.length ? (
+            <AgentConversationGroup
+              activeConversationId={activeConversationId}
+              chats={pinnedChats}
+              label="Pinned"
+              onArchiveChat={onArchiveChat}
+              onOpenChat={onOpenChat}
+              onSetPinned={onSetPinned}
+            />
+          ) : null}
+          {[...new Set(recentChats.map((chat) => projectNames.get(chat.projectUuid) ?? "General"))].map(
+            (projectName) => (
+              <AgentConversationGroup
+                activeConversationId={activeConversationId}
+                chats={recentChats.filter(
+                  (chat) => (projectNames.get(chat.projectUuid) ?? "General") === projectName
+                )}
+                key={projectName}
+                label={projectName}
+                onArchiveChat={onArchiveChat}
+                onOpenChat={onOpenChat}
+                onSetPinned={onSetPinned}
+              />
+            )
+          )}
+        </div>
+      ) : (
+        <p>{normalizedQuery ? "No matching agent chats" : "No agent conversations yet"}</p>
+      )}
+    </section>
+  );
+}
+
+function AgentConversationGroup({
+  activeConversationId,
+  chats,
+  label,
+  onArchiveChat,
+  onOpenChat,
+  onSetPinned
+}: {
+  activeConversationId: string | null;
+  chats: CoworkerChat[];
+  label: string;
+  onArchiveChat: (conversationId: string) => void;
+  onOpenChat: (conversationId: string) => void;
+  onSetPinned: (conversationId: string, pinned: boolean) => void;
+}) {
+  return (
+    <section>
+      <h2>{label}</h2>
+      {chats.map((chat) => (
+        <div className="agent-history-row" key={chat.uuid}>
+          <button
+            aria-current={activeConversationId === chat.uuid ? "page" : undefined}
+            className="agent-history-open"
+            onClick={() => onOpenChat(chat.uuid)}
+            type="button"
+          >
+            <Bot size={15} />
+            <span>
+              <strong>{chat.title}</strong>
+              <small>{formatRecentTime(chat.updatedAt)}</small>
+            </span>
+          </button>
+          <span className="agent-history-actions">
+            <button
+              aria-label={chat.pinnedAt ? `Unpin ${chat.title}` : `Pin ${chat.title}`}
+              onClick={() => onSetPinned(chat.uuid, !chat.pinnedAt)}
+              title={chat.pinnedAt ? "Unpin conversation" : "Pin conversation"}
+              type="button"
+            >
+              {chat.pinnedAt ? <PinOff size={14} /> : <Pin size={14} />}
+            </button>
+            <button
+              aria-label={`Archive ${chat.title}`}
+              onClick={() => onArchiveChat(chat.uuid)}
+              title="Archive conversation"
+              type="button"
+            >
+              <Archive size={14} />
+            </button>
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function formatRecentTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recent";
+  return date.toLocaleDateString([], { day: "numeric", month: "short" });
 }
 
 async function request<T>(
@@ -488,4 +839,8 @@ function messageFrom(reason: unknown) {
   return reason instanceof Error
     ? reason.message
     : "Messenger could not connect. Please try again.";
+}
+
+function plainText(value: string) {
+  return value.replace(/<[^>]*>/gu, "").trim();
 }

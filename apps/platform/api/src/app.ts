@@ -3,7 +3,6 @@ import { AppError } from "@codexsun/framework/errors";
 import type { HealthCheck } from "@codexsun/framework/health";
 import { registerModules } from "@codexsun/framework/modules";
 import {
-  bootstrapDevkitDatabase,
   configureNotificationRuntime,
   desktopNodeBroker,
   devkitApiModuleKeys,
@@ -32,7 +31,6 @@ export async function createApp() {
   console.info("[devkit.boot] bootstrap started");
   await bootstrapPlatformDatabase();
   const database = getPlatformDatabase() as unknown as Kysely<DevkitDatabase>;
-  await bootstrapDevkitDatabase(database);
   const closeNotifications = await configureNotificationRuntime({
     database,
     email: {

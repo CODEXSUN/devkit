@@ -1,8 +1,45 @@
 # Changelog
 
-Current version: 1.0.84
-Release tag: v-1.0.84
-Changelog label: v 1.0.84
+Current version: 1.0.85
+Release tag: v-1.0.85
+Changelog label: v 1.0.85
+
+## v-1.0.85
+
+### [v 1.0.85] 2026-08-30 8:34 am - Messenger and Agent Chat workspace navigation
+
+#### Database Changes
+
+- Database update: Yes.
+- Added migration `devkit.orchestration-chat.sql.v5`.
+- Added nullable column `devkit_orchestration_chat_threads.pinned_at` after `status`.
+- Updated new table creation to include `pinned_at` for clean database setup.
+- The migration preserves existing chat threads and does not backfill pinned state.
+- No live database received this migration during verification.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.85.
+- Added pinned and archived Agent Chat navigation for the shared web and desktop workspace.
+- Added project cards and project-based Agent Chat history groups to the shared workspace.
+- Added mobile project browsing, repository connection, chat search, pinning, and archiving.
+- Changed DevKit API module startup to load each module through one ordered composition list.
+- Changed API development startup to load the DevKit API workspace from source.
+- Recorded review gaps for Messenger history pagination, Messenger permissions, Agent Chat connector reuse, stream cancellation, restored action evidence, and focused test coverage.
+
+#### Verification
+
+- Passed `npm.cmd run typecheck --workspace @codexsun/coworker-chat`.
+- Passed `npm.cmd run lint --workspace @codexsun/coworker-chat`.
+- Passed `npm.cmd run typecheck --workspace @codexsun/devkit-api`.
+- Passed `npm.cmd run typecheck --workspace @devkit/mobile`.
+- Passed `npm.cmd run check:module-boundaries`.
+- Passed `npm.cmd run check:versions` for version 1.0.85.
+- Passed `git diff --check`.
+- Ran `npm.cmd run release:scope`. The final inventory found 35 changed paths, including 17 unclassified paths.
+- Ran the `npm.cmd run github:now` review. It reported commit subject `#85 - Messenger and Agent Chat workspace navigation` and 34 uncommitted paths before one concurrent untracked path appeared.
+- Database migration, database-backed runtime, authenticated browser, mobile emulator, live Codex connector, and multi-client Messenger checks did not run.
+- GitHub release publication, Git commit, Git push, deployment, and VPS update did not run.
 
 ## v-1.0.84
 

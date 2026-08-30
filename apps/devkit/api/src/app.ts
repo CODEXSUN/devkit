@@ -72,16 +72,24 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
       await bootstrapDevkitDatabase(context.database);
       await adapter.authorize?.({ context, request });
     });
-    await projectManagerModule.register({ app: devkitApp });
-    await taskManagerModule.register({ app: devkitApp });
-    await githubDashboardModule.register({ app: devkitApp });
-    await planningModule.register({ app: devkitApp });
-    await orchestrationModule.register({ app: devkitApp });
-    await skillsModule.register({ app: devkitApp });
-    await telegramSupportModule.register({ app: devkitApp });
-    await honeyModule.register({ app: devkitApp });
-    await notificationModule.register({ app: devkitApp });
-    await messengerModule.register({ app: devkitApp });
-    await syncModule.register({ app: devkitApp });
+    for (const module of devkitModules) {
+      console.info(`[devkit.module] loading ${module.key}`);
+      await module.register({ app: devkitApp });
+      console.info(`[devkit.module] ready ${module.key}`);
+    }
   });
 }
+
+const devkitModules = [
+  projectManagerModule,
+  taskManagerModule,
+  githubDashboardModule,
+  planningModule,
+  orchestrationModule,
+  skillsModule,
+  telegramSupportModule,
+  honeyModule,
+  notificationModule,
+  messengerModule,
+  syncModule
+] as const;
