@@ -12,10 +12,25 @@ Changelog label: v 1.0.85
 
 - Database update: Yes.
 - Added migration `devkit.orchestration-chat.sql.v5`.
+- Added migration `devkit.task-manager.sql.v4`.
+- Added migration `devkit.messenger.sql.v5`.
+- Added `devkit_messenger_conversations` with conversation type, title, creator, and update timestamps.
+- Added `devkit_messenger_participants` with participant, read, mute, archive, and join timestamps.
+- Added `devkit_messenger_activity` with actor, conversation, action, structured details, and creation timestamps.
+- Added nullable `devkit_messenger_messages.conversation_uuid` for compatibility with existing messages.
+- Added nullable `devkit_messenger_messages.delivered_at` and `read_at` receipt timestamps.
+- Added conversation and participant indexes for message history, actor lookup, unread counts, and recent conversation ordering.
+- Added activity indexes for conversation history and actor audit review.
+- Existing device and direct messages attach to deterministic conversations when an actor opens that conversation.
+- The Messenger migration preserves message bodies, clients, actors, recipients, and timestamps.
 - Added nullable column `devkit_orchestration_chat_threads.pinned_at` after `status`.
+- Added `devkit_task_manager_todos.visibility` with a required `private` default.
 - Updated new table creation to include `pinned_at` for clean database setup.
 - The migration preserves existing chat threads and does not backfill pinned state.
-- No live database received this migration during verification.
+- The Todo migration preserves existing rows and assigns `private` visibility through the column default.
+- Confirmed `devkit.task-manager.sql.v4` in the `devkit_db.schema_migrations` journal.
+- Confirmed the live `visibility` column is `VARCHAR(16) NOT NULL DEFAULT 'private'`.
+- Confirmed all 14 existing Todo rows have `private` visibility after migration.
 
 #### App Codebase Changes
 
@@ -23,6 +38,50 @@ Changelog label: v 1.0.85
 - Added pinned and archived Agent Chat navigation for the shared web and desktop workspace.
 - Added project cards and project-based Agent Chat history groups to the shared workspace.
 - Added mobile project browsing, repository connection, chat search, pinning, and archiving.
+- Added private and public Todo visibility controls for web, desktop, and mobile.
+- Added actor-owned device conversations and two-person direct conversations to Messenger.
+- Added participant authorization before Messenger reads, writes, and read-state changes.
+- Added a host-provided active-user check that rejects unknown or inactive direct-message recipients.
+- Added participant mute and archive preference endpoints for conversation-list controls.
+- Stored conversation creation, message send, unread-to-read, mute, and archive actions in the Messenger activity journal.
+- Avoided repeated read activity writes when a conversation has no unread messages.
+- Added searchable desktop and web conversation lists with last-message previews, unread badges, mute controls, and archive controls.
+- Added the searchable mobile conversation switcher with direct chats and unread badges.
+- Added sent, delivered, and read receipt labels for outgoing messages on web, desktop, and mobile.
+- Added a compact conversation activity viewer backed by the stored Messenger activity journal.
+- Added durable conversation summaries with the last message, unread count, mute state, archive state, peer, and update time.
+- Added an authenticated active-user contact lookup without identity administration access.
+- Added a compact plus action beside Messenger contact search that opens a searchable user picker and creates or opens a private conversation.
+- Widened the shared Messenger and Agent drawers and added a 2px inner inset so search actions remain visible across desktop, web, and mobile layouts.
+- Removed the duplicate Messenger conversation banner and moved its conversation, connection, and activity controls into the main header.
+- Reduced the Messenger header to its title and connection dot, and moved conversation selection and activity into the right properties drawer.
+- Removed the Agent Chat workspace subtitle and replaced the full project name with the shared folder dropdown from Todos.
+- Applied the compact title, project folder dropdown, and status dot header to Todos and Projects, with Todo project filtering.
+- Added `@`, `/`, and `#` composer suggestions, symbol help, mention highlighting, tag filtering, and keyboard selection.
+- Added a compact Todo composer with icon controls and color-coded priority choices.
+- Changed the Category and Project controls to compact icon triggers with animated, labeled menus.
+- Added Todo title autofocus and visible focus states for every Todo control.
+- Changed Todo due dates to `dd-MM-yyyy` and added relative labels such as `7d ago` and `in 7d`.
+- Added compact color badges for Open, In Progress, Blocked, Completed, and fallback statuses.
+- Changed inline Todo editing to match the new-Todo icon pattern with a wider title field.
+- Changed inline status and visibility selects to animated icon dropdowns.
+- Changed the inline due date to a compact calendar trigger that opens the native date picker.
+- Fixed inline dropdown stacking so lower Todo row actions cannot appear through an open menu.
+- Spread Todo visibility, edit, and delete actions into aligned lanes with 25px gaps.
+- Replaced layout-shifting Todo drag gaps with stable before and after insertion guides.
+- Added pointer-based drop placement and revision-safe optimistic reorder persistence.
+- Added focused Todo reorder tests for upward, downward, before, after, and invalid moves.
+- Expanded the Todo workspace content width from 960px to 1320px with responsive page gutters.
+- Added a shared workspace header title, global search with Ctrl+K focus, and the opened project name.
+- Upgraded global search to a compact Ctrl+K command palette with a translucent backdrop, searchable projects and conversations, recent history, workspace commands, keyboard navigation, and scrollable results.
+- Removed the Ctrl+K shortcut badge border and reduced its size and contrast in the header search launcher.
+- Decoupled left workspace navigation from the right drawer so only the right-side toggle changes its open state.
+- Wired Project Ideas to a full-page title and rich-text editor with persisted saves and a collapsible properties drawer.
+- Added arrow, Home, End, Escape, selection, and focus-return behavior to Todo option menus.
+- Split the Todo form, option menu, and delete dialog into focused components.
+- Added project reference validation, duplicate reorder rejection, and Todo sync visibility validation.
+- Added focused Task Manager service, live migration, sync validation, and dropdown navigation tests.
+- Added `assist/documentation/TODO-MESSENGER-REVIEW.md` with the table, migration, code, and improvement review.
 - Changed DevKit API module startup to load each module through one ordered composition list.
 - Changed API development startup to load the DevKit API workspace from source.
 - Recorded review gaps for Messenger history pagination, Messenger permissions, Agent Chat connector reuse, stream cancellation, restored action evidence, and focused test coverage.
@@ -31,14 +90,34 @@ Changelog label: v 1.0.85
 
 - Passed `npm.cmd run typecheck --workspace @codexsun/coworker-chat`.
 - Passed `npm.cmd run lint --workspace @codexsun/coworker-chat`.
+- Passed desktop, web, and mobile typechecks after adding the Messenger contact picker.
+- A final Coworker Chat rerun found a concurrent missing `MessengerConversationList` symbol and three unused Messenger icon imports.
 - Passed `npm.cmd run typecheck --workspace @codexsun/devkit-api`.
+- A final API typecheck rerun found four concurrent Messenger route signature errors in `messenger.routes.ts`.
 - Passed `npm.cmd run typecheck --workspace @devkit/mobile`.
 - Passed `npm.cmd run check:module-boundaries`.
+- Passed `npm.cmd run check:database-lifecycle`.
+- Passed `npm.cmd run lint --workspace @codexsun/devkit-api`.
+- Passed `npm.cmd run typecheck --workspace @devkit/platform-api`.
+- Passed `npx.cmd tsx --test packages/coworker-chat/tests/composer-symbols.test.ts packages/coworker-chat/tests/messenger-client.test.ts` with 8 tests.
+- Passed the authenticated local browser check for `@`, `/`, and `#` suggestion menus and the symbol help panel.
+- Ran `npm.cmd run release:scope`. The latest inventory found 54 changed paths, including 52 unclassified paths from concurrent repository work.
+- Ran `npm.cmd run release:scope` after the receipt slice. It found 58 changed paths, including 55 unclassified paths from concurrent repository work.
+- Built `@codexsun/devkit-api`, ran `npm.cmd run db:migrate`, and confirmed `devkit.messenger.sql.v4` in `devkit_db.schema_migrations`.
+- Rebuilt `@codexsun/devkit-api`, ran `npm.cmd run db:migrate`, and confirmed `devkit.messenger.sql.v5` in `devkit_db.schema_migrations`.
+- Confirmed the live `devkit_messenger_activity`, `devkit_messenger_conversations`, and `devkit_messenger_participants` tables.
+- Confirmed nullable live `devkit_messenger_messages.conversation_uuid` and `recipient_actor_id` columns.
+- Passed `npm.cmd run build --workspace @devkit/platform-web`.
+- Passed `npm.cmd run build --workspace @devkit/mobile`.
 - Passed `npm.cmd run check:versions` for version 1.0.85.
 - Passed `git diff --check`.
+- Ran `npm.cmd run db:migrations:list`. It confirmed `devkit.task-manager.sql.v4` in `devkit_db`.
+- Queried `information_schema.columns` for the live Todo table and checked visibility row counts.
+- Passed 10 focused Todo service, live migration, sync-row, and dropdown-navigation tests with Vitest.
+- Passed 7 focused Todo date, status-tone, and dropdown-navigation tests with Vitest.
 - Ran `npm.cmd run release:scope`. The final inventory found 35 changed paths, including 17 unclassified paths.
 - Ran the `npm.cmd run github:now` review. It reported commit subject `#85 - Messenger and Agent Chat workspace navigation` and 34 uncommitted paths before one concurrent untracked path appeared.
-- Database migration, database-backed runtime, authenticated browser, mobile emulator, live Codex connector, and multi-client Messenger checks did not run.
+- Database-backed API runtime, authenticated browser, mobile emulator, live Codex connector, and multi-client Messenger checks did not run.
 - GitHub release publication, Git commit, Git push, deployment, and VPS update did not run.
 
 ## v-1.0.84

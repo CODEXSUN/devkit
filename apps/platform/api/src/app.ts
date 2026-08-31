@@ -95,6 +95,7 @@ export async function createApp() {
           if (!actor) throw AppError.unauthorized("Session expired. Please sign in again.");
           return {
             actor: {
+              canMessageActor: async (actorId: string) => Boolean(await context.database.selectFrom("users").select("uuid").where("uuid", "=", actorId).where("status", "=", "active").executeTakeFirst()),
               email: actor.email,
               id: actor.uuid,
               permissions: [],
@@ -157,7 +158,9 @@ function registerMessengerSocket(app: Awaited<ReturnType<typeof createApiApp>>) 
     next();
   });
   const unsubscribe = subscribeMessengerEvents((event) => {
-    io.to(`actor:${event.actorId}`).emit("messenger.message", event.message);
+    for (const actorId of event.actorIds) {
+      io.to(`actor:${actorId}`).emit("messenger.message", event.message);
+    }
   });
   app.addHook("onClose", async () => { unsubscribe(); await io.close(); });
 }

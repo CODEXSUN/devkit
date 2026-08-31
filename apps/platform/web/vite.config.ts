@@ -164,7 +164,8 @@ export default defineConfig(({ command, mode }) => {
               "/api/platform": {
                 changeOrigin: false,
                 rewrite: (path) => path.replace(/^\/api\/platform/u, "") || "/",
-                target: platformApiTarget(runtimeEnv)
+                target: platformApiTarget(runtimeEnv),
+                ws: true
               }
             }
           }

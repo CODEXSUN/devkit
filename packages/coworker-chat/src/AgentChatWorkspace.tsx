@@ -1,15 +1,11 @@
-import { Bot, Check, Circle, LoaderCircle, SendHorizontal, Wrench } from "lucide-react";
+import { Bot, SendHorizontal, Square, Wrench } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { CoworkerClient } from "./client";
-import type { CoworkerEvent, CoworkerProject } from "./types";
-
-type AgentAction = Extract<CoworkerEvent, { type: "chat.action" }>["action"];
-type AgentMessage = {
-  actions: AgentAction[];
-  id: string;
-  role: "assistant" | "user";
-  text: string;
-};
+import { AgentMessageCard } from "./AgentMessageCard";
+import { AgentFlowPreferences, type AgentFlowPreferencesValue } from "./AgentFlowPreferences";
+import type { AgentAccessMode } from "./client";
+import { ComposerSymbolButtons, ComposerSymbolHelp, ComposerSuggestions, useComposerSymbols } from "./composer-symbols";
+import { useAgentChat } from "./use-agent-chat";
+import { TodoClient } from "./todo-client";
 
 export function AgentChatWorkspace({
   apiUrl,
@@ -26,152 +22,109 @@ export function AgentChatWorkspace({
   selectedConversationId: string | null;
   token: string;
 }) {
-  const client = useMemo(() => new CoworkerClient(apiUrl, () => token), [apiUrl, token]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [error, setError] = useState("");
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [project, setProject] = useState<CoworkerProject | null>(null);
-  const [running, setRunning] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [access, setAccess] = useState<AgentAccessMode>("read-only");
+  const [flowPreferences, setFlowPreferences] = useState<AgentFlowPreferencesValue>({
+    evidenceExpanded: false,
+    reducedMotion: false
+  });
+  const {
+    conversationId,
+    elapsedMs,
+    error,
+    messages,
+    project,
+    resolveApproval,
+    running,
+    send: sendMessage,
+    setFeedback,
+    stop
+  } = useAgentChat({
+    apiUrl,
+    onConversationChange,
+    selectedConversationId,
+    selectedProjectId,
+    token
+  });
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const todoClient = useMemo(() => new TodoClient(apiUrl, token), [apiUrl, token]);
+  const [creatingTasks, setCreatingTasks] = useState(false);
+  const [taskError, setTaskError] = useState("");
+  const symbols = useComposerSymbols({
+    inputRef,
+    onChange: setDraft,
+    tags: messageTags(messages.map((message) => message.text)),
+    value: draft
+  });
 
   useEffect(() => {
-    let active = true;
-    void client
-      .projects()
-      .then((projects) => {
-        if (active) {
-          setProject(projects.find((item) => item.id === selectedProjectId) ?? projects[0] ?? null);
-        }
-      })
-      .catch((reason) => {
-        if (active) setError(messageFrom(reason));
-      });
-    return () => {
-      active = false;
-    };
-  }, [client, selectedProjectId]);
+    if (!project || running) return;
+    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [project?.id, running]);
   useEffect(() => {
-    if (selectedConversationId === conversationId) return;
-    if (!selectedConversationId) {
-      setConversationId(null);
-      setThreadId(null);
-      setMessages([]);
-      setError("");
-      return;
-    }
-    let active = true;
-    setError("");
-    void Promise.all([client.chat(selectedConversationId), client.projects()])
-      .then(([detail, projects]) => {
-        if (!active) return;
-        setConversationId(detail.uuid);
-        setThreadId(detail.codexThreadId);
-        setProject(projects.find((item) => item.id === detail.projectUuid) ?? projects[0] ?? null);
-        setMessages(
-          detail.messages.map((message) => ({
-            actions: [],
-            id: message.uuid,
-            role: message.role,
-            text: message.body
-          }))
-        );
-      })
-      .catch((reason) => {
-        if (active) setError(messageFrom(reason));
-      });
-    return () => {
-      active = false;
-    };
-  }, [client, conversationId, selectedConversationId]);
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    endRef.current?.scrollIntoView({ behavior: running ? "auto" : "smooth" });
+  }, [messages, running]);
 
-  async function send(event: FormEvent) {
+  async function submitMessage(event: FormEvent) {
     event.preventDefault();
     const text = draft.trim();
     if (!text || !project || running) return;
-    const assistantId = crypto.randomUUID();
-    setMessages((current) => [
-      ...current,
-      { actions: [], id: crypto.randomUUID(), role: "user", text },
-      { actions: [], id: assistantId, role: "assistant", text: "" }
-    ]);
     setDraft("");
-    setError("");
-    setRunning(true);
+    await sendMessage(text, access);
+    inputRef.current?.focus();
+  }
+
+  async function createTasks(tasks: string[], acceptance: string[], tests: string[]) {
+    if (!project || !tasks.length || creatingTasks) return false;
+    setCreatingTasks(true);
+    setTaskError("");
     try {
-      await client.stream(
-        { access: "read-only", conversationId, message: text, project, threadId },
-        (agentEvent) => {
-          if (agentEvent.type === "chat.started") {
-            setConversationId(agentEvent.conversationId);
-            setThreadId(agentEvent.threadId);
-            onConversationChange?.(agentEvent.conversationId);
-          } else if (agentEvent.type === "chat.delta") {
-            updateAssistant(setMessages, assistantId, (message) => ({
-              ...message,
-              text: message.text + agentEvent.delta
-            }));
-          } else if (agentEvent.type === "chat.action") {
-            updateAssistant(setMessages, assistantId, (message) => ({
-              ...message,
-              actions: upsertAction(message.actions, agentEvent.action)
-            }));
-          } else if (agentEvent.type === "chat.failed") {
-            updateAssistant(setMessages, assistantId, (message) => ({
-              ...message,
-              text: message.text || agentEvent.message
-            }));
-            setError(agentEvent.message);
-          }
-        }
-      );
+      const provenance = conversationId
+        ? `Source agent conversation: ${conversationId}`
+        : "Source agent conversation: current session";
+      const criteria = acceptance.length ? `Acceptance criteria:\n${acceptance.map((item) => `- ${item}`).join("\n")}` : "";
+      const testPlan = tests.length ? `Test plan:\n${tests.map((item) => `- ${item}`).join("\n")}` : "";
+      await todoClient.createBatch(tasks.map((title) => ({
+        category: "agent-plan",
+        description: [provenance, criteria, testPlan].filter(Boolean).join("\n\n"),
+        groupName: "Agent plan",
+        priority: "medium",
+        projectId: project.id,
+        status: "open",
+        title,
+        visibility: "private"
+      })));
+      return true;
     } catch (reason) {
-      const message = messageFrom(reason);
-      updateAssistant(setMessages, assistantId, (entry) => ({
-        ...entry,
-        text: entry.text || message
-      }));
-      setError(message);
+      setTaskError(messageFrom(reason));
+      return false;
     } finally {
-      setRunning(false);
-      inputRef.current?.focus();
+      setCreatingTasks(false);
     }
   }
 
   return (
-    <section className="messenger-agent-space">
+    <section className={`messenger-agent-space${flowPreferences.reducedMotion ? " reduce-agent-motion" : ""}`}>
       <section className="messenger-agent-thread" aria-live="polite">
         {messages.length ? (
-          messages.map((message) => (
-            <article className={`messenger-agent-message ${message.role}`} key={message.id}>
-              {message.role === "assistant" ? (
-                <span className="messenger-agent-avatar">
-                  <Bot size={16} />
-                </span>
-              ) : null}
-              <div>
-                {message.actions.length ? (
-                  <div className="messenger-agent-actions">
-                    {message.actions.map((action) => (
-                      <div key={action.id}>
-                        <ActionIcon status={action.status} />
-                        <span>{action.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <p>{message.text || (running ? "Working…" : "No response returned.")}</p>
-              </div>
-            </article>
-          ))
+          messages.map((message, index) => {
+            const active = running && message.role === "assistant" && index === messages.length - 1;
+            return (
+              <AgentMessageCard
+                active={active}
+                evidenceExpanded={flowPreferences.evidenceExpanded}
+                key={message.id}
+                message={message}
+                onApproval={resolveApproval}
+                onFeedback={setFeedback}
+                creatingTasks={creatingTasks}
+                onCreateTasks={createTasks}
+                onRetry={() => void sendMessage(promptBefore(messages, index), access)}
+              />
+            );
+          })
         ) : (
           <div className="messenger-agent-empty">
             <span>
@@ -188,6 +141,9 @@ export function AgentChatWorkspace({
             <small>
               <Wrench size={13} /> Read-only coding tools enabled
             </small>
+            <div className="messenger-agent-starters">
+              {agentStarters.map((starter) => <button key={starter.label} onClick={() => { setAccess(starter.access); setDraft(starter.prompt); inputRef.current?.focus(); }} type="button">{starter.label}</button>)}
+            </div>
           </div>
         )}
         <div ref={endRef} />
@@ -197,12 +153,16 @@ export function AgentChatWorkspace({
           {error}
         </p>
       ) : null}
-      <form className="messenger-agent-composer" onSubmit={send}>
+      {taskError ? <p className="messenger-agent-error" role="status">{taskError}</p> : null}
+      <AgentFlowPreferences onChange={setFlowPreferences} value={flowPreferences} />
+      <form className="messenger-agent-composer" onSubmit={submitMessage}>
+        {symbols.trigger ? <ComposerSuggestions onPick={symbols.insert} onSelect={symbols.setSelectedIndex} selectedIndex={symbols.selectedIndex} suggestions={symbols.suggestions} symbol={symbols.trigger.kind} /> : null}
         <textarea
           aria-label="Ask the connected coding agent"
           disabled={!project || running}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
+            if (symbols.onKeyDown(event)) return;
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
@@ -214,42 +174,49 @@ export function AgentChatWorkspace({
           value={draft}
         />
         <footer>
-          <span>{project?.title ?? "No project selected"}</span>
-          <button
-            aria-label="Send agent task"
-            disabled={!draft.trim() || !project || running}
-            type="submit"
-          >
-            {running ? <LoaderCircle className="spin" size={17} /> : <SendHorizontal size={17} />}
-          </button>
+          <div className="agent-composer-context">
+            <span>{project?.title ?? "No project selected"}</span>
+            <select aria-label="Agent access mode" disabled={running} onChange={(event) => setAccess(event.target.value as AgentAccessMode)} value={access}>
+              <option value="read-only">Explore</option>
+              <option value="plan">Plan</option>
+              <option value="ask-approval">Build with approval</option>
+            </select>
+            <ComposerSymbolButtons insert={symbols.insert} /><ComposerSymbolHelp />
+          </div>
+          {running ? (
+            <button aria-label={`Stop agent after ${formatDuration(elapsedMs)}`} className="agent-stop-button" onClick={stop} title="Stop" type="button"><Square size={13} /></button>
+          ) : (
+            <button aria-label="Send agent task" disabled={!draft.trim() || !project} type="submit"><SendHorizontal size={17} /></button>
+          )}
         </footer>
       </form>
     </section>
   );
 }
 
-function ActionIcon({ status }: { status: string }) {
-  if (status === "completed") return <Check size={13} />;
-  if (status === "running") return <LoaderCircle className="spin" size={13} />;
-  return <Circle size={13} />;
+function messageTags(messages: string[]) {
+  return [...new Set(messages.flatMap((message) => [...message.matchAll(/#([\w.-]+)/gu)].map((match) => match[1]!.toLocaleLowerCase())))].sort();
 }
 
-function updateAssistant(
-  setMessages: React.Dispatch<React.SetStateAction<AgentMessage[]>>,
-  id: string,
-  update: (message: AgentMessage) => AgentMessage
-) {
-  setMessages((current) =>
-    current.map((message) => (message.id === id ? update(message) : message))
-  );
+function formatDuration(durationMs: number) {
+  return durationMs < 1000 ? "a moment" : `${Math.round(durationMs / 1000)} seconds`;
 }
 
-function upsertAction(actions: AgentAction[], action: AgentAction) {
-  return [...actions.filter((entry) => entry.id !== action.id), action];
+function promptBefore(messages: Array<{ role: "assistant" | "user"; text: string }>, index: number) {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const message = messages[cursor];
+    if (message?.role === "user") return message.text;
+  }
+  return "";
 }
+
+const agentStarters = [
+  { access: "read-only", label: "Explore an idea", prompt: "Help me explore a new idea. Challenge the assumptions, identify user value, risks, and practical options before recommending a direction." },
+  { access: "plan", label: "Organize into tasks", prompt: "Turn this idea into an ordered implementation plan with clear tasks, dependencies, acceptance checks, and review gates: " },
+  { access: "read-only", label: "Review this project", prompt: "Review this project globally. Identify the strongest improvements, correctness risks, missing tests, maintainability issues, and the next three high-value actions." },
+  { access: "plan", label: "Plan implementation", prompt: "Inspect the project and prepare a careful implementation plan. Reuse existing modules, name the files and tests involved, and call out every approval boundary." }
+] as const;
 
 function messageFrom(reason: unknown) {
-  return reason instanceof Error
-    ? reason.message
-    : "The coding agent could not complete this task.";
+  return reason instanceof Error ? reason.message : "Tasks could not be created from this plan.";
 }

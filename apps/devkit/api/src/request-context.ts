@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export type DevkitActor = {
+  canMessageActor?: (actorId: string) => Promise<boolean>;
   email?: string;
   id: string;
   permissions: readonly string[];

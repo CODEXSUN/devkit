@@ -64,3 +64,26 @@ Project N stays undefined until the team records these decisions:
 6. Define tests, deployment, support, and maintenance ownership.
 
 After approval, Project N becomes an independent product with its own delivery cycle.
+
+<DatabaseForm
+  pageSlug="product-structure"
+  formKey="project-n-definition"
+  title="Project N approval notes"
+  description="Record the owner-approved definition here. These notes are private to your signed-in account and are stored in the DevKit database."
+  submitLabel="Save approval notes"
+  fields={[
+    {
+      name: "owner",
+      label: "Approving owner",
+      placeholder: "Name or role",
+      required: true
+    },
+    {
+      name: "decision",
+      label: "Approved definition",
+      type: "textarea",
+      placeholder: "Record the approved purpose, users, scope, and first workflow.",
+      required: true
+    }
+  ]}
+/>

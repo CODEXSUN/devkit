@@ -34,6 +34,13 @@ export class UserService {
     if (!record) throw AppError.notFound("Signed-in user was not found.");
     return profile(record);
   }
+  async contacts() {
+    return (await this.repository.listActiveReferences()).map(({ email, name, uuid }) => ({
+      email,
+      name,
+      uuid
+    }));
+  }
   async updateProfile(input: UserProfileSavePayload): Promise<UserProfile> {
     const current = await this.repository.findByEmail(this.context.actorEmail);
     if (!current) throw AppError.notFound("Signed-in user was not found.");

@@ -15,7 +15,8 @@ import {
 import type { CoworkerChatRecord, CoworkerProject } from "@codexsun/coworker-chat";
 import logoImage from "../assets/logo.png";
 
-export type MobileScreen = "chat" | "todos" | "projects";
+export type MobileScreen =
+  "archives" | "chat" | "connection" | "docs" | "project-overview" | "projects" | "todos";
 
 export function MobileDrawer({
   open,
@@ -50,6 +51,8 @@ export function MobileDrawer({
   const drawerWidth = Math.min(width * 0.84, 340);
   const progress = useRef(new Animated.Value(0)).current;
   const [projectsOpen, setProjectsOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mounted, setMounted] = useState(open);
   const [query, setQuery] = useState("");
   const projectNames = new Map(projects.map((project) => [project.id, project.title]));
@@ -135,12 +138,37 @@ export function MobileDrawer({
             label="Projects"
             onPress={() => onOpenScreen("projects")}
           />
+          <DrawerItem
+            active={screen === "docs"}
+            icon="book-outline"
+            label="Docs"
+            onPress={() => onOpenScreen("docs")}
+          />
+          <DrawerItem
+            active={screen === "connection"}
+            icon="git-network-outline"
+            label="Connect Service"
+            onPress={() => onOpenScreen("connection")}
+          />
           <View style={styles.divider} />
           <DrawerItem icon="create-outline" label="New chat" onPress={onNewChat} />
           {visibleChats.length ? (
             <View style={styles.chatHistory}>
-              <Text style={styles.sectionLabel}>Recent chats</Text>
-              {pinnedChats.length ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: historyOpen }}
+                onPress={() => setHistoryOpen((value) => !value)}
+                style={styles.chatHistoryToggle}
+              >
+                <Ionicons
+                  color="#777770"
+                  name={historyOpen ? "chevron-down" : "chevron-forward"}
+                  size={16}
+                />
+                <Text style={[styles.sectionLabel, styles.chatHistoryLabel]}>Recent chats</Text>
+                <Text style={styles.chatHistoryCount}>{visibleChats.length}</Text>
+              </Pressable>
+              {historyOpen && pinnedChats.length ? (
                 <View style={styles.chatGroup}>
                   <Text style={styles.chatGroupLabel}>Pinned</Text>
                   {pinnedChats.map((chat) => (
@@ -155,26 +183,29 @@ export function MobileDrawer({
                   ))}
                 </View>
               ) : null}
-              {chatGroups.map((projectName) => (
-                <View key={projectName} style={styles.chatGroup}>
-                  <Text style={styles.chatGroupLabel}>{projectName}</Text>
-                  {recentChats
-                    .filter(
-                      (chat) => (projectNames.get(chat.projectUuid) ?? "General") === projectName
-                    )
-                    .slice(0, 12)
-                    .map((chat) => (
-                      <ChatDrawerItem
-                        active={screen === "chat" && activeChatId === chat.uuid}
-                        chat={chat}
-                        key={chat.uuid}
-                        onArchive={() => onArchiveChat(chat)}
-                        onOpen={() => onOpenChat(chat)}
-                        onTogglePin={() => onSetChatPinned(chat)}
-                      />
-                    ))}
-                </View>
-              ))}
+              {historyOpen
+                ? chatGroups.map((projectName) => (
+                    <View key={projectName} style={styles.chatGroup}>
+                      <Text style={styles.chatGroupLabel}>{projectName}</Text>
+                      {recentChats
+                        .filter(
+                          (chat) =>
+                            (projectNames.get(chat.projectUuid) ?? "General") === projectName
+                        )
+                        .slice(0, 12)
+                        .map((chat) => (
+                          <ChatDrawerItem
+                            active={screen === "chat" && activeChatId === chat.uuid}
+                            chat={chat}
+                            key={chat.uuid}
+                            onArchive={() => onArchiveChat(chat)}
+                            onOpen={() => onOpenChat(chat)}
+                            onTogglePin={() => onSetChatPinned(chat)}
+                          />
+                        ))}
+                    </View>
+                  ))
+                : null}
             </View>
           ) : normalizedQuery ? (
             <Text style={styles.emptySearch}>No matching agent chats</Text>
@@ -188,7 +219,7 @@ export function MobileDrawer({
             <View style={styles.nested}>
               {projects.map((project) => (
                 <DrawerItem
-                  active={screen === "chat" && selectedProject?.id === project.id}
+                  active={screen === "project-overview" && selectedProject?.id === project.id}
                   icon="folder-outline"
                   key={project.id}
                   label={project.title}
@@ -198,7 +229,25 @@ export function MobileDrawer({
               ))}
             </View>
           ) : null}
-          <DrawerItem icon="settings-outline" label="Settings" onPress={onClose} />
+          <View style={styles.divider} />
+          <DrawerItem
+            active={screen === "archives"}
+            icon={settingsOpen ? "chevron-down" : "settings-outline"}
+            label="Settings"
+            onPress={() => setSettingsOpen((value) => !value)}
+          />
+          {settingsOpen ? (
+            <View style={styles.nested}>
+              <Text style={styles.sectionLabel}>Archived</Text>
+              <DrawerItem
+                active={screen === "archives"}
+                icon="archive-outline"
+                label="Archived chats"
+                onPress={() => onOpenScreen("archives")}
+                small
+              />
+            </View>
+          ) : null}
         </ScrollView>
       </Animated.View>
     </View>
@@ -258,7 +307,10 @@ function DrawerItem({
   small?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.item, active && styles.itemActive, small && styles.small]}>
+    <Pressable
+      onPress={onPress}
+      style={[styles.item, active && styles.itemActive, small && styles.small]}
+    >
       <Ionicons color={active ? "#242421" : "#696963"} name={icon} size={small ? 18 : 20} />
       <Text numberOfLines={1} style={[styles.itemText, active && styles.itemTextActive]}>
         {label}
@@ -287,12 +339,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   chatHistory: { gap: 2, paddingVertical: 4 },
+  chatHistoryCount: { color: "#85857e", fontSize: 12, marginLeft: "auto" },
+  chatHistoryLabel: { flex: 1, paddingBottom: 0, paddingHorizontal: 0, paddingTop: 0 },
+  chatHistoryToggle: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+    minHeight: 38,
+    paddingHorizontal: 13
+  },
   chatGroup: { gap: 2, paddingBottom: 7 },
-  chatGroupLabel: { color: "#85857e", fontSize: 12, fontWeight: "600", paddingHorizontal: 13, paddingTop: 5 },
+  chatGroupLabel: {
+    color: "#85857e",
+    fontSize: 12,
+    fontWeight: "600",
+    paddingHorizontal: 13,
+    paddingTop: 5
+  },
   chatAction: { alignItems: "center", height: 36, justifyContent: "center", width: 34 },
   chatItem: { alignItems: "center", borderRadius: 10, flexDirection: "row", minHeight: 41 },
-  chatItemMain: { alignItems: "center", flex: 1, flexDirection: "row", gap: 10, minWidth: 0, paddingLeft: 13 },
-  close: { alignItems: "center", height: 40, justifyContent: "center", marginLeft: "auto", width: 40 },
+  chatItemMain: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    minWidth: 0,
+    paddingLeft: 13
+  },
+  close: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
+    marginLeft: "auto",
+    width: 40
+  },
   divider: { backgroundColor: "#e7e7e1", height: 1, marginVertical: 8 },
   drawer: {
     backgroundColor: "#fbfbf9",
@@ -322,7 +402,15 @@ const styles = StyleSheet.create({
   navigation: { padding: 12, paddingBottom: 30 },
   emptySearch: { color: "#777770", fontSize: 13, paddingHorizontal: 13, paddingVertical: 10 },
   searchInput: { color: "#242421", flex: 1, fontSize: 15, height: 42, paddingVertical: 0 },
-  searchRow: { alignItems: "center", borderBottomColor: "#e7e7e1", borderBottomWidth: 1, flexDirection: "row", gap: 8, height: 54, paddingHorizontal: 16 },
+  searchRow: {
+    alignItems: "center",
+    borderBottomColor: "#e7e7e1",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    height: 54,
+    paddingHorizontal: 16
+  },
   sectionLabel: {
     color: "#85857e",
     fontSize: 12,

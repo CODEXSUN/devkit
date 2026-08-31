@@ -8,5 +8,6 @@ export * from "./modules/sync/index.js";
 export * from "./modules/honey/index.js";
 export * from "./modules/notification/index.js";
 export * from "./modules/messenger/index.js";
+export * from "./modules/docs/index.js";
 export * from "./request-context.js";
 export * from "./stack.js";

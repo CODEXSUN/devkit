@@ -14,9 +14,11 @@ import { telegramSupportModule } from "./modules/telegram-support/index.js";
 import { honeyModule } from "./modules/honey/index.js";
 import { notificationModule } from "./modules/notification/index.js";
 import { messengerModule } from "./modules/messenger/index.js";
+import { docsModule } from "./modules/docs/index.js";
 import { runWithDevkitActor, type DevkitActor } from "./request-context.js";
 
 export const devkitApiModuleKeys = [
+  docsModule.key,
   projectManagerModule.key,
   taskManagerModule.key,
   githubDashboardModule.key,
@@ -81,6 +83,7 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
 }
 
 const devkitModules = [
+  docsModule,
   projectManagerModule,
   taskManagerModule,
   githubDashboardModule,

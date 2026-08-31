@@ -16,7 +16,8 @@ const todoInputSchema = z
     projectId: z.string().optional(),
     priority: z.string().optional(),
     status: z.string().optional(),
-    title: z.string().min(1)
+    title: z.string().min(1),
+    visibility: z.enum(["private", "public"]).optional()
   })
   .strict();
 const lookupInputSchema = z
@@ -43,6 +44,16 @@ export async function registerTaskManagerRoutes(app: FastifyInstance) {
     ok(await service.create(scopeKey, todoInputSchema.parse(request.body), actor(request)), {
       requestId: request.id
     })
+  );
+  app.post("/task-manager/todos/batch", async (request) =>
+    ok(
+      await service.createBatch(
+        scopeKey,
+        z.object({ items: z.array(todoInputSchema).min(1).max(30) }).strict().parse(request.body).items,
+        actor(request)
+      ),
+      { requestId: request.id }
+    )
   );
   app.post("/task-manager/todos/reorder", async (request) =>
     ok(

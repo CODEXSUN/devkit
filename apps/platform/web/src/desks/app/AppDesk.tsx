@@ -1,5 +1,10 @@
 import { CoworkerChat } from "@codexsun/coworker-chat";
-import { MessengerChat, MessengerConnectionPanel, type MessengerConnectionState } from "@codexsun/coworker-chat/messenger";
+import {
+  AgentConnectionPanel,
+  MessengerChat,
+  MessengerConnectionPanel,
+  type MessengerConnectionState
+} from "@codexsun/coworker-chat/messenger";
 import "@codexsun/coworker-chat/styles.css";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
@@ -35,13 +40,39 @@ type IdentityPage =
 type Claims = { email: string; name?: string; permissions?: string[]; role?: string };
 
 export function AppDesk() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (["/app/devkit/docs", "/app/devkit/project-sync"].includes(pathname))
+    return <_LegacyAppDesk />;
+  return <MessengerAppDesk />;
+}
+
+function MessengerAppDesk() {
   const token = getToken();
   const [drawerCollapsed, setDrawerCollapsed] = useState(true);
   const [connectionState, setConnectionState] = useState<MessengerConnectionState>("connecting");
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   return (
     <AuthGate>
-      {token ? <MessengerChat apiUrl={import.meta.env.VITE_PLATFORM_API_URL} clientKind="web" drawerCollapsed={drawerCollapsed} onConnectionStateChange={setConnectionState} onDrawerCollapsedChange={setDrawerCollapsed} onOpenAi={() => setSidePanelOpen(true)} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} product="DevKit" sidePanel={<MessengerConnectionPanel client="web" state={connectionState} />} sidePanelOpen={sidePanelOpen} token={token} /> : <CoworkerChat apiUrl={import.meta.env.VITE_PLATFORM_API_URL} />}
+      {token ? (
+        <MessengerChat
+          agentSidePanel={
+            <AgentConnectionPanel agent="Codex" model="gpt-5.6-terra" state={connectionState} />
+          }
+          apiUrl={import.meta.env.VITE_PLATFORM_API_URL}
+          clientKind="web"
+          connectionHref="/app/devkit/project-sync"
+          drawerCollapsed={drawerCollapsed}
+          onConnectionStateChange={setConnectionState}
+          onDrawerCollapsedChange={setDrawerCollapsed}
+          onToggleSidePanel={() => setSidePanelOpen((open) => !open)}
+          product="DevKit"
+          sidePanel={<MessengerConnectionPanel client="web" state={connectionState} />}
+          sidePanelOpen={sidePanelOpen}
+          token={token}
+        />
+      ) : (
+        <CoworkerChat apiUrl={import.meta.env.VITE_PLATFORM_API_URL} />
+      )}
     </AuthGate>
   );
 }
@@ -159,7 +190,8 @@ function _LegacyAppDesk() {
 
 function buildApplicationMenu(activeWorkspaceId: string, showingSettings: boolean) {
   const menuItems = devkitWebBundle.menuItems(activeWorkspaceId);
-  const documentation = menuItems.at(-1);
+  const documentation = menuItems.find((item) => item.title === "Documentation");
+  const connection = menuItems.find((item) => item.title === "Connect Service");
   const settings: SidemenuItem = {
     icon: Settings2Icon,
     isActive: showingSettings,
@@ -172,9 +204,13 @@ function buildApplicationMenu(activeWorkspaceId: string, showingSettings: boolea
     ],
     title: "Settings"
   };
-  return documentation
-    ? [...menuItems.slice(0, -1), settings, documentation]
-    : [...menuItems, settings];
+  const workspaceItems = menuItems.filter((item) => item !== documentation && item !== connection);
+  return [
+    ...workspaceItems,
+    settings,
+    ...(documentation ? [documentation] : []),
+    ...(connection ? [connection] : [])
+  ];
 }
 
 function buildGlobalSearchItems(administrator: boolean): GlobalSearchItem[] {

@@ -19,15 +19,15 @@ export function ProjectSyncSettingsWorkspace() {
       <header className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold">Local-first hybrid sync</h1>
+            <h1 className="text-2xl font-semibold">Connect Service</h1>
             <WorkspaceStatusBadge
               label={connectionLabel(sync)}
               tone={sync?.status === "bound" || sync?.role === "cloud" ? "success" : "warning"}
             />
           </div>
           <p className="max-w-3xl pt-2 text-sm leading-6 text-muted-foreground">
-            Development stays on this computer. CodeLogicX Cloud synchronizes approved work data,
-            documents, planning records, and attachments in both directions.
+            Connect this signed-in account to another device. CodeLogicX Cloud synchronizes approved
+            work data, documents, planning records, and attachments in both directions.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium">
@@ -82,7 +82,7 @@ export function ProjectSyncButton() {
       href="/app/devkit/project-sync"
     >
       <CloudIcon className="size-4" />
-      {status.data?.status === "bound" ? "Open sync" : "Connect cloud"}
+      {status.data?.status === "bound" ? "Open connection" : "Connect device"}
     </a>
   );
 }

@@ -480,6 +480,18 @@ export class AgentRunRepository {
     await this.event(uuid, actorId, "run.failed", { message });
   }
 
+  async cancel(uuid: string, actorId: string, message: string) {
+    const current = await this.requireRun(uuid, actorId);
+    if (isTerminalAgentRunStatus(current.status)) return;
+    await this.finishSteps(uuid, "cancelled");
+    await this.updateOwned(uuid, actorId, {
+      completed_at: new Date(),
+      error_message: message,
+      status: "cancelled"
+    });
+    await this.event(uuid, actorId, "run.cancelled", { message });
+  }
+
   async list(projectUuid: string, actorId: string) {
     const rows = await this.database
       .selectFrom("devkit_agent_runs")

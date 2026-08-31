@@ -46,6 +46,20 @@ export class ProjectClient {
     });
   }
 
+  create(title: string) {
+    return this.request<MobileProject>("/api/devkit/admin/project-manager/project", {
+      body: JSON.stringify({
+        description: "Project workspace",
+        key: title.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, ""),
+        moduleKey: "project-manager",
+        status: "planning",
+        title,
+        type: "project"
+      }),
+      method: "POST"
+    });
+  }
+
   private async request<T>(path: string, options: RequestInit = {}) {
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...options,

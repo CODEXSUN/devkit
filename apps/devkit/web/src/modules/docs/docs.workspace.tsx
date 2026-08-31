@@ -9,6 +9,7 @@ import {
   SearchIcon,
   XIcon
 } from "lucide-react";
+import { DockedSideDrawer } from "@codexsun/ui";
 import {
   Suspense,
   useEffect,
@@ -18,6 +19,7 @@ import {
   type ComponentPropsWithoutRef
 } from "react";
 import { docsPages, findDocPage, type DocPage } from "./docs.registry";
+import { DatabaseForm } from "./docs-form";
 
 export function DocsWorkspace() {
   const [selectedSlug, setSelectedSlug] = useState(currentPageSlug);
@@ -69,10 +71,7 @@ export function DocsWorkspace() {
           type="button"
         />
       ) : null}
-      <aside
-        aria-hidden={!drawerOpen}
-        className={`absolute inset-y-0 left-0 z-40 w-72 overflow-y-auto border-r bg-background px-4 py-6 transition-transform duration-200 lg:sticky lg:top-0 lg:h-[calc(100vh-4rem)] lg:w-auto ${drawerOpen ? "visible translate-x-0" : "invisible pointer-events-none -translate-x-full"}`}
-      >
+      <DockedSideDrawer className="px-4 py-6" open={drawerOpen}>
         <div className="flex items-center gap-3 px-2">
           <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
             <BookOpenIcon className="size-4" />
@@ -136,7 +135,7 @@ export function DocsWorkspace() {
             </section>
           ))}
         </nav>
-      </aside>
+      </DockedSideDrawer>
       <article className="min-w-0 overflow-y-auto px-6 py-9 lg:px-12 xl:px-16" ref={articleRef}>
         <div className="mx-auto w-full max-w-6xl">
           <div className="flex items-center gap-3 pb-5">
@@ -232,6 +231,7 @@ function adjacentPages(slug: string) {
 }
 
 const mdxComponents = {
+  DatabaseForm,
   h1: (props: ComponentPropsWithoutRef<"h1">) => (
     <h1 className="text-4xl font-semibold tracking-tight" {...props} />
   ),

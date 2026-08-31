@@ -1,6 +1,10 @@
 import { Component, lazy, StrictMode, Suspense, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { MessengerChat } from "@codexsun/coworker-chat/messenger";
+import {
+  MessengerChat,
+  MessengerConnectionPanel,
+  type MessengerConnectionState
+} from "@codexsun/coworker-chat/messenger";
 import "@codexsun/ui/styles.css";
 import "@codexsun/coworker-chat/styles.css";
 import "./styles.css";
@@ -22,7 +26,11 @@ const AgentSidePanel = lazy(() =>
 function WorkspaceLoadingScreen() {
   return (
     <main className="desktop-messenger-loading">
-      <div><span /><strong>Opening DevKit</strong><small>Connecting your workspace…</small></div>
+      <div>
+        <span />
+        <strong>Opening DevKit</strong>
+        <small>Connecting your workspace…</small>
+      </div>
     </main>
   );
 }
@@ -66,9 +74,13 @@ function releaseStartupLoader() {
 }
 
 function AppRoot() {
-  const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem("devkit_session"));
+  const [sessionToken, setSessionToken] = useState<string | null>(() =>
+    localStorage.getItem("devkit_session")
+  );
   const [messengerDrawerCollapsed, setMessengerDrawerCollapsed] = useState(true);
   const [nodeState, setNodeState] = useState<DesktopNodeState>({ status: "disconnected" });
+  const [messengerConnectionState, setMessengerConnectionState] =
+    useState<MessengerConnectionState>("connecting");
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   useEffect(() => {
     releaseStartupLoader();
@@ -78,12 +90,16 @@ function AppRoot() {
     let disposed = false;
     void fetch(`${centralApiUrl.replace(/\/+$/u, "")}/auth/session`, {
       headers: { Authorization: `Bearer ${sessionToken}` }
-    }).then((response) => {
-      if (disposed || response.ok || response.status !== 401) return;
-      localStorage.removeItem("devkit_session");
-      setSessionToken(null);
-    }).catch(() => undefined);
-    return () => { disposed = true; };
+    })
+      .then((response) => {
+        if (disposed || response.ok || response.status !== 401) return;
+        localStorage.removeItem("devkit_session");
+        setSessionToken(null);
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+    };
   }, [sessionToken]);
   useEffect(() => {
     if (!sessionToken) return;
@@ -105,15 +121,20 @@ function AppRoot() {
     return (
       <MessengerBoundary>
         <MessengerChat
+          agentSidePanel={
+            <Suspense fallback={null}>
+              <AgentSidePanel state={nodeState} />
+            </Suspense>
+          }
           apiUrl={centralApiUrl}
           clientKind="desktop"
           drawerCollapsed={messengerDrawerCollapsed}
           logoSrc={devkitLogo}
+          onConnectionStateChange={setMessengerConnectionState}
           onDrawerCollapsedChange={setMessengerDrawerCollapsed}
-          onOpenAi={() => setAgentPanelOpen(true)}
           onToggleSidePanel={() => setAgentPanelOpen((open) => !open)}
           product="DevKit"
-          sidePanel={<Suspense fallback={null}><AgentSidePanel state={nodeState} /></Suspense>}
+          sidePanel={<MessengerConnectionPanel client="desktop" state={messengerConnectionState} />}
           sidePanelOpen={agentPanelOpen}
           token={sessionToken}
         />

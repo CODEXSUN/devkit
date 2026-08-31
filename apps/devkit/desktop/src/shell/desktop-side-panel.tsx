@@ -19,6 +19,7 @@ export type Activity =
   | "search"
   | "settings"
   | "compass"
+  | "docs"
   | "sync"
   | "tasks";
 
@@ -114,6 +115,7 @@ function EmptyPanel({ activity }: { activity: Activity }) {
   const descriptions: Record<Activity, string> = {
     assist: "Connect Assist to plan, edit, review, and verify this workspace.",
     compass: "Run standalone sales and CRM workflow prototypes without connecting to DevKit tasks.",
+    docs: "Read CodeLogicX architecture, product boundaries, and approved documentation notes.",
     docker: "Inspect services and run approved Docker operations.",
     files: "Open a workspace to browse files.",
     git: "Open a Git repository to review changes.",

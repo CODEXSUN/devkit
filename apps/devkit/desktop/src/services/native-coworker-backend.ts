@@ -50,7 +50,11 @@ export class NativeCoworkerBackend implements CoworkerBackend {
     return {
       ...toChat(task, project.id),
       messages: messages.map((message) => ({
+        actions: [],
         body: message.content,
+        durationMs: null,
+        feedback: null,
+        files: [],
         role: message.role === "agent" ? "assistant" : "user",
         uuid: message.id
       }))

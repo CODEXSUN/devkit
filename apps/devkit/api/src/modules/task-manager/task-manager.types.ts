@@ -1,6 +1,7 @@
 export type TodoStatus = string;
 export type TodoPriority = string;
 export type TodoCategory = string;
+export type TodoVisibility = "private" | "public";
 export type Todo = {
   id: string;
   title: string;
@@ -14,6 +15,7 @@ export type Todo = {
   position: number;
   createdAt: string;
   updatedAt: string;
+  visibility: TodoVisibility;
 };
 export type TodoInput = {
   category?: TodoCategory | undefined;
@@ -24,6 +26,7 @@ export type TodoInput = {
   priority?: TodoPriority | undefined;
   status?: TodoStatus | undefined;
   title: string;
+  visibility?: TodoVisibility | undefined;
 };
 export type TodoUpdateInput = {
   category?: TodoCategory | undefined;
@@ -34,6 +37,7 @@ export type TodoUpdateInput = {
   priority?: TodoPriority | undefined;
   status?: TodoStatus | undefined;
   title?: string | undefined;
+  visibility?: TodoVisibility | undefined;
 };
 export type TodoLookupKind = "category" | "group" | "status" | "priority";
 export type TodoLookup = {

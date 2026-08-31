@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { type SharedTodo as MobileTodo, TodoClient } from "@codexsun/coworker-chat";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,12 +11,13 @@ import {
   TextInput,
   View
 } from "react-native";
-import { type MobileTodo, TodoClient } from "./todo-client";
 
 export function TodoPage({ apiUrl, token }: { apiUrl: string; token: string }) {
   const client = useMemo(() => new TodoClient(apiUrl, token), [apiUrl, token]);
   const [todos, setTodos] = useState<MobileTodo[]>([]);
   const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState("medium");
+  const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -34,7 +36,7 @@ export function TodoPage({ apiUrl, token }: { apiUrl: string; token: string }) {
     setBusy(true);
     setError("");
     try {
-      const todo = await client.create(nextTitle);
+      const todo = await client.create({ priority, title: nextTitle, visibility });
       setTodos((current) => [todo, ...current]);
       setTitle("");
     } catch (reason) {
@@ -48,6 +50,17 @@ export function TodoPage({ apiUrl, token }: { apiUrl: string; token: string }) {
     const status = isDone(todo) ? "open" : "completed";
     try {
       const updated = await client.status(todo.id, status);
+      setTodos((current) => current.map((item) => (item.id === todo.id ? updated : item)));
+    } catch (reason) {
+      setError(messageOf(reason));
+    }
+  }
+
+  async function toggleVisibility(todo: MobileTodo) {
+    try {
+      const updated = await client.update(todo.id, {
+        visibility: todo.visibility === "public" ? "private" : "public"
+      });
       setTodos((current) => current.map((item) => (item.id === todo.id ? updated : item)));
     } catch (reason) {
       setError(messageOf(reason));
@@ -87,6 +100,27 @@ export function TodoPage({ apiUrl, token }: { apiUrl: string; token: string }) {
           value={title}
         />
         <Pressable
+          accessibilityLabel={`Priority ${priority}`}
+          onPress={() => setPriority(nextPriority(priority))}
+          style={[styles.option, priorityStyle(priority)]}
+        >
+          <View style={[styles.priorityDot, priorityDotStyle(priority)]} />
+          <Text style={styles.optionText}>{priorityLabel(priority)}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={
+            visibility === "public" ? "Make new todo private" : "Make new todo public"
+          }
+          onPress={() => setVisibility(visibility === "public" ? "private" : "public")}
+          style={styles.iconOption}
+        >
+          <Ionicons
+            color={visibility === "public" ? "#397bb8" : "#696963"}
+            name={visibility === "public" ? "eye-outline" : "lock-closed-outline"}
+            size={18}
+          />
+        </Pressable>
+        <Pressable
           accessibilityLabel="Add todo"
           disabled={!title.trim() || busy}
           onPress={() => void create()}
@@ -112,6 +146,17 @@ export function TodoPage({ apiUrl, token }: { apiUrl: string; token: string }) {
           ListEmptyComponent={<Text style={styles.empty}>No todos yet.</Text>}
           renderItem={({ item }) => (
             <View style={styles.row}>
+              <Pressable
+                accessibilityLabel={`${item.visibility === "public" ? "Make private" : "Make public"} ${item.title}`}
+                onPress={() => void toggleVisibility(item)}
+                style={styles.visibility}
+              >
+                <Ionicons
+                  color={item.visibility === "public" ? "#397bb8" : "#8a8a83"}
+                  name={item.visibility === "public" ? "eye-outline" : "lock-closed-outline"}
+                  size={17}
+                />
+              </Pressable>
               <Pressable
                 accessibilityLabel={`${isDone(item) ? "Reopen" : "Complete"} ${item.title}`}
                 onPress={() => void toggle(item)}
@@ -150,6 +195,26 @@ function messageOf(reason: unknown) {
   return reason instanceof Error ? reason.message : "Todos could not be loaded.";
 }
 
+const priorities = ["low", "medium", "high", "urgent"];
+function nextPriority(priority: string) {
+  return priorities[(priorities.indexOf(priority) + 1) % priorities.length] ?? "medium";
+}
+function priorityLabel(priority: string) {
+  return priority === "medium" ? "Med" : priority[0]!.toUpperCase() + priority.slice(1);
+}
+function priorityStyle(priority: string) {
+  if (priority === "urgent") return styles.priorityUrgent;
+  if (priority === "high") return styles.priorityHigh;
+  if (priority === "low") return styles.priorityLow;
+  return styles.priorityMedium;
+}
+function priorityDotStyle(priority: string) {
+  if (priority === "urgent") return styles.dotUrgent;
+  if (priority === "high") return styles.dotHigh;
+  if (priority === "low") return styles.dotLow;
+  return styles.dotMedium;
+}
+
 const styles = StyleSheet.create({
   add: {
     alignItems: "center",
@@ -162,7 +227,7 @@ const styles = StyleSheet.create({
   check: { borderColor: "#aaa9a2", borderRadius: 7, borderWidth: 1.5, height: 24, width: 24 },
   checked: { alignItems: "center", backgroundColor: "#242421", justifyContent: "center" },
   count: { color: "#777770", fontSize: 14 },
-  createRow: { flexDirection: "row", gap: 9 },
+  createRow: { flexDirection: "row", gap: 6 },
   delete: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
   disabled: { opacity: 0.35 },
   done: { color: "#8a8a83", textDecorationLine: "line-through" },
@@ -181,9 +246,39 @@ const styles = StyleSheet.create({
     height: 42,
     paddingHorizontal: 13
   },
+  iconOption: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#deded8",
+    borderRadius: 11,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: "center",
+    width: 42
+  },
   list: { paddingBottom: 24, paddingTop: 18 },
   loading: { alignItems: "center", flex: 1, justifyContent: "center" },
   meta: { color: "#85857e", fontSize: 12, paddingTop: 3 },
+  option: {
+    alignItems: "center",
+    borderRadius: 11,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 8
+  },
+  optionText: { color: "#4c4c47", fontSize: 12, fontWeight: "600" },
+  priorityDot: { borderRadius: 4, height: 8, width: 8 },
+  priorityLow: { backgroundColor: "#f1f7fc", borderColor: "#cfe0ef" },
+  priorityMedium: { backgroundColor: "#fff8e8", borderColor: "#edd9a8" },
+  priorityHigh: { backgroundColor: "#fff3ec", borderColor: "#efc8b4" },
+  priorityUrgent: { backgroundColor: "#fff0ef", borderColor: "#e9bebc" },
+  dotLow: { backgroundColor: "#4f91d1" },
+  dotMedium: { backgroundColor: "#e59a18" },
+  dotHigh: { backgroundColor: "#e8671c" },
+  dotUrgent: { backgroundColor: "#c7463d" },
   page: { flex: 1, gap: 14, paddingHorizontal: 18, paddingTop: 24 },
   row: {
     alignItems: "center",
@@ -194,5 +289,6 @@ const styles = StyleSheet.create({
   },
   title: { color: "#242421", fontSize: 27, fontWeight: "700", letterSpacing: -0.8 },
   todoCopy: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  todoTitle: { color: "#242421", fontSize: 16, lineHeight: 21 }
+  todoTitle: { color: "#242421", fontSize: 16, lineHeight: 21 },
+  visibility: { alignItems: "center", height: 40, justifyContent: "center", width: 34 }
 });

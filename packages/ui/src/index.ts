@@ -22,6 +22,7 @@ export * from "./components/collapsible";
 export * from "./components/command";
 export * from "./components/context-menu";
 export * from "./components/dialog";
+export * from "./components/docked-side-drawer";
 export * from "./components/drawer";
 export * from "./components/dropdown-menu";
 export * from "./components/empty";

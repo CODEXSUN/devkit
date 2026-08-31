@@ -3,8 +3,8 @@ import { renameLegacyTable } from "../../database/database-utils.js";
 import type { DevkitDatabase } from "../../database/schema.js";
 
 export const taskManagerMigration = {
-  description: "Task Manager todos, project links, lookups, and audit activity.",
-  key: "devkit.task-manager.sql.v3"
+  description: "Task Manager todos, visibility, project links, lookups, and audit activity.",
+  key: "devkit.task-manager.sql.v4"
 } as const;
 
 export async function migrateTaskManagerModule(database: Kysely<DevkitDatabase>) {
@@ -33,6 +33,7 @@ export async function migrateTaskManagerModule(database: Kysely<DevkitDatabase>)
       position INT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      visibility VARCHAR(16) NOT NULL DEFAULT 'private',
       UNIQUE KEY uq_devkit_task_manager_todos_uuid (uuid),
       KEY idx_devkit_task_manager_todos_scope_order (scope_key, position, updated_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -40,6 +41,10 @@ export async function migrateTaskManagerModule(database: Kysely<DevkitDatabase>)
 
   await sql`ALTER TABLE devkit_task_manager_todos
     ADD COLUMN IF NOT EXISTS project_uuid CHAR(36) NOT NULL DEFAULT '' AFTER group_name`.execute(
+    database
+  );
+  await sql`ALTER TABLE devkit_task_manager_todos
+    ADD COLUMN IF NOT EXISTS visibility VARCHAR(16) NOT NULL DEFAULT 'private' AFTER priority`.execute(
     database
   );
 

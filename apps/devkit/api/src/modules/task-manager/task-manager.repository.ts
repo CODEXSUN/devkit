@@ -47,6 +47,19 @@ export class TaskManagerRepository {
     return record;
   }
 
+  async createBatch(scopeKey: string, records: Todo[], actorEmail: string) {
+    await this.database.transaction().execute(async (transaction) => {
+      for (const record of records) {
+        await transaction
+          .insertInto("devkit_task_manager_todos")
+          .values(todoValues(scopeKey, record))
+          .executeTakeFirstOrThrow();
+        await writeActivity(transaction, actorEmail, "created", record.id, { title: record.title });
+      }
+    });
+    return records;
+  }
+
   async update(scopeKey: string, record: Todo, actorEmail: string, action = "updated") {
     await this.database.transaction().execute(async (transaction) => {
       await transaction
@@ -61,7 +74,8 @@ export class TaskManagerRepository {
           priority: record.priority,
           status: record.status,
           title: record.title,
-          updated_at: new Date(record.updatedAt)
+          updated_at: new Date(record.updatedAt),
+          visibility: record.visibility
         })
         .where("scope_key", "=", scopeKey)
         .where("uuid", "=", record.id)
@@ -172,7 +186,8 @@ function todoValues(scopeKey: string, record: Todo) {
     status: record.status,
     title: record.title,
     updated_at: new Date(record.updatedAt),
-    uuid: record.id
+    uuid: record.id,
+    visibility: record.visibility
   };
 }
 
@@ -208,7 +223,8 @@ function mapTodo(row: Selectable<TaskManagerTodosTable>): Todo {
     priority: row.priority,
     status: row.status,
     title: row.title,
-    updatedAt: iso(row.updated_at)
+    updatedAt: iso(row.updated_at),
+    visibility: row.visibility === "public" ? "public" : "private"
   };
 }
 

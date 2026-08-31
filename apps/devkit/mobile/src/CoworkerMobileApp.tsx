@@ -24,6 +24,10 @@ import { sessionStorage } from "./session-storage";
 import logoImage from "../assets/logo.png";
 import { resolveApiUrl } from "./api-url";
 import { MobileDrawer, type MobileScreen } from "./MobileDrawer";
+import { ProjectOverviewPage } from "./ProjectOverviewPage";
+import { ConnectionServicePage } from "./ConnectionServicePage";
+import { DocsPage } from "./DocsPage";
+import { ArchivedChatsPage } from "./ArchivedChatsPage";
 import { TodoPage } from "./TodoPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { MessengerMobile } from "./MessengerMobile";
@@ -40,21 +44,33 @@ export function CoworkerMobileApp() {
       .finally(() => setLoading(false));
   }, []);
   if (loading) return <CenteredSpinner />;
-  return token ? <MobileHome onSessionExpired={() => setToken(null)} token={token} /> : <Login onLogin={setToken} />;
+  return token ? (
+    <MobileHome onSessionExpired={() => setToken(null)} token={token} />
+  ) : (
+    <Login onLogin={setToken} />
+  );
 }
 
 function MobileHome({ onSessionExpired, token }: { onSessionExpired: () => void; token: string }) {
   const [aiOpen, setAiOpen] = useState(false);
   useEffect(() => {
     let disposed = false;
-    void fetch(`${API_URL}/auth/session`, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
-      if (disposed || response.ok || response.status !== 401) return;
-      await sessionStorage.clear();
-      if (!disposed) onSessionExpired();
-    }).catch(() => undefined);
-    return () => { disposed = true; };
+    void fetch(`${API_URL}/auth/session`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (response) => {
+        if (disposed || response.ok || response.status !== 401) return;
+        await sessionStorage.clear();
+        if (!disposed) onSessionExpired();
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+    };
   }, [onSessionExpired, token]);
-  return aiOpen ? <NativeChat onOpenMessenger={() => setAiOpen(false)} token={token} /> : <MessengerMobile apiUrl={API_URL} onOpenAi={() => setAiOpen(true)} token={token} />;
+  return aiOpen ? (
+    <NativeChat onOpenMessenger={() => setAiOpen(false)} token={token} />
+  ) : (
+    <MessengerMobile apiUrl={API_URL} onOpenAi={() => setAiOpen(true)} token={token} />
+  );
 }
 
 function Login({ onLogin }: { onLogin: (token: string) => void }) {
@@ -126,12 +142,14 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
   const client = useMemo(() => new CoworkerClient(API_URL, () => token), [token]);
   const [projects, setProjects] = useState<CoworkerProject[]>([]);
   const [chats, setChats] = useState<CoworkerChatRecord[]>([]);
+  const [archivedChats, setArchivedChats] = useState<CoworkerChatRecord[]>([]);
   const [project, setProject] = useState<CoworkerProject>();
   const [messages, setMessages] = useState<CoworkerMessage[]>([]);
   const [composer, setComposer] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activityLabel, setActivityLabel] = useState("Understanding your request");
   const [menuOpen, setMenuOpen] = useState(false);
   const [screen, setScreen] = useState<MobileScreen>("chat");
   const list = useRef<FlatList<CoworkerMessage>>(null);
@@ -179,12 +197,21 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
     return () => clearInterval(timer);
   }, [busy, client, conversationId]);
 
+  useEffect(() => {
+    if (screen !== "archives") return;
+    void client
+      .archivedChats()
+      .then(setArchivedChats)
+      .catch(() => undefined);
+  }, [client, screen]);
+
   async function send() {
     const text = composer.trim();
     if (!text || !project || busy) return;
     const assistantId = `${Date.now()}-assistant`;
     setComposer("");
     setBusy(true);
+    setActivityLabel("Understanding your request");
     setMessages((current) => [
       ...current,
       { id: `${Date.now()}-user`, role: "user", text },
@@ -205,6 +232,9 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
                 : message
             )
           );
+        if (event.type === "chat.action" && event.action.status === "running") {
+          setActivityLabel(event.action.label);
+        }
         if (event.type === "chat.failed") streamError = event.message;
       });
       if (streamError) throw new Error(streamError);
@@ -222,6 +252,7 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
       );
     } finally {
       setBusy(false);
+      setActivityLabel("Understanding your request");
     }
   }
 
@@ -235,7 +266,8 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
 
   function openProject(nextProject: CoworkerProject) {
     setProject(nextProject);
-    newChat();
+    setScreen("project-overview");
+    setMenuOpen(false);
   }
 
   async function openChat(chat: CoworkerChatRecord) {
@@ -265,6 +297,23 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
     setChats(await client.chats());
   }
 
+  async function restoreArchivedChat(chat: CoworkerChatRecord) {
+    await client.restoreChat(chat.uuid);
+    const [active, archived] = await Promise.all([client.chats(), client.archivedChats()]);
+    setChats(active);
+    setArchivedChats(archived);
+  }
+
+  async function deleteArchivedChat(chat: CoworkerChatRecord) {
+    await client.forceDeleteChat(chat.uuid);
+    setArchivedChats(await client.archivedChats());
+  }
+
+  async function deleteAllArchivedChats() {
+    await client.forceDeleteArchivedChats();
+    setArchivedChats([]);
+  }
+
   function openScreen(nextScreen: MobileScreen) {
     setScreen(nextScreen);
     setMenuOpen(false);
@@ -291,13 +340,28 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
               <Text numberOfLines={1} style={styles.project}>
                 {screen === "todos"
                   ? "Task Manager"
-                  : screen === "projects"
-                    ? "Connected workspaces"
-                    : project?.title ?? (projects.length ? "Choose project" : "No projects")}
+                  : screen === "project-overview"
+                    ? (project?.title ?? "Project overview")
+                    : screen === "projects"
+                      ? "Connected workspaces"
+                      : screen === "connection"
+                        ? "Connect Service"
+                        : screen === "docs"
+                          ? "Documentation"
+                          : screen === "archives"
+                            ? "Archived chats"
+                            : (project?.title ??
+                              (projects.length ? "Choose project" : "No projects"))}
               </Text>
             </View>
           </View>
-          <Pressable accessibilityLabel="Open Messenger" onPress={onOpenMessenger} style={styles.iconButton}><Ionicons color={dark ? "#efefeb" : "#242421"} name="chatbubbles-outline" size={23} /></Pressable>
+          <Pressable
+            accessibilityLabel="Open Messenger"
+            onPress={onOpenMessenger}
+            style={styles.iconButton}
+          >
+            <Ionicons color={dark ? "#efefeb" : "#242421"} name="chatbubbles-outline" size={23} />
+          </Pressable>
           <Pressable
             accessibilityLabel="Open menu"
             accessibilityState={{ expanded: menuOpen }}
@@ -309,6 +373,8 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
         </View>
         {screen === "todos" ? (
           <TodoPage apiUrl={API_URL} token={token} />
+        ) : screen === "project-overview" && project ? (
+          <ProjectOverviewPage apiUrl={API_URL} project={project} token={token} />
         ) : screen === "projects" ? (
           <ProjectsPage
             apiUrl={API_URL}
@@ -316,77 +382,98 @@ function NativeChat({ onOpenMessenger, token }: { onOpenMessenger: () => void; t
             onOpen={openProject}
             token={token}
           />
+        ) : screen === "connection" ? (
+          <ConnectionServicePage apiUrl={API_URL} token={token} />
+        ) : screen === "docs" ? (
+          <DocsPage apiUrl={API_URL} token={token} />
+        ) : screen === "archives" ? (
+          <ArchivedChatsPage
+            chats={archivedChats}
+            onDelete={deleteArchivedChat}
+            onDeleteAll={deleteAllArchivedChats}
+            onRestore={restoreArchivedChat}
+            projects={projects}
+          />
         ) : (
           <>
             <FlatList
-          contentContainerStyle={messages.length ? styles.messages : styles.emptyList}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
-          ref={list}
-          style={styles.threadList}
-          renderItem={({ item }) => (
-            <View style={[styles.messageRow, item.role === "user" && styles.userRow]}>
-              {item.role === "assistant" ? (
-                <View style={styles.assistantIcon}>
-                  <Ionicons color="#fff" name="sparkles" size={13} />
+              contentContainerStyle={messages.length ? styles.messages : styles.emptyList}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
+              ref={list}
+              style={styles.threadList}
+              renderItem={({ item }) => (
+                <View style={[styles.messageRow, item.role === "user" && styles.userRow]}>
+                  {item.role === "assistant" ? (
+                    <View style={styles.assistantIcon}>
+                      <Ionicons color="#fff" name="sparkles" size={13} />
+                    </View>
+                  ) : null}
+                  <View
+                    style={[
+                      styles.message,
+                      item.role === "user" && styles.userMessage,
+                      dark && item.role === "user" && styles.userMessageDark
+                    ]}
+                  >
+                    {item.role === "assistant" && !item.text && busy ? (
+                      <View accessibilityLiveRegion="polite" style={styles.agentActivity}>
+                        <ActivityIndicator color={dark ? "#d8d8d2" : "#555550"} size="small" />
+                        <Text style={[styles.agentActivityText, dark && styles.textDark]}>
+                          {activityLabel}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text selectable style={[styles.messageText, dark && styles.textDark]}>
+                        {item.text || "No response returned."}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              ) : null}
-              <View
-                style={[
-                  styles.message,
-                  item.role === "user" && styles.userMessage,
-                  dark && item.role === "user" && styles.userMessageDark
-                ]}
-              >
-                <Text selectable style={[styles.messageText, dark && styles.textDark]}>
-                  {item.text || "Thinking…"}
-                </Text>
-              </View>
-            </View>
-          )}
-          ListEmptyComponent={
-            <View style={styles.welcome}>
-              <View style={styles.logo}>
-                <Ionicons color="#fff" name="sparkles" size={22} />
-              </View>
-              <Text style={[styles.welcomeTitle, dark && styles.textDark]}>
-                What are we working on?
-              </Text>
-              <Text style={styles.welcomeCopy}>
-                Ask about your selected project. Your conversation stays connected with web and
-                desktop.
-              </Text>
-            </View>
-          }
+              )}
+              ListEmptyComponent={
+                <View style={styles.welcome}>
+                  <View style={styles.logo}>
+                    <Ionicons color="#fff" name="sparkles" size={22} />
+                  </View>
+                  <Text style={[styles.welcomeTitle, dark && styles.textDark]}>
+                    What are we working on?
+                  </Text>
+                  <Text style={styles.welcomeCopy}>
+                    Ask about your selected project. Your conversation stays connected with web and
+                    desktop.
+                  </Text>
+                </View>
+              }
             />
             <View style={[styles.composerWrap, dark && styles.composerDark]}>
-          <TextInput
-            multiline
-            numberOfLines={3}
-            onChangeText={setComposer}
-            placeholder={project ? `Ask about ${project.title}` : "Add a project to begin"}
-            placeholderTextColor="#898981"
-            scrollEnabled
-            style={[styles.composer, dark && styles.textDark]}
-            textAlignVertical="top"
-            value={composer}
-          />
-          <Pressable
-            disabled={!composer.trim() || busy || !project}
-            onPress={() => void send()}
-            style={({ pressed }) => [
-              styles.send,
-              (!composer.trim() || busy || !project) && styles.sendDisabled,
-              pressed && styles.pressed
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Ionicons color="#fff" name="arrow-up" size={20} />
-            )}
-          </Pressable>
+              <TextInput
+                multiline
+                numberOfLines={3}
+                onChangeText={setComposer}
+                placeholder={project ? `Ask about ${project.title}` : "Add a project to begin"}
+                placeholderTextColor="#898981"
+                scrollEnabled
+                style={[styles.composer, dark && styles.textDark]}
+                textAlignVertical="top"
+                value={composer}
+              />
+              <Pressable
+                disabled={!composer.trim() || busy || !project}
+                onPress={() => void send()}
+                style={({ pressed }) => [
+                  styles.send,
+                  (!composer.trim() || busy || !project) && styles.sendDisabled,
+                  pressed && styles.pressed
+                ]}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons color="#fff" name="arrow-up" size={20} />
+                )}
+              </Pressable>
             </View>
           </>
         )}
@@ -419,6 +506,8 @@ function CenteredSpinner() {
 }
 
 const styles = StyleSheet.create({
+  agentActivity: { alignItems: "center", flexDirection: "row", gap: 9, minHeight: 28 },
+  agentActivityText: { color: "#595953", fontSize: 15 },
   assistantIcon: {
     alignItems: "center",
     backgroundColor: "#222220",

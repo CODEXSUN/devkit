@@ -9,6 +9,7 @@ export type TimestampColumn = ColumnType<
 export type DevkitDatabase = {
   schema_migrations: DevkitMigrationsTable;
   devkit_users: DevkitUsersTable;
+  devkit_docs_form_values: DocsFormValuesTable;
   devkit_planning_boards: PlanningBoardsTable;
   devkit_planning_board_links: PlanningBoardLinksTable;
   devkit_planning_comments: PlanningCommentsTable;
@@ -44,6 +45,9 @@ export type DevkitDatabase = {
   devkit_honey_memory: HoneyMemoryTable;
   devkit_notifications: NotificationsTable;
   devkit_messenger_messages: MessengerMessagesTable;
+  devkit_messenger_conversations: MessengerConversationsTable;
+  devkit_messenger_participants: MessengerParticipantsTable;
+  devkit_messenger_activity: MessengerActivityTable;
   devkit_notification_jobs: NotificationJobsTable;
   devkit_sync_conflicts: DevkitSyncConflictsTable;
   devkit_sync_connections: DevkitSyncConnectionsTable;
@@ -52,7 +56,59 @@ export type DevkitDatabase = {
   devkit_sync_tokens: DevkitSyncTokensTable;
 };
 
-export type MessengerMessagesTable = { actor_id: string; body: string; client: string; created_at: TimestampColumn; id: Generated<number>; uuid: string };
+export type DocsFormValuesTable = {
+  actor_id: string;
+  created_at: TimestampColumn;
+  form_key: string;
+  id: Generated<number>;
+  page_slug: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+  values_json: string;
+};
+
+export type MessengerMessagesTable = {
+  actor_id: string;
+  body: string;
+  client: string;
+  conversation_uuid: string | null;
+  created_at: TimestampColumn;
+  delivered_at: TimestampColumn | null;
+  id: Generated<number>;
+  recipient_actor_id: string | null;
+  read_at: TimestampColumn | null;
+  uuid: string;
+};
+
+export type MessengerConversationsTable = {
+  created_at: TimestampColumn;
+  created_by_actor_id: string;
+  id: Generated<number>;
+  kind: string;
+  title: string;
+  updated_at: TimestampColumn;
+  uuid: string;
+};
+
+export type MessengerParticipantsTable = {
+  actor_id: string;
+  archived_at: TimestampColumn | null;
+  conversation_uuid: string;
+  id: Generated<number>;
+  joined_at: TimestampColumn;
+  last_read_at: TimestampColumn | null;
+  muted_at: TimestampColumn | null;
+};
+
+export type MessengerActivityTable = {
+  action: string;
+  actor_id: string;
+  conversation_uuid: string;
+  created_at: TimestampColumn;
+  details_json: string;
+  id: Generated<number>;
+  uuid: string;
+};
 
 export type ModelProviderConnectionsTable = {
   actor_id: string;
@@ -585,6 +641,7 @@ export type TaskManagerTodosTable = SyncColumns & {
   title: string;
   updated_at: TimestampColumn;
   uuid: string;
+  visibility: string;
 };
 
 export type TaskManagerLookupsTable = SyncColumns & {

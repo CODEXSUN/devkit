@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { AppError } from "@codexsun/framework/errors";
 import { TaskManagerRepository } from "./task-manager.repository.js";
+import { ProjectManagerRepository } from "../project-manager/project-manager.repository.js";
 import type {
   Todo,
   TodoInput,
@@ -16,7 +17,8 @@ const lookupKinds: TodoLookupKind[] = ["category", "group", "priority", "status"
 export class TaskManagerService {
   constructor(
     private readonly repository = new TaskManagerRepository(),
-    private readonly notifications = new TelegramNotificationService()
+    private readonly notifications = new TelegramNotificationService(),
+    private readonly projects = new ProjectManagerRepository()
   ) {}
 
   list(scopeKey: string) {
@@ -24,42 +26,38 @@ export class TaskManagerService {
   }
 
   async create(scopeKey: string, input: TodoInput, actorEmail: string) {
-    const title = requiredTitle(input.title);
     const records = await this.repository.list(scopeKey);
-    const timestamp = now();
-    const record: Todo = {
-      category: input.category ?? "work",
-      createdAt: timestamp,
-      description: String(input.description ?? ""),
-      dueDate: String(input.dueDate ?? ""),
-      groupName: String(input.groupName ?? "").trim(),
-      projectId: String(input.projectId ?? "").trim(),
-      id: newUuid(),
-      position: records.length,
-      priority: input.priority ?? "medium",
-      status: input.status ?? "open",
-      title,
-      updatedAt: timestamp
-    };
+    const record = await this.newRecord(input, records.length);
     const created = await this.repository.create(scopeKey, record, actorEmail);
     await this.notifications.taskChanged("created", created);
+    return created;
+  }
+
+  async createBatch(scopeKey: string, inputs: TodoInput[], actorEmail: string) {
+    const existing = await this.repository.list(scopeKey);
+    const records = await Promise.all(inputs.map((input, index) => this.newRecord(input, existing.length + index)));
+    const created = await this.repository.createBatch(scopeKey, records, actorEmail);
+    await Promise.all(created.map((record) => this.notifications.taskChanged("created", record)));
     return created;
   }
 
   async update(scopeKey: string, id: string, input: TodoUpdateInput, actorEmail: string) {
     const current = await this.repository.find(scopeKey, id);
     if (!current) throw AppError.notFound("Todo was not found.");
+    const projectId = String(input.projectId ?? current.projectId).trim();
+    await this.requireProject(projectId);
     const next: Todo = {
       ...current,
       category: input.category ?? current.category,
       description: String(input.description ?? current.description),
       dueDate: String(input.dueDate ?? current.dueDate),
       groupName: String(input.groupName ?? current.groupName).trim(),
-      projectId: String(input.projectId ?? current.projectId).trim(),
+      projectId,
       priority: input.priority ?? current.priority,
       status: input.status ?? current.status,
       title: requiredTitle(input.title ?? current.title),
-      updatedAt: now()
+      updatedAt: now(),
+      visibility: input.visibility ?? current.visibility
     };
     const updated = await this.repository.update(scopeKey, next, actorEmail);
     await this.notifications.taskChanged("updated", updated);
@@ -91,6 +89,9 @@ export class TaskManagerService {
   }
 
   async reorder(scopeKey: string, orderedIds: string[], actorEmail: string) {
+    if (new Set(orderedIds).size !== orderedIds.length) {
+      throw AppError.validation("Todo order contains duplicate IDs.");
+    }
     const records = await this.repository.list(scopeKey);
     const known = new Set(records.map((record) => record.id));
     const ordered = orderedIds.filter((id) => known.has(id));
@@ -128,6 +129,35 @@ export class TaskManagerService {
       value: toValue(name)
     };
     return this.repository.createLookup(scopeKey, record, actorEmail);
+  }
+
+  private async requireProject(projectId: string) {
+    if (!projectId) return;
+    if (!(await this.projects.find("project", projectId))) {
+      throw AppError.validation("Todo project was not found.");
+    }
+  }
+
+  private async newRecord(input: TodoInput, position: number): Promise<Todo> {
+    const title = requiredTitle(input.title);
+    const projectId = String(input.projectId ?? "").trim();
+    await this.requireProject(projectId);
+    const timestamp = now();
+    return {
+      category: input.category ?? "work",
+      createdAt: timestamp,
+      description: String(input.description ?? ""),
+      dueDate: String(input.dueDate ?? ""),
+      groupName: String(input.groupName ?? "").trim(),
+      projectId,
+      id: newUuid(),
+      position,
+      priority: input.priority ?? "medium",
+      status: input.status ?? "open",
+      title,
+      updatedAt: timestamp,
+      visibility: input.visibility ?? "private"
+    };
   }
 }
 

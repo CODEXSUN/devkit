@@ -61,7 +61,7 @@ const workspaces = Object.freeze([
       default: module.HostingerDetailWorkspace
     }))
   ),
-  workspace("project-sync", "Local-first Sync", "Cloud", () =>
+  workspace("project-sync", "Connect Service", "Services", () =>
     import("./modules/sync").then((module) => ({
       default: module.ProjectSyncSettingsWorkspace
     }))
@@ -286,22 +286,22 @@ export const devkitWebBundle = Object.freeze({
         title: "Deployment"
       },
       {
+        icon: BookOpenIcon,
+        isActive: activeWorkspaceId === "docs",
+        title: "Documentation",
+        url: "/app/devkit/docs"
+      },
+      {
         icon: CloudCogIcon,
         isActive: activeWorkspaceId === "project-sync",
         items: [
           {
             isActive: activeWorkspaceId === "project-sync",
-            title: "Local-first Sync",
+            title: "Connect Service",
             url: "/app/devkit/project-sync"
           }
         ],
-        title: "Cloud"
-      },
-      {
-        icon: BookOpenIcon,
-        isActive: activeWorkspaceId === "docs",
-        title: "Documentation",
-        url: "/app/devkit/docs"
+        title: "Connect Service"
       }
     ];
   },

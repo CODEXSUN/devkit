@@ -42,6 +42,9 @@ export class CodexChatService {
     let actions: OrchestrationChatAction[] = [];
     let runId: string | null = null;
     let workspace: AgentWorkspace | null = null;
+    let activeThreadId: string | null = null;
+    let activeTurnId: string | null = null;
+    let terminal = false;
     const startedAt = Date.now();
     const budget = new AgentRunBudgetGuard(undefined, startedAt);
     try {
@@ -118,6 +121,8 @@ export class CodexChatService {
         input.model,
         input.access
       );
+      activeThreadId = threadId;
+      activeTurnId = turnId;
       await orchestrationChatRepository.updateRuntime(conversationId, actorId, {
         access: input.access,
         codexThreadId: threadId,
@@ -141,6 +146,7 @@ export class CodexChatService {
             actions,
             workspace
           );
+          terminal = true;
           yield { type: "chat.failed", message };
           return;
         }
@@ -172,6 +178,7 @@ export class CodexChatService {
             actions,
             workspace
           );
+          terminal = true;
           yield { type: "chat.failed", message: budgetViolation };
           return;
         }
@@ -198,6 +205,7 @@ export class CodexChatService {
             assistantText || "No response returned."
           );
           await finalizeWorkspace(runId, actorId, workspace);
+          terminal = true;
         }
         if (event.type === "chat.failed") {
           await orchestrationChatRepository.addMessage(
@@ -214,6 +222,7 @@ export class CodexChatService {
           );
           await agentRunRepository.fail(runId, actorId, event.message);
           await finalizeWorkspace(runId, actorId, workspace);
+          terminal = true;
         }
         yield event;
         if (event.type === "chat.completed" || event.type === "chat.failed") return;
@@ -241,12 +250,28 @@ export class CodexChatService {
           )
           .catch(() => undefined);
       }
+      terminal = true;
       yield {
         type: "chat.failed",
         message: error instanceof Error ? error.message : "Codex chat failed."
       };
     } finally {
       unsubscribe?.();
+      if (!terminal && runId && conversationId && workspace && activeThreadId && activeTurnId) {
+        await codexConnectorPool
+          .client(input.connectionId)
+          .interruptTurn(activeThreadId, activeTurnId)
+          .catch(() => undefined);
+        await persistCancellation(
+          runId,
+          actorId,
+          conversationId,
+          startedAt,
+          editedFileList,
+          actions,
+          workspace
+        ).catch(() => undefined);
+      }
     }
   }
 }
@@ -337,7 +362,7 @@ async function formatInputs(input: CodexChatInput, workspace: AgentWorkspace, ac
     : "";
   const planInstruction = `\n- Authenticated DevKit actor: ${actorId}${
     input.access === "plan"
-      ? "\n- Planning mode: inspect and reason, but return a plan only. Do not modify files."
+      ? "\n- Planning mode: inspect and reason, but return a plan only. Do not modify files.\n- Use these Markdown sections exactly when preparing a task-ready plan: Proposal, Assumptions, Risks and alternatives, Implementation tasks, Acceptance criteria, Test plan.\n- Put each implementation task on its own Markdown list item. Keep tasks independently actionable and ordered by dependency."
       : ""
   }`;
   const skillContext = await skillsRepository.promptingContext();
@@ -392,6 +417,32 @@ async function persistFailure(
     actorId
   );
   await agentRunRepository.fail(runId, actorId, message);
+  await finalizeWorkspace(runId, actorId, workspace);
+}
+
+async function persistCancellation(
+  runId: string,
+  actorId: string,
+  conversationId: string,
+  startedAt: number,
+  files: string[],
+  actions: OrchestrationChatAction[],
+  workspace: AgentWorkspace
+) {
+  const message = "Stopped by you.";
+  await orchestrationChatRepository.addMessage(
+    {
+      actions,
+      attachments: [],
+      body: message,
+      durationMs: Date.now() - startedAt,
+      files,
+      role: "assistant",
+      threadUuid: conversationId
+    },
+    actorId
+  );
+  await agentRunRepository.cancel(runId, actorId, message);
   await finalizeWorkspace(runId, actorId, workspace);
 }
 

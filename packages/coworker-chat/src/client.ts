@@ -1,4 +1,11 @@
-import type { CoworkerChat, CoworkerChatDetail, CoworkerEvent, CoworkerProject } from "./types";
+import type {
+  CoworkerChat,
+  CoworkerChatDetail,
+  CoworkerEvent,
+  CoworkerProject,
+  CoworkerProjectRecord,
+  CoworkerRepository
+} from "./types";
 
 type Envelope<T> = { data: T; success: true } | { error: { message: string }; success: false };
 
@@ -9,6 +16,7 @@ export type CoworkerStreamInput = {
   project: CoworkerProject;
   threadId: string | null;
 };
+export type AgentAccessMode = NonNullable<CoworkerStreamInput["access"]>;
 
 export interface CoworkerBackend {
   archiveChat?(uuid: string): Promise<{ archived: boolean; uuid: string }>;
@@ -22,7 +30,11 @@ export interface CoworkerBackend {
   restoreChat?(uuid: string): Promise<{ restored: boolean; uuid: string }>;
   selectProject?(project: CoworkerProject): Promise<void>;
   setChatPinned?(uuid: string, pinned: boolean): Promise<{ pinned: boolean; uuid: string }>;
-  stream(input: CoworkerStreamInput, onEvent: (event: CoworkerEvent) => void): Promise<void>;
+  stream(
+    input: CoworkerStreamInput,
+    onEvent: (event: CoworkerEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void>;
 }
 
 export class CoworkerClient implements CoworkerBackend {
@@ -48,6 +60,70 @@ export class CoworkerClient implements CoworkerBackend {
       "/api/devkit/admin/project-manager/project"
     );
     return records.filter((project) => project.active);
+  }
+
+  projectRecords(kind: string) {
+    return this.request<CoworkerProjectRecord[]>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}`
+    );
+  }
+
+  createProjectRecord(kind: string, input: Partial<CoworkerProjectRecord> & { key: string; title: string }) {
+    return this.request<CoworkerProjectRecord>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}`,
+      { body: JSON.stringify(input), method: "POST" }
+    );
+  }
+
+  updateProjectRecord(kind: string, id: string, input: Partial<CoworkerProjectRecord>) {
+    return this.request<CoworkerProjectRecord>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`,
+      { body: JSON.stringify(input), method: "PUT" }
+    );
+  }
+
+  repositories() {
+    return this.request<CoworkerRepository[]>("/api/devkit/project-manager/repositories");
+  }
+
+  createProject(input: {
+    colorKey?: string;
+    description?: string;
+    key?: string;
+    logoText?: string;
+    referenceId?: string;
+    repositoryName?: string;
+    title: string;
+  }) {
+    const key =
+      input.key?.trim() ||
+      input.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/gu, "-")
+        .replace(/^-|-$/gu, "");
+    return this.request<CoworkerProject>("/api/devkit/admin/project-manager/project", {
+      body: JSON.stringify({
+        description: input.description || "Project workspace",
+        key,
+        colorKey: input.colorKey || "slate",
+        logoText: input.logoText?.trim().toUpperCase() || "",
+        moduleKey: "project-manager",
+        referenceId: input.referenceId || "",
+        referenceType: input.referenceId ? "repository" : "",
+        repositoryName: input.repositoryName || "",
+        status: "planning",
+        title: input.title,
+        type: "project"
+      }),
+      method: "POST"
+    });
+  }
+
+  selectLocalFolder() {
+    return this.request<{ path: string }>("/api/devkit/project-manager/select-local-folder", {
+      body: JSON.stringify({}),
+      method: "POST"
+    });
   }
 
   chats() {
@@ -80,10 +156,9 @@ export class CoworkerClient implements CoworkerBackend {
   }
 
   forceDeleteArchivedChats() {
-    return this.request<{ deleted: number }>(
-      "/api/devkit/orchestration/agent-ide/chats/archived",
-      { method: "DELETE" }
-    );
+    return this.request<{ deleted: number }>("/api/devkit/orchestration/agent-ide/chats/archived", {
+      method: "DELETE"
+    });
   }
 
   setChatPinned(uuid: string, pinned: boolean) {
@@ -97,7 +172,11 @@ export class CoworkerClient implements CoworkerBackend {
     return this.request<CoworkerChatDetail>(`/api/devkit/orchestration/agent-ide/chats/${uuid}`);
   }
 
-  async stream(input: CoworkerStreamInput, onEvent: (event: CoworkerEvent) => void) {
+  async stream(
+    input: CoworkerStreamInput,
+    onEvent: (event: CoworkerEvent) => void,
+    signal?: AbortSignal
+  ) {
     const response = await this.fetcher(
       `${this.baseUrl}/api/devkit/orchestration/agent-ide/codex/chat/stream`,
       {
@@ -121,7 +200,8 @@ export class CoworkerClient implements CoworkerBackend {
           workItem: null
         }),
         headers: this.headers(),
-        method: "POST"
+        method: "POST",
+        ...(signal ? { signal } : {})
       }
     );
     if (!response.ok || !response.body) throw new Error(await responseError(response));
@@ -136,6 +216,24 @@ export class CoworkerClient implements CoworkerBackend {
       buffer = lines.pop() ?? "";
       for (const line of lines) if (line.trim()) onEvent(JSON.parse(line) as CoworkerEvent);
     }
+  }
+
+  resolveApproval(input: {
+    decision: "accept" | "acceptForSession" | "decline";
+    requestId: number;
+    threadId: string;
+  }) {
+    return this.request<{ resolved: boolean }>(
+      "/api/devkit/orchestration/agent-ide/codex/approval",
+      { body: JSON.stringify(input), method: "POST" }
+    );
+  }
+
+  setMessageFeedback(uuid: string, feedback: "down" | "up" | null) {
+    return this.request<{ feedback: "down" | "up" | null; uuid: string }>(
+      `/api/devkit/orchestration/agent-ide/chat-messages/${uuid}/feedback`,
+      { body: JSON.stringify({ feedback }), method: "PUT" }
+    );
   }
 
   private async request<T>(path: string, options: RequestInit = {}, authorize = true) {

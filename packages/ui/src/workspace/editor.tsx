@@ -220,14 +220,19 @@ export function WorkspaceEditor({
   className,
   content,
   onChange,
+  fullPreview = false,
+  initialMode = "write",
   placeholder = "Start typing..."
 }: {
   className?: string;
   content?: string;
+  fullPreview?: boolean;
+  initialMode?: "write" | "markdown" | "preview";
   onChange?: (html: string) => void;
   placeholder?: string;
 }) {
-  const [mode, setMode] = React.useState<"write" | "preview">("write");
+  const [mode, setMode] = React.useState<"write" | "markdown" | "preview">(initialMode);
+  const [markdown, setMarkdown] = React.useState(() => htmlToMarkdown(content ?? ""));
   const headingSelectId = React.useId();
   const editor = useEditor({
     extensions: [
@@ -282,6 +287,7 @@ export function WorkspaceEditor({
   React.useEffect(() => {
     if (!editor || content === undefined || content === editor.getHTML()) return;
     editor.commands.setContent(content, { emitUpdate: false });
+    setMarkdown(htmlToMarkdown(content));
   }, [content, editor]);
 
   if (!editor) return null;
@@ -394,6 +400,13 @@ export function WorkspaceEditor({
     }
 
     activeEditor.chain().focus().setHighlight({ color }).run();
+  }
+
+  function updateMarkdown(value: string) {
+    setMarkdown(value);
+    const html = markdownToHtml(value);
+    activeEditor.commands.setContent(html, { emitUpdate: false });
+    onChange?.(html);
   }
 
   const currentHeadingLevel = headingLevels.find((level) =>
@@ -623,6 +636,18 @@ export function WorkspaceEditor({
               >
                 Preview
               </button>
+              <button
+                type="button"
+                className={cn(
+                  "border-b-2 px-3 py-2 text-sm font-medium",
+                  mode === "markdown"
+                    ? "border-background bg-background text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setMode("markdown")}
+              >
+                Markdown
+              </button>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Pilcrow className="size-3.5" />
@@ -632,9 +657,22 @@ export function WorkspaceEditor({
         </div>
         {mode === "write" ? (
           <EditorContent editor={activeEditor} />
+        ) : mode === "markdown" ? (
+          <textarea
+            aria-label="Markdown content"
+            className={cn(
+              "min-h-[132px] w-full resize-y bg-background px-4 py-4 font-mono text-sm leading-6 outline-none",
+              fullPreview && "min-h-[calc(100svh-18rem)]"
+            )}
+            value={markdown}
+            onChange={(event) => updateMarkdown(event.target.value)}
+          />
         ) : (
           <div
-            className="typeset typeset-article min-h-[132px] max-w-[37em] px-4 py-4"
+            className={cn(
+              "typeset typeset-article min-h-[132px] max-w-[37em] px-4 py-4",
+              fullPreview && "min-h-[calc(100svh-18rem)] max-w-none overflow-y-auto"
+            )}
             dangerouslySetInnerHTML={{ __html: activeEditor.getHTML() || "<p>No preview yet.</p>" }}
           />
         )}
@@ -678,6 +716,55 @@ function EditorIconButton({
       {children}
     </button>
   );
+}
+
+function htmlToMarkdown(html: string) {
+  if (!html.trim()) return "";
+  const document = new DOMParser().parseFromString(html, "text/html");
+  return [...document.body.childNodes]
+    .map((node) => markdownNode(node))
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+function markdownNode(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+  if (!(node instanceof HTMLElement)) return "";
+  const content = [...node.childNodes].map((child) => markdownNode(child)).join("");
+  if (/^H[1-6]$/u.test(node.tagName)) return `${"#".repeat(Number(node.tagName[1]))} ${content}`;
+  if (node.tagName === "P") return content;
+  if (node.tagName === "STRONG" || node.tagName === "B") return `**${content}**`;
+  if (node.tagName === "EM" || node.tagName === "I") return `*${content}*`;
+  if (node.tagName === "CODE") return `\`${content}\``;
+  if (node.tagName === "A") return `[${content}](${node.getAttribute("href") ?? ""})`;
+  if (node.tagName === "LI") return `- ${content}`;
+  if (node.tagName === "UL" || node.tagName === "OL") return content;
+  if (node.tagName === "BR") return "\n";
+  return content;
+}
+
+function markdownToHtml(markdown: string) {
+  const escaped = markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const blocks = escaped.split(/\n{2,}/u).map((block) => block.trim()).filter(Boolean);
+  return blocks.map((block) => markdownBlock(block)).join("");
+}
+
+function markdownBlock(block: string) {
+  const heading = block.match(/^(#{1,6})\s+(.+)$/u);
+  if (heading) return `<h${heading[1]!.length}>${markdownInline(heading[2]!)}</h${heading[1]!.length}>`;
+  if (block.split("\n").every((line) => line.startsWith("- "))) {
+    return `<ul>${block.split("\n").map((line) => `<li>${markdownInline(line.slice(2))}</li>`).join("")}</ul>`;
+  }
+  return `<p>${markdownInline(block).replaceAll("\n", "<br>")}</p>`;
+}
+
+function markdownInline(value: string) {
+  return value
+    .replace(/\*\*(.+?)\*\*/gu, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/gu, "<em>$1</em>")
+    .replace(/`(.+?)`/gu, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/gu, '<a href="$2">$1</a>');
 }
 
 function ToolbarSelect({

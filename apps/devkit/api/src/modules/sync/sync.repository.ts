@@ -5,6 +5,7 @@ import { getDevkitDatabase } from "../../database/devkit-database.js";
 import type { DevkitDatabase } from "../../database/schema.js";
 import { ProjectManagerAttachmentStorage } from "../project-manager/project-manager.storage.js";
 import type { DevkitSyncSnapshot } from "./sync.types.js";
+import { z } from "zod";
 
 export const synchronizedTables = [
   "devkit_planning_boards",
@@ -23,6 +24,9 @@ export const synchronizedTables = [
 ] as const;
 
 type DynamicDatabase = Record<string, Record<string, unknown>>;
+const synchronizedTodoSchema = z
+  .object({ visibility: z.enum(["private", "public"]).default("private") })
+  .passthrough();
 
 export class DevkitSyncRepository {
   constructor(
@@ -110,7 +114,8 @@ export class DevkitSyncRepository {
     await this.database.transaction().execute(async (transaction) => {
       const target = transaction as unknown as Kysely<DynamicDatabase>;
       for (const table of synchronizedTables) {
-        for (const input of snapshot.tables[table] ?? []) {
+        for (const snapshotRow of snapshot.tables[table] ?? []) {
+          const input = validateSynchronizedRow(table, snapshotRow);
           const row = {
             ...input,
             sync_direction: "inbound",
@@ -391,6 +396,10 @@ export class DevkitSyncRepository {
       })
       .executeTakeFirstOrThrow();
   }
+}
+
+export function validateSynchronizedRow(table: string, row: Record<string, unknown>) {
+  return table === "devkit_task_manager_todos" ? synchronizedTodoSchema.parse(row) : row;
 }
 
 function serializable(row: Record<string, unknown>) {

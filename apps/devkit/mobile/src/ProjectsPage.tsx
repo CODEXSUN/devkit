@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { CoworkerProject } from "@codexsun/coworker-chat";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   type MobileProject,
   type MobileRepository,
@@ -30,6 +30,8 @@ export function ProjectsPage({
   const [connectingId, setConnectingId] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [projectName, setProjectName] = useState("");
 
   useEffect(() => {
     void client
@@ -58,6 +60,23 @@ export function ProjectsPage({
     }
   }
 
+  async function createProject() {
+    if (!projectName.trim()) return;
+    setConnectingId("new-project");
+    setError("");
+    try {
+      const project = await client.create(projectName.trim());
+      setProjects((current) => [project, ...current]);
+      onConnect(project);
+      setProjectName("");
+      setAdding(false);
+    } catch (reason) {
+      setError(messageOf(reason));
+    } finally {
+      setConnectingId(undefined);
+    }
+  }
+
   return (
     <View style={styles.page}>
       <View style={styles.heading}>
@@ -65,11 +84,12 @@ export function ProjectsPage({
           <Text style={styles.title}>Projects</Text>
           <Text style={styles.subtitle}>Connected work and available repositories</Text>
         </View>
-        <View style={styles.summary}>
+        <View style={styles.headingActions}><View style={styles.summary}>
           <Text style={styles.summaryValue}>{projects.length}</Text>
           <Text style={styles.summaryLabel}>connected</Text>
-        </View>
+        </View><Pressable accessibilityLabel="Add project or repository" onPress={() => setAdding((open) => !open)} style={styles.addButton}><Ionicons color="#fff" name={adding ? "close" : "add"} size={20} /></Pressable></View>
       </View>
+      {adding ? <View style={styles.createPanel}><TextInput onChangeText={setProjectName} placeholder="New project name" placeholderTextColor="#85857e" style={styles.createInput} value={projectName} /><Pressable disabled={!projectName.trim() || connectingId === "new-project"} onPress={() => void createProject()} style={styles.createButton}><Text style={styles.createButtonText}>Create</Text></Pressable><Text style={styles.repositoryHint}>Or choose an available repository below.</Text></View> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {loading ? (
         <View style={styles.loading}>
@@ -207,6 +227,7 @@ function messageOf(reason: unknown) {
 }
 
 const styles = StyleSheet.create({
+  addButton: { alignItems: "center", backgroundColor: "#242421", borderRadius: 9, height: 34, justifyContent: "center", width: 34 },
   badge: { backgroundColor: "#e4f3e8", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   badgeMuted: { backgroundColor: "#efefe9" },
   badgeText: { color: "#267144", fontSize: 11, fontWeight: "700" },
@@ -249,6 +270,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11
   },
   connectText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  createButton: { alignItems: "center", backgroundColor: "#242421", borderRadius: 8, height: 36, justifyContent: "center", width: 78 },
+  createButtonText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  createInput: { borderColor: "#deded8", borderRadius: 8, borderWidth: 1, color: "#242421", flex: 1, fontSize: 14, height: 36, paddingHorizontal: 10 },
+  createPanel: { alignItems: "center", backgroundColor: "#fff", borderColor: "#e2e2dc", borderRadius: 12, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 11 },
   description: { color: "#6f6f68", fontSize: 13, lineHeight: 19, paddingTop: 6 },
   detail: { alignItems: "center", flexDirection: "row", gap: 5, maxWidth: "48%" },
   details: { flexDirection: "row", gap: 14, paddingTop: 10 },
@@ -257,10 +282,12 @@ const styles = StyleSheet.create({
   emptyList: { flexGrow: 1, justifyContent: "center" },
   error: { color: "#b53b35", fontSize: 14 },
   heading: { alignItems: "flex-end", flexDirection: "row", justifyContent: "space-between" },
+  headingActions: { alignItems: "center", flexDirection: "row", gap: 10 },
   list: { gap: 10, paddingBottom: 26, paddingTop: 4 },
   loading: { alignItems: "center", flex: 1, justifyContent: "center" },
   page: { flex: 1, gap: 16, paddingHorizontal: 16, paddingTop: 22 },
   repositoryIcon: { backgroundColor: "#f4f4f0" },
+  repositoryHint: { color: "#85857e", fontSize: 11, width: "100%" },
   subtitle: { color: "#777770", fontSize: 13, paddingTop: 4 },
   summary: { alignItems: "flex-end" },
   summaryLabel: { color: "#85857e", fontSize: 11 },

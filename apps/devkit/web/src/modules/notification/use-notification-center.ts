@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { io } from "socket.io-client";
+import { devkitSocketPath } from "@codexsun/coworker-chat";
 import { listNotifications, markNotificationRead } from "./notification.services";
 
 const queryKey = ["devkit", "notifications"] as const;
@@ -19,7 +20,7 @@ export function useNotificationCenter() {
     const apiUrl = import.meta.env.VITE_PLATFORM_API_URL.replace(/\/+$/u, "");
     const socket = io(apiUrl, {
       auth: { token },
-      path: "/api/devkit/notifications/socket.io",
+      path: devkitSocketPath(apiUrl, "/api/devkit/notifications/socket.io"),
       transports: ["websocket", "polling"]
     });
     socket.on("notification.created", () => {

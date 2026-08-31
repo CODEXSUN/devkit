@@ -41,7 +41,11 @@ import {
   migrateModelProviders,
   modelProviderMigration
 } from "../modules/orchestration/model-provider.migration.js";
-import { messengerMigration, migrateMessengerModule } from "../modules/messenger/messenger.migration.js";
+import {
+  messengerMigration,
+  migrateMessengerModule
+} from "../modules/messenger/messenger.migration.js";
+import { docsMigration, migrateDocsModule } from "../modules/docs/docs.migration.js";
 
 const databaseContext = new AsyncLocalStorage<Kysely<DevkitDatabase>>();
 const bootstrapPromises = new WeakMap<Kysely<DevkitDatabase>, Promise<void>>();
@@ -55,6 +59,7 @@ const requestDatabase = new Proxy({} as Kysely<DevkitDatabase>, {
 });
 
 const migrationSteps = [
+  { migrate: migrateDocsModule, name: docsMigration.key },
   {
     migrate: migrateProjectManagerModule,
     name: projectManagerMigration.key

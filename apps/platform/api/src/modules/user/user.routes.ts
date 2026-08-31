@@ -33,9 +33,16 @@ const profilePayload = z
   .strict();
 const profileRecord = record.pick({ email: true, id: true, name: true, uuid: true });
 const profileResponse = z.object({ accessToken: z.string(), profile: profileRecord });
+const contactRecord = profileRecord.pick({ email: true, name: true, uuid: true });
 const params = z.object({ id: z.string().regex(/^\d+$/) });
 const query = z.object({ search: z.string().trim().optional() });
 export async function registerUserRoutes(app: FastifyInstance) {
+  registerContractRoute(app, {
+    method: "GET",
+    url: "/identity/contacts",
+    schemas: { response: z.array(contactRecord) },
+    handler: ({ request }) => new UserService(identityContext(request)).contacts()
+  });
   registerContractRoute(app, {
     method: "GET",
     url: "/identity/profile",
