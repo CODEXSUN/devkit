@@ -9,7 +9,7 @@ import {
   tokenIsCurrent
 } from "../api/platform-api";
 
-export function AuthGate({ children }: { children: ReactElement }) {
+export function AuthGate({ children, requireSuperAdmin = false }: { children: ReactElement; requireSuperAdmin?: boolean }) {
   const token = useMemo(() => getToken(), []);
   const expiresAt = useMemo(() => tokenExpiresAt(token), [token]);
   const localValid = useMemo(() => tokenIsCurrent(token), [token]);
@@ -21,29 +21,29 @@ export function AuthGate({ children }: { children: ReactElement }) {
       return;
     }
     let cancelled = false;
-    void apiGet<{ authenticated: boolean }>("/auth/session")
-      .then((session) => !cancelled && setServerValid(session.authenticated))
+    void apiGet<{ authenticated: boolean; superAdmin?: boolean }>("/auth/session")
+      .then((session) => !cancelled && setServerValid(session.authenticated && (!requireSuperAdmin || session.superAdmin === true)))
       .catch(() => !cancelled && setServerValid(false));
     return () => {
       cancelled = true;
     };
-  }, [localValid]);
+  }, [localValid, requireSuperAdmin]);
 
   useEffect(() => {
     if (serverValid !== false) return;
-    redirectToLoginForExpiredSession();
-  }, [serverValid]);
+    redirectToLoginForExpiredSession(requireSuperAdmin ? "/sa/login" : "/login");
+  }, [requireSuperAdmin, serverValid]);
 
   useEffect(() => {
     if (!expiresAt) return;
     const remaining = expiresAt - Date.now();
     if (remaining <= 0) {
-      redirectToLoginForExpiredSession();
+      redirectToLoginForExpiredSession(requireSuperAdmin ? "/sa/login" : "/login");
       return;
     }
-    const timeout = window.setTimeout(redirectToLoginForExpiredSession, remaining);
+    const timeout = window.setTimeout(() => redirectToLoginForExpiredSession(requireSuperAdmin ? "/sa/login" : "/login"), remaining);
     return () => window.clearTimeout(timeout);
-  }, [expiresAt]);
+  }, [expiresAt, requireSuperAdmin]);
 
   if (serverValid === true) return children;
   return <GlobalLoader />;

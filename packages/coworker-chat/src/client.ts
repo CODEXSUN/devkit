@@ -2,8 +2,14 @@ import type {
   CoworkerChat,
   CoworkerChatDetail,
   CoworkerEvent,
+  CoworkerIdentityContact,
+  CoworkerPlanningBoard,
+  CoworkerPlanningScene,
+  CoworkerProjectAttachment,
   CoworkerProject,
   CoworkerProjectRecord,
+  CoworkerRegistryModule,
+  CoworkerRegistryResult,
   CoworkerRepository
 } from "./types";
 
@@ -62,9 +68,51 @@ export class CoworkerClient implements CoworkerBackend {
     return records.filter((project) => project.active);
   }
 
+  identityContacts() {
+    return this.request<CoworkerIdentityContact[]>("/identity/contacts");
+  }
+
+  planningBoards(projectId: string) {
+    return this.request<CoworkerPlanningBoard[]>(`/api/devkit/planning/boards?projectUuid=${encodeURIComponent(projectId)}`);
+  }
+
+  createPlanningBoard(projectId: string, title: string) {
+    return this.request<CoworkerPlanningBoard>("/api/devkit/planning/boards", {
+      body: JSON.stringify({ description: "Project whiteboard", projectUuid: projectId, recordKind: "project", recordUuid: projectId, title }),
+      method: "POST"
+    });
+  }
+
+  updatePlanningBoard(uuid: string, scene: CoworkerPlanningScene) {
+    return this.request<CoworkerPlanningBoard>(`/api/devkit/planning/boards/${encodeURIComponent(uuid)}`, {
+      body: JSON.stringify({ scene }),
+      method: "PUT"
+    });
+  }
+
   projectRecords(kind: string) {
     return this.request<CoworkerProjectRecord[]>(
       `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}`
+    );
+  }
+
+  registry() {
+    return this.request<CoworkerRegistryResult>(
+      "/api/devkit/admin/project-manager/registry/result"
+    );
+  }
+
+  updateRegistryModule(id: string, input: Partial<CoworkerRegistryModule>) {
+    return this.request<CoworkerRegistryModule>(
+      `/api/devkit/admin/project-manager/registry/modules/${encodeURIComponent(id)}`,
+      { body: JSON.stringify(input), method: "PUT" }
+    );
+  }
+
+  createRegistryModule(input: Partial<CoworkerRegistryModule> & { groupId: string; key: string; name: string }) {
+    return this.request<CoworkerRegistryModule>(
+      "/api/devkit/admin/project-manager/registry/modules",
+      { body: JSON.stringify(input), method: "POST" }
     );
   }
 
@@ -82,6 +130,56 @@ export class CoworkerClient implements CoworkerBackend {
     );
   }
 
+  archiveProjectRecord(kind: string, id: string) {
+    return this.request<CoworkerProjectRecord>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/deactivate`,
+      { body: JSON.stringify({}), method: "POST" }
+    );
+  }
+
+  deleteProjectRecord(kind: string, id: string) {
+    return this.request<{ deleted: boolean; id: string }>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`,
+      { method: "DELETE" }
+    );
+  }
+
+  projectRecordAttachments(kind: string, id: string) {
+    return this.request<CoworkerProjectAttachment[]>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/attachments`
+    );
+  }
+
+  async uploadProjectRecordAttachment(kind: string, id: string, file: File) {
+    const response = await this.fetcher(
+      `${this.baseUrl}/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/attachments`,
+      {
+        body: await file.arrayBuffer(),
+        headers: { ...this.headers(), "Content-Type": "application/octet-stream", "x-file-name": encodeURIComponent(file.name), "x-file-type": attachmentMimeType(file) },
+        method: "POST"
+      }
+    );
+    const envelope = (await response.json()) as Envelope<CoworkerProjectAttachment>;
+    if (!response.ok || !envelope.success) throw new Error(envelope.success ? `Request failed (${response.status}).` : envelope.error.message);
+    return envelope.data;
+  }
+
+  async downloadProjectRecordAttachment(kind: string, id: string, attachmentId: string) {
+    const response = await this.fetcher(
+      `${this.baseUrl}/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/download`,
+      { headers: this.headers() }
+    );
+    if (!response.ok) throw new Error("The attachment preview could not be loaded.");
+    return response.blob();
+  }
+
+  deleteProjectRecordAttachment(kind: string, id: string, attachmentId: string) {
+    return this.request<{ deleted: boolean; id: string }>(
+      `/api/devkit/admin/project-manager/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`,
+      { method: "DELETE" }
+    );
+  }
+
   repositories() {
     return this.request<CoworkerRepository[]>("/api/devkit/project-manager/repositories");
   }
@@ -93,6 +191,7 @@ export class CoworkerClient implements CoworkerBackend {
     logoText?: string;
     referenceId?: string;
     repositoryName?: string;
+    repositoryUrl?: string;
     title: string;
   }) {
     const key =
@@ -111,6 +210,7 @@ export class CoworkerClient implements CoworkerBackend {
         referenceId: input.referenceId || "",
         referenceType: input.referenceId ? "repository" : "",
         repositoryName: input.repositoryName || "",
+        repositoryUrl: input.repositoryUrl?.trim() || "",
         status: "planning",
         title: input.title,
         type: "project"
@@ -260,6 +360,13 @@ export class CoworkerClient implements CoworkerBackend {
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
   }
+}
+
+function attachmentMimeType(file: File) {
+  if (file.type === "image/jpg") return "image/jpeg";
+  if (file.type) return file.type;
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return extension === "jpg" || extension === "jpeg" ? "image/jpeg" : extension === "png" ? "image/png" : extension === "gif" ? "image/gif" : extension === "webp" ? "image/webp" : extension === "pdf" ? "application/pdf" : "text/plain";
 }
 
 async function responseError(response: Response) {

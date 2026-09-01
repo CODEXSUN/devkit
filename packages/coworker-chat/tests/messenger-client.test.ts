@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   MessengerClient,
+  isMessengerMessageOwn,
   mergeMessengerMessage,
   type MessengerMessage,
   reconcileMessengerMessages
@@ -26,8 +27,26 @@ test("reconcileMessengerMessages orders messages and replaces duplicates", () =>
   assert.deepEqual(reconcileMessengerMessages([second, first], [updated]), [updated, second]);
 });
 
+test("reconcileMessengerMessages uses message id for stable ascending ties", () => {
+  const createdAt = "2026-09-01T10:00:00.000Z";
+  const laterId = { ...first, createdAt, uuid: "message-b" };
+  const earlierId = { ...second, createdAt, uuid: "message-a" };
+  assert.deepEqual(reconcileMessengerMessages([laterId], [earlierId]), [earlierId, laterId]);
+});
+
 test("mergeMessengerMessage appends one new message", () => {
   assert.deepEqual(mergeMessengerMessage([first], second), [first, second]);
+});
+
+test("device chats align only the active client on the right", () => {
+  assert.equal(isMessengerMessageOwn({ ...first, actorId: "me" }, "web", "me", ""), true);
+  assert.equal(isMessengerMessageOwn({ ...first, actorId: "me" }, "desktop", "me", ""), false);
+  assert.equal(isMessengerMessageOwn({ ...second, actorId: "me" }, "mobile", "me", ""), true);
+});
+
+test("direct chats align the signed-in actor on the right", () => {
+  assert.equal(isMessengerMessageOwn({ ...first, actorId: "me" }, "desktop", "me", "other"), true);
+  assert.equal(isMessengerMessageOwn({ ...first, actorId: "other" }, "desktop", "me", "other"), false);
 });
 
 test("private device chat accepts only the signed-in actor without a recipient", () => {

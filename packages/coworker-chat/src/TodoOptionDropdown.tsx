@@ -1,15 +1,17 @@
-import { Circle, Eye, Folder, Lock, Tag } from "lucide-react";
+import { Check, Circle, Eye, Folder, Lock, Tag } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { SharedTodoLookup } from "./todo-client";
 import type { CoworkerProject } from "./types";
 
-type DropdownOption = { id: string; name: string; value: string };
+type DropdownOption = { id: string; name: string; project?: CoworkerProject; value: string };
 type DropdownProps = {
   ariaLabel: string;
   className?: string;
   onChange: (value: string) => void;
   options: DropdownOption[];
   renderIcon: (value: string) => ReactNode;
+  renderOptionIcon?: (option: DropdownOption) => ReactNode;
+  showSelectedCheck?: boolean;
   value: string;
 };
 
@@ -70,7 +72,7 @@ export function ProjectDropdown({
 }) {
   const options = [
     { id: "all-projects", name: "All projects", value: "" },
-    ...projects.map((project) => ({ id: project.id, name: project.title, value: project.id }))
+    ...projects.map((project) => ({ id: project.id, name: project.title, project, value: project.id }))
   ];
   return (
     <TodoOptionDropdown
@@ -78,7 +80,12 @@ export function ProjectDropdown({
       className="project"
       onChange={onChange}
       options={options}
-      renderIcon={() => <Folder size={17} />}
+      renderIcon={(projectId) => {
+        const project = projects.find((entry) => entry.id === projectId);
+        return project ? <ProjectAvatar project={project} /> : <Folder size={17} />;
+      }}
+      renderOptionIcon={(option) => option.project ? <ProjectOptionIcon project={option.project} /> : <Folder size={17} />}
+      showSelectedCheck
       value={value}
     />
   );
@@ -137,6 +144,8 @@ export function TodoOptionDropdown({
   onChange,
   options,
   renderIcon,
+  renderOptionIcon,
+  showSelectedCheck = false,
   value
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
@@ -151,17 +160,20 @@ export function TodoOptionDropdown({
 
   useEffect(() => {
     if (!open) return;
-    const close = (event: MouseEvent | globalThis.KeyboardEvent) => {
-      if (event instanceof globalThis.KeyboardEvent && event.key !== "Escape") return;
-      if (event instanceof MouseEvent && rootRef.current?.contains(event.target as Node)) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) return;
       setOpen(false);
-      if (event instanceof globalThis.KeyboardEvent) triggerRef.current?.focus();
     };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", close);
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    window.addEventListener("pointerdown", closeOnPointerDown);
+    window.addEventListener("keydown", closeOnEscape);
     return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", close);
+      window.removeEventListener("pointerdown", closeOnPointerDown);
+      window.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
 
@@ -215,13 +227,23 @@ export function TodoOptionDropdown({
             tabIndex={open && index === selectedIndex ? 0 : -1}
             type="button"
           >
-            {renderIcon(option.value)}
+            {renderOptionIcon ? renderOptionIcon(option) : renderIcon(option.value)}
             <span>{option.name}</span>
+            {showSelectedCheck && option.value === value ? <Check className="todo-option-check" size={16} /> : null}
           </button>
         ))}
       </div>
     </div>
   );
+}
+
+function ProjectOptionIcon({ project }: { project: CoworkerProject }) {
+  return <span className="todo-project-option-icon"><ProjectAvatar project={project} /></span>;
+}
+
+function ProjectAvatar({ project }: { project: CoworkerProject | undefined }) {
+  const initials = project?.logoText?.trim() || project?.title.slice(0, 2).toUpperCase() || "A";
+  return <i className={`todo-project-avatar ${project?.colorKey ?? "slate"}`}>{initials}</i>;
 }
 
 export function nextOptionIndex(key: string, index: number, length: number) {

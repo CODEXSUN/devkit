@@ -5,6 +5,7 @@ const requestStartTimes = new WeakMap<object, [number, number]>();
 
 export function registerRequestLogging(app: FastifyInstance): void {
   app.addHook("onRequest", async (request) => {
+    if (isSocketTransport(request.url)) return;
     requestStartTimes.set(request.raw, process.hrtime());
 
     const log = createStructuredLog({
@@ -34,6 +35,7 @@ export function registerRequestLogging(app: FastifyInstance): void {
       const diff = process.hrtime(start);
       durationMs = diff[0] * 1e3 + diff[1] / 1e6;
     }
+    if (isSocketTransport(request.url)) return;
 
     const log = createStructuredLog({
       level: reply.statusCode >= 500 ? "error" : reply.statusCode >= 400 ? "warn" : "info",
@@ -64,6 +66,10 @@ export function registerRequestLogging(app: FastifyInstance): void {
       request.log.info(log);
     }
   });
+}
+
+function isSocketTransport(url: string) {
+  return url.toLocaleLowerCase().includes("socket.io");
 }
 
 function writeConsoleLog(

@@ -32,12 +32,22 @@ export class AuthService {
       .distinct()
       .orderBy("permission.key")
       .execute();
+    const assignedRoles = await database
+      .selectFrom("user_roles as userRole")
+      .innerJoin("roles as role", "role.id", "userRole.role_id")
+      .select("role.key")
+      .where("userRole.user_id", "=", user.id)
+      .where("userRole.status", "=", "active")
+      .where("role.status", "=", "active")
+      .execute();
+    const superAdmin = user.role === "admin" || assignedRoles.some(({ key }) => key.replace(/[-_\s]/gu, "").toLowerCase() === "superadmin");
     const permissionKeys = permissions.map(({ key }) => key);
     const accessToken = signAuthToken({
       email: user.email,
       name: user.name,
       permissions: permissionKeys,
       role: user.role,
+      superAdmin,
       userId: user.uuid
     });
 
@@ -46,7 +56,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       permissions: permissionKeys,
-      role: user.role
+      role: user.role,
+      superAdmin
     };
   }
 }

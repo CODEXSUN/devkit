@@ -7,17 +7,23 @@ import {
   type MessengerContact,
   type MessengerConversation,
   type MessengerActivity,
-  type MessengerMessage
+  type MessengerMessage,
+  type MessengerPresenceEvent,
+  type MessengerProfile,
+  type MessengerUnreadEvent
 } from "./messenger-client";
 import { devkitSocketPath } from "./socket-path";
 
-const refreshIntervalMs = 10_000;
+const connectedRefreshIntervalMs = 60_000;
+const reconnectRefreshIntervalMs = 5_000;
 
 export function useMessenger({
+  active = true,
   apiUrl,
   clientKind,
   token
 }: {
+  active?: boolean;
   apiUrl: string;
   clientKind: MessengerClientKind;
   token: string;
@@ -25,18 +31,39 @@ export function useMessenger({
   const baseUrl = apiUrl.replace(/\/+$/u, "");
   const client = useMemo(() => new MessengerClient(baseUrl, () => token), [baseUrl, token]);
   const [connected, setConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "offline" | "reconnecting">("connecting");
+  const [connectionStatus, setConnectionStatus] = useState<
+    "connected" | "connecting" | "offline" | "reconnecting"
+  >("connecting");
   const [error, setError] = useState("");
   const [messages, setMessages] = useState<MessengerMessage[]>([]);
   const [activity, setActivity] = useState<MessengerActivity[]>([]);
   const [conversations, setConversations] = useState<MessengerConversation[]>([]);
   const [conversationId, setConversationId] = useState("");
   const [contacts, setContacts] = useState<MessengerContact[]>([]);
+  const [profile, setProfile] = useState<MessengerProfile>();
   const [profileId, setProfileId] = useState("");
   const [peerActorId, setPeerActorId] = useState("");
   const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<
+    NotificationPermission | "unsupported"
+  >(() => (typeof Notification === "undefined" ? "unsupported" : Notification.permission));
+  const [onlineActorIds, setOnlineActorIds] = useState<string[]>([]);
   const refreshing = useRef(false);
+  const conversationLoad = useRef(0);
+  const socketConnected = useRef(false);
+  const conversationsRef = useRef<MessengerConversation[]>([]);
+  const activeRef = useRef(active);
+  const contactsRef = useRef(contacts);
+  const conversationIdRef = useRef(conversationId);
+  const profileIdRef = useRef(profileId);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+  useEffect(() => { activeRef.current = active; }, [active]);
+  useEffect(() => { contactsRef.current = contacts; }, [contacts]);
+  useEffect(() => { conversationIdRef.current = conversationId; }, [conversationId]);
+  useEffect(() => { profileIdRef.current = profileId; }, [profileId]);
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
@@ -45,78 +72,192 @@ export function useMessenger({
     try {
       if (!conversationId) return;
       const latest = await client.list(conversationId);
-      setMessages(latest);
-      await client.read(conversationId);
-      setConversations(await client.conversations());
+      setMessages((current) => (sameMessages(current, latest) ? current : latest));
       setError("");
+      const [conversationResult] = await Promise.allSettled([
+        client.conversations(),
+        isConversationVisible(active) ? client.read(conversationId) : Promise.resolve(null)
+      ]);
+      if (conversationResult.status === "fulfilled") setConversations(conversationResult.value);
     } catch (reason) {
       setError(messageFrom(reason));
     } finally {
       refreshing.current = false;
       setSyncing(false);
     }
-  }, [client, conversationId]);
+  }, [active, client, conversationId]);
+  const refreshRef = useRef(refresh);
+  useEffect(() => { refreshRef.current = refresh; }, [refresh]);
 
   useEffect(() => {
     setMessages([]);
-    void client.conversation(peerActorId || undefined).then((conversation) => {
-      setConversationId(conversation.id);
-      return Promise.all([client.list(conversation.id), client.activity(conversation.id)]);
-    }).then(([items, log]) => { setMessages(items); setActivity(log); }).catch((reason) => setError(messageFrom(reason)));
+    setError("");
+    setConversationId("");
+    const load = ++conversationLoad.current;
+    void client
+      .conversation(peerActorId || undefined)
+      .then(async (conversation) => {
+        if (load !== conversationLoad.current) return;
+        setConversationId(conversation.id);
+        const items = await client.list(conversation.id);
+        if (load !== conversationLoad.current) return;
+        setMessages(items);
+        setError("");
+        const log = await client.activity(conversation.id).catch(() => []);
+        if (load !== conversationLoad.current) return;
+        setActivity(log);
+      })
+      .catch((reason) => {
+        if (load === conversationLoad.current) setError(messageFrom(reason));
+      });
+    return () => {
+      if (load === conversationLoad.current) conversationLoad.current += 1;
+    };
   }, [client, peerActorId]);
 
   useEffect(() => {
     void Promise.all([client.contacts(), client.profile(), client.conversations()])
       .then(([availableContacts, profile, availableConversations]) => {
         setContacts(availableContacts.filter((contact) => contact.uuid !== profile.uuid));
+        setProfile(profile);
         setProfileId(profile.uuid);
         setConversations(availableConversations);
       })
       .catch(() => setContacts([]));
-    void refresh();
+    void refreshRef.current();
     const socket = io(baseUrl, {
       auth: { token: `Bearer ${token}` },
       path: devkitSocketPath(baseUrl, "/api/devkit/messenger/socket.io"),
       transports: ["websocket", "polling"],
       tryAllTransports: true
     });
+    let mounted = true;
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleRefresh = () => {
+      if (!mounted) return;
+      if (refreshTimer) globalThis.clearTimeout(refreshTimer);
+      refreshTimer = globalThis.setTimeout(
+        async () => {
+          await refreshRef.current();
+          scheduleRefresh();
+        },
+        socketConnected.current ? connectedRefreshIntervalMs : reconnectRefreshIntervalMs
+      );
+    };
     socket.on("connect", () => {
+      socketConnected.current = true;
       setConnected(true);
       setConnectionStatus("connected");
+      setError("");
+      void refreshRef.current();
+      scheduleRefresh();
     });
     socket.io.on("reconnect_attempt", () => setConnectionStatus("reconnecting"));
     socket.on("connect_error", () => {
+      socketConnected.current = false;
       setConnected(false);
       setConnectionStatus("reconnecting");
-      setError("Live connection is retrying. Messages will continue to refresh.");
+      scheduleRefresh();
     });
     socket.on("disconnect", () => {
+      socketConnected.current = false;
       setConnected(false);
       setConnectionStatus("reconnecting");
+      setOnlineActorIds([]);
+      scheduleRefresh();
+    });
+    socket.on("messenger.presence.snapshot", (actorIds: string[]) => {
+      setOnlineActorIds([...new Set(actorIds)]);
+    });
+    socket.on("messenger.presence", (event: MessengerPresenceEvent) => {
+      setOnlineActorIds((current) =>
+        event.online
+          ? [...new Set([...current, event.actorId])]
+          : current.filter((actorId) => actorId !== event.actorId)
+      );
     });
     socket.on("messenger.message", (message: MessengerMessage) => {
-      if (message.conversationId === conversationId) {
+      const selectedConversationId = conversationIdRef.current;
+      const conversation = conversationsRef.current.find(
+        (item) => item.id === message.conversationId
+      );
+      const ownMessage =
+        conversation?.kind === "device"
+          ? message.client === clientKind
+          : message.actorId === profileIdRef.current;
+      if (
+        !ownMessage &&
+        (!isConversationVisible(activeRef.current) || message.conversationId !== selectedConversationId) &&
+        !conversation?.mutedAt
+      ) {
+        showMessageNotification(
+          message,
+          contactsRef.current.find((contact) => contact.uuid === message.actorId)?.name ??
+            conversation?.title ??
+            "Messenger"
+        );
+      }
+      if (message.conversationId === selectedConversationId) {
         setMessages((current) => mergeMessengerMessage(current, message));
-        void client.read(conversationId);
+        if (isConversationVisible(activeRef.current)) void client.read(selectedConversationId).catch(() => undefined);
       }
     });
-    const interval = setInterval(() => void refresh(), refreshIntervalMs);
+    socket.on("messenger.unread", (event: MessengerUnreadEvent) => {
+      if (event.actorId === profileIdRef.current) {
+        setConversations((current) => [event.conversation, ...current.filter((item) => item.id !== event.conversation.id)]);
+      }
+    });
+    const recover = () => {
+      const visible = typeof document === "undefined" || document.visibilityState === "visible";
+      const online = typeof navigator === "undefined" || navigator.onLine;
+      if (visible && online) void refreshRef.current();
+    };
+    const offline = () => {
+      socketConnected.current = false;
+      setConnected(false);
+      setConnectionStatus("offline");
+      scheduleRefresh();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", recover);
+      window.addEventListener("online", recover);
+      window.addEventListener("offline", offline);
+    }
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", recover);
+    scheduleRefresh();
     return () => {
-      clearInterval(interval);
+      mounted = false;
+      if (refreshTimer) globalThis.clearTimeout(refreshTimer);
+      socketConnected.current = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", recover);
+        window.removeEventListener("online", recover);
+        window.removeEventListener("offline", offline);
+      }
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", recover);
       socket.disconnect();
     };
-  }, [baseUrl, client, conversationId, refresh, token]);
+  }, [baseUrl, client, clientKind, token]);
 
   const send = useCallback(
-    async (body: string) => {
+    async (body: string, files: File[] = []) => {
       const text = body.trim();
-      if (!text || sending) return false;
+      if ((!text && !files.length) || sending) return false;
       setSending(true);
       try {
         if (!conversationId) return false;
-        const message = await client.send(conversationId, text, clientKind);
+        const message = await client.send(
+          conversationId,
+          text || files[0]?.name || "Attachment",
+          clientKind
+        );
         setMessages((current) => mergeMessengerMessage(current, message));
-        setActivity(await client.activity(conversationId));
+        if (files.length)
+          await Promise.all(files.map((file) => client.attach(conversationId, message.uuid, file)));
+        const latest = await client.list(conversationId);
+        setMessages((current) => (sameMessages(current, latest) ? current : latest));
+        const log = await client.activity(conversationId).catch(() => null);
+        if (log) setActivity(log);
         setError("");
         return true;
       } catch (reason) {
@@ -129,23 +270,116 @@ export function useMessenger({
     [client, clientKind, conversationId, sending]
   );
 
-  const updateConversationPreferences = useCallback(async (targetId: string, input: { archived?: boolean; muted?: boolean }) => {
-    await client.preferences(targetId, input);
-    setConversations(await client.conversations());
-  }, [client]);
+  const react = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!conversationId) return;
+      await client.react(conversationId, messageId, emoji);
+      const latest = await client.list(conversationId);
+      setMessages((current) => (sameMessages(current, latest) ? current : latest));
+    },
+    [client, conversationId]
+  );
 
-  return { activity, connected, connectionStatus, contacts, conversations, error, messages, peerActorId, profileId, refresh, send, sending, setPeerActorId, syncing, updateConversationPreferences };
+  const updateConversationPreferences = useCallback(
+    async (targetId: string, input: { archived?: boolean; muted?: boolean }) => {
+      await client.preferences(targetId, input);
+      setConversations(await client.conversations());
+    },
+    [client]
+  );
+
+  const attachmentBlob = useCallback(
+    (attachment: Parameters<MessengerClient["attachmentBlob"]>[0]) =>
+      client.attachmentBlob(attachment),
+    [client]
+  );
+  const requestNotifications = useCallback(async () => {
+    if (typeof Notification === "undefined") return "unsupported" as const;
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    return permission;
+  }, []);
+
+  return {
+    activity,
+    attachmentBlob,
+    connected,
+    connectionStatus,
+    contacts,
+    conversations,
+    error,
+    messages,
+    notificationPermission,
+    onlineActorIds,
+    peerActorId,
+    profile,
+    profileId,
+    react,
+    refresh,
+    requestNotifications,
+    send,
+    sending,
+    setPeerActorId,
+    syncing,
+    updateConversationPreferences
+  };
 }
 
-export function isMessengerConversationMessage(message: MessengerMessage, profileId: string, peerActorId: string) {
+export function isMessengerConversationMessage(
+  message: MessengerMessage,
+  profileId: string,
+  peerActorId: string
+) {
   if (!profileId) return false;
   if (!peerActorId) return message.actorId === profileId && !message.recipientActorId;
-  return (message.actorId === profileId && message.recipientActorId === peerActorId) ||
-    (message.actorId === peerActorId && message.recipientActorId === profileId);
+  return (
+    (message.actorId === profileId && message.recipientActorId === peerActorId) ||
+    (message.actorId === peerActorId && message.recipientActorId === profileId)
+  );
 }
 
 function messageFrom(reason: unknown) {
   return reason instanceof Error
     ? reason.message
     : "Messenger could not connect. Please try again.";
+}
+
+function sameMessages(current: MessengerMessage[], latest: MessengerMessage[]) {
+  if (current.length !== latest.length) return false;
+  return current.every((message, index) => {
+    const next = latest[index];
+    return (
+      next?.uuid === message.uuid &&
+      next.createdAt === message.createdAt &&
+      next.deliveredAt === message.deliveredAt &&
+      next.readAt === message.readAt &&
+      next.body === message.body &&
+      sameMessageItems(next.attachments, message.attachments) &&
+      sameMessageItems(next.reactions, message.reactions)
+    );
+  });
+}
+
+function sameMessageItems(left: unknown[] | undefined, right: unknown[] | undefined) {
+  return JSON.stringify(left ?? []) === JSON.stringify(right ?? []);
+}
+
+function isConversationVisible(active: boolean) {
+  return (
+    active &&
+    (typeof document === "undefined" ||
+      (document.visibilityState === "visible" && document.hasFocus()))
+  );
+}
+
+function showMessageNotification(message: MessengerMessage, title: string) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  const notification = new Notification(title, {
+    body: message.body.slice(0, 180),
+    tag: `messenger:${message.conversationId}`
+  });
+  notification.onclick = () => {
+    if (typeof window !== "undefined") window.focus();
+    notification.close();
+  };
 }

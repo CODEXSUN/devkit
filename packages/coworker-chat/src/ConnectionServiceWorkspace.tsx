@@ -70,9 +70,7 @@ export function ConnectionServiceWorkspace({
         <div>
           <small>SERVICES</small>
           <h1>Connect Service</h1>
-          <p>
-            Connect your signed-in CodeLogicX account to this device and its approved workspaces.
-          </p>
+          <p>Connect your signed-in DevKit account to this device and its approved workspaces.</p>
         </div>
       </header>
       <section className="connection-service-layout">

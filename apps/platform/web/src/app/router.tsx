@@ -13,12 +13,21 @@ const LoginPage = lazy(() =>
 const LandingLoginPage = lazy(() =>
   import("../public/login/LoginPage").then((module) => ({ default: module.LandingLoginPage }))
 );
+const SuperAdminLoginPage = lazy(() =>
+  import("../public/login/LoginPage").then((module) => ({ default: module.SuperAdminLoginPage }))
+);
+const SaDesk = lazy(() =>
+  import("../desks/sa/SaDesk").then((module) => ({ default: module.SaDesk }))
+);
 
 const rootRoute = createRootRoute();
 const routeTree = rootRoute.addChildren([
   createRoute({ component: LandingLoginPage, getParentRoute: () => rootRoute, path: "/" }),
   createRoute({ component: HealthPage, getParentRoute: () => rootRoute, path: "/status" }),
   createRoute({ component: LoginPage, getParentRoute: () => rootRoute, path: "/login" }),
+  createRoute({ component: SuperAdminLoginPage, getParentRoute: () => rootRoute, path: "/sa/login" }),
+  createRoute({ component: SaDesk, getParentRoute: () => rootRoute, path: "/sa" }),
+  createRoute({ component: SaDesk, getParentRoute: () => rootRoute, path: "/sa/$" }),
   createRoute({ component: AppDesk, getParentRoute: () => rootRoute, path: "/app/$" })
 ]);
 

@@ -78,7 +78,7 @@ export function ConnectionServicePage({ apiUrl, token }: { apiUrl: string; token
           <Text style={styles.eyebrow}>SERVICES</Text>
           <Text style={styles.title}>Connect Service</Text>
           <Text style={styles.copy}>
-            Connect your signed-in account and approved workspaces to this mobile device.
+            Connect your signed-in DevKit account and approved workspaces to this mobile device.
           </Text>
         </View>
       </View>

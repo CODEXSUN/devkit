@@ -48,6 +48,8 @@ export type DevkitDatabase = {
   devkit_messenger_conversations: MessengerConversationsTable;
   devkit_messenger_participants: MessengerParticipantsTable;
   devkit_messenger_activity: MessengerActivityTable;
+  devkit_messenger_attachments: MessengerAttachmentsTable;
+  devkit_messenger_reactions: MessengerReactionsTable;
   devkit_notification_jobs: NotificationJobsTable;
   devkit_sync_conflicts: DevkitSyncConflictsTable;
   devkit_sync_connections: DevkitSyncConnectionsTable;
@@ -107,6 +109,27 @@ export type MessengerActivityTable = {
   created_at: TimestampColumn;
   details_json: string;
   id: Generated<number>;
+  uuid: string;
+};
+
+export type MessengerAttachmentsTable = {
+  checksum: string;
+  created_at: TimestampColumn;
+  id: Generated<number>;
+  message_uuid: string;
+  mime_type: string;
+  original_name: string;
+  size_bytes: number;
+  storage_key: string;
+  uuid: string;
+};
+
+export type MessengerReactionsTable = {
+  actor_id: string;
+  created_at: TimestampColumn;
+  emoji: string;
+  id: Generated<number>;
+  message_uuid: string;
   uuid: string;
 };
 

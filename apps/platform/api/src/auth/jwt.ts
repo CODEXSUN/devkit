@@ -11,6 +11,7 @@ export type AuthTokenPayload = {
   name?: string;
   sessionIssuedAt: string;
   role?: string;
+  superAdmin?: boolean;
   permissions?: string[];
   userId: string;
 };

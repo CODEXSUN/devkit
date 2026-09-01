@@ -7,7 +7,11 @@ import type { DevkitDatabase } from "../../database/schema.js";
 type ConversationRow = {
   archived_at: Date | null;
   kind: "device" | "direct";
+  last_message_actor_id: string | null;
+  last_message_client: "desktop" | "mobile" | "web" | null;
+  last_message_delivered_at: Date | null;
   last_message: string | null;
+  last_message_read_at: Date | null;
   muted_at: Date | null;
   peer_actor_id: string | null;
   title: string;
@@ -23,8 +27,9 @@ export class MessengerRepository {
     await this.ensureDeviceConversation(actorId);
     const result = await sql<ConversationRow>`SELECT conversation.uuid,conversation.kind,
       conversation.title,conversation.updated_at,participant.muted_at,participant.archived_at,
-      (SELECT body FROM devkit_messenger_messages message WHERE message.conversation_uuid=conversation.uuid
-        ORDER BY message.created_at DESC LIMIT 1) last_message,
+      latest.body last_message,latest.actor_id last_message_actor_id,
+      latest.client last_message_client,latest.delivered_at last_message_delivered_at,
+      latest.read_at last_message_read_at,
       (SELECT other.actor_id FROM devkit_messenger_participants other
         WHERE other.conversation_uuid=conversation.uuid AND other.actor_id<>${actorId} LIMIT 1) peer_actor_id,
       (SELECT COUNT(*) FROM devkit_messenger_messages unread
@@ -33,6 +38,10 @@ export class MessengerRepository {
       FROM devkit_messenger_conversations conversation
       INNER JOIN devkit_messenger_participants participant
         ON participant.conversation_uuid=conversation.uuid AND participant.actor_id=${actorId}
+      LEFT JOIN devkit_messenger_messages latest ON latest.uuid=(
+        SELECT message.uuid FROM devkit_messenger_messages message
+        WHERE message.conversation_uuid=conversation.uuid
+        ORDER BY message.created_at DESC,message.uuid DESC LIMIT 1)
       ORDER BY conversation.updated_at DESC`.execute(this.database);
     return result.rows;
   }
@@ -46,9 +55,64 @@ export class MessengerRepository {
     await this.database.updateTable("devkit_messenger_messages").set({ delivered_at: new Date() })
       .where("conversation_uuid", "=", conversationId).where("actor_id", "!=", actorId)
       .where("delivered_at", "is", null).execute();
-    return this.database.selectFrom("devkit_messenger_messages").selectAll()
+    const messages = await this.database.selectFrom("devkit_messenger_messages").selectAll()
       .where("conversation_uuid", "=", conversationId)
-      .orderBy("created_at", "asc").limit(300).execute();
+      .orderBy("created_at", "desc").orderBy("uuid", "desc").limit(300).execute();
+    return messages.reverse();
+  }
+
+  async messageDetails(actorId: string, conversationId: string, messageIds: string[]) {
+    await this.requireParticipant(actorId, conversationId);
+    if (!messageIds.length) return { attachments: [], reactions: [] };
+    const [attachments, reactions] = await Promise.all([
+      this.database.selectFrom("devkit_messenger_attachments").selectAll().where("message_uuid", "in", messageIds).execute(),
+      this.database.selectFrom("devkit_messenger_reactions").selectAll().where("message_uuid", "in", messageIds).execute()
+    ]);
+    return { attachments, reactions };
+  }
+
+  async message(actorId: string, conversationId: string, messageId: string) {
+    await this.requireParticipant(actorId, conversationId);
+    return this.database.selectFrom("devkit_messenger_messages").selectAll().where("uuid", "=", messageId).where("conversation_uuid", "=", conversationId).executeTakeFirstOrThrow();
+  }
+
+  async messagesById(actorId: string, conversationId: string, messageIds: string[]) {
+    await this.requireParticipant(actorId, conversationId);
+    return this.database.selectFrom("devkit_messenger_messages").selectAll()
+      .where("conversation_uuid", "=", conversationId).where("uuid", "in", messageIds).execute();
+  }
+
+  async participantIds(actorId: string, conversationId: string) {
+    await this.requireParticipant(actorId, conversationId);
+    return (await this.database.selectFrom("devkit_messenger_participants").select("actor_id").where("conversation_uuid", "=", conversationId).execute()).map((row) => row.actor_id);
+  }
+
+  async addAttachment(actorId: string, conversationId: string, messageId: string, input: { checksum: string; mimeType: string; originalName: string; sizeBytes: number; storageKey: string; uuid: string }) {
+    await this.requireOwnedMessage(actorId, conversationId, messageId);
+    await this.database.insertInto("devkit_messenger_attachments").values({
+      checksum: input.checksum, message_uuid: messageId, mime_type: input.mimeType,
+      original_name: input.originalName, size_bytes: input.sizeBytes, storage_key: input.storageKey, uuid: input.uuid
+    }).executeTakeFirstOrThrow();
+    return this.database.selectFrom("devkit_messenger_attachments").selectAll().where("uuid", "=", input.uuid).executeTakeFirstOrThrow();
+  }
+
+  async attachment(actorId: string, conversationId: string, attachmentId: string) {
+    await this.requireParticipant(actorId, conversationId);
+    const result = await this.database.selectFrom("devkit_messenger_attachments").innerJoin("devkit_messenger_messages", "devkit_messenger_messages.uuid", "devkit_messenger_attachments.message_uuid")
+      .select(["devkit_messenger_attachments.uuid", "storage_key", "original_name", "mime_type", "size_bytes"])
+      .where("devkit_messenger_attachments.uuid", "=", attachmentId).where("devkit_messenger_messages.conversation_uuid", "=", conversationId).executeTakeFirst();
+    if (!result) throw AppError.notFound("Messenger attachment was not found.");
+    return result;
+  }
+
+  async toggleReaction(actorId: string, conversationId: string, messageId: string, emoji: string) {
+    await this.requireParticipant(actorId, conversationId);
+    const message = await this.database.selectFrom("devkit_messenger_messages").select("uuid").where("uuid", "=", messageId).where("conversation_uuid", "=", conversationId).executeTakeFirst();
+    if (!message) throw AppError.notFound("Messenger message was not found.");
+    const existing = await this.database.selectFrom("devkit_messenger_reactions").select("uuid").where("message_uuid", "=", messageId).where("actor_id", "=", actorId).where("emoji", "=", emoji).executeTakeFirst();
+    if (existing) await this.database.deleteFrom("devkit_messenger_reactions").where("uuid", "=", existing.uuid).execute();
+    else await this.database.insertInto("devkit_messenger_reactions").values({ actor_id: actorId, emoji, message_uuid: messageId, uuid: randomBytes(16).toString("hex") }).execute();
+    return this.database.selectFrom("devkit_messenger_reactions").selectAll().where("message_uuid", "=", messageId).execute();
   }
 
   async create(actorId: string, activityActorId: string, conversationId: string, body: string, client: string) {
@@ -70,13 +134,14 @@ export class MessengerRepository {
 
   async markRead(actorId: string, activityActorId: string, conversationId: string) {
     await this.requireParticipant(actorId, conversationId);
-    const unread = await sql<{ count: number | string }>`SELECT COUNT(*) count
+    const unread = await sql<{ uuid: string }>`SELECT message.uuid
       FROM devkit_messenger_messages message
       INNER JOIN devkit_messenger_participants participant
         ON participant.conversation_uuid=message.conversation_uuid AND participant.actor_id=${actorId}
       WHERE message.conversation_uuid=${conversationId} AND message.actor_id<>${actorId}
         AND (participant.last_read_at IS NULL OR message.created_at>participant.last_read_at)`.execute(this.database);
-    if (Number(unread.rows[0]?.count ?? 0) === 0) return { conversationId, read: true };
+    const messageIds = unread.rows.map((message) => message.uuid);
+    if (!messageIds.length) return { changed: false, conversationId, messageIds, read: true };
     await this.database.transaction().execute(async (transaction) => {
       await transaction.updateTable("devkit_messenger_participants").set({ last_read_at: new Date() })
         .where("conversation_uuid", "=", conversationId).where("actor_id", "=", actorId).executeTakeFirstOrThrow();
@@ -85,7 +150,7 @@ export class MessengerRepository {
         .where("conversation_uuid", "=", conversationId).where("actor_id", "!=", actorId)
         .where("read_at", "is", null).execute();
     });
-    return { conversationId, read: true };
+    return { changed: true, conversationId, messageIds, read: true };
   }
 
   async preferences(actorId: string, activityActorId: string, conversationId: string, input: { archived?: boolean; muted?: boolean }) {
@@ -146,6 +211,13 @@ export class MessengerRepository {
     const participant = await this.database.selectFrom("devkit_messenger_participants").select("id")
       .where("conversation_uuid", "=", conversationId).where("actor_id", "=", actorId).executeTakeFirst();
     if (!participant) throw AppError.forbidden("Messenger conversation is not available to this user.");
+  }
+
+  private async requireOwnedMessage(actorId: string, conversationId: string, messageId: string) {
+    await this.requireParticipant(actorId, conversationId);
+    const message = await this.database.selectFrom("devkit_messenger_messages").select("uuid")
+      .where("uuid", "=", messageId).where("conversation_uuid", "=", conversationId).where("actor_id", "=", actorId).executeTakeFirst();
+    if (!message) throw AppError.forbidden("Attachments can only be added to your own message.");
   }
 
   private async refreshConversationTime(conversationId: string) {

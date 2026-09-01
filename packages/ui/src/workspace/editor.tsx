@@ -24,8 +24,11 @@ import {
   AlignRight,
   AtSign,
   Bold,
+  Braces,
   ChevronDown,
   Code2,
+  Eye,
+  FileCode2,
   Highlighter,
   ImagePlus,
   Italic,
@@ -34,7 +37,7 @@ import {
   PaintBucket,
   Palette,
   Paperclip,
-  Pilcrow,
+  PenLine,
   Quote,
   Redo2,
   Strikethrough,
@@ -144,8 +147,8 @@ const mentionSuggestion = {
         button.className = cn(
           "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
           index === selectedIndex
-            ? "bg-accent text-accent-foreground"
-            : "text-foreground hover:bg-muted"
+            ? "bg-neutral-300 text-neutral-800"
+            : "text-foreground hover:bg-neutral-200"
         );
         const marker = document.createElement("span");
         marker.className =
@@ -227,12 +230,13 @@ export function WorkspaceEditor({
   className?: string;
   content?: string;
   fullPreview?: boolean;
-  initialMode?: "write" | "markdown" | "preview";
+  initialMode?: "html" | "write" | "markdown" | "preview";
   onChange?: (html: string) => void;
   placeholder?: string;
 }) {
-  const [mode, setMode] = React.useState<"write" | "markdown" | "preview">(initialMode);
+  const [mode, setMode] = React.useState<"html" | "write" | "markdown" | "preview">(initialMode);
   const [markdown, setMarkdown] = React.useState(() => htmlToMarkdown(content ?? ""));
+  const [rawHtml, setRawHtml] = React.useState(content ?? "");
   const headingSelectId = React.useId();
   const editor = useEditor({
     extensions: [
@@ -281,13 +285,18 @@ export function WorkspaceEditor({
         class: "prose prose-sm max-w-none min-h-[132px] px-4 py-4 focus:outline-none"
       }
     },
-    onUpdate: ({ editor }) => onChange?.(editor.getHTML())
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      setRawHtml(html);
+      onChange?.(html);
+    }
   });
 
   React.useEffect(() => {
     if (!editor || content === undefined || content === editor.getHTML()) return;
     editor.commands.setContent(content, { emitUpdate: false });
     setMarkdown(htmlToMarkdown(content));
+    setRawHtml(content);
   }, [content, editor]);
 
   if (!editor) return null;
@@ -405,8 +414,16 @@ export function WorkspaceEditor({
   function updateMarkdown(value: string) {
     setMarkdown(value);
     const html = markdownToHtml(value);
+    setRawHtml(html);
     activeEditor.commands.setContent(html, { emitUpdate: false });
     onChange?.(html);
+  }
+
+  function updateRawHtml(value: string) {
+    setRawHtml(value);
+    setMarkdown(htmlToMarkdown(value));
+    activeEditor.commands.setContent(value, { emitUpdate: false });
+    onChange?.(value);
   }
 
   const currentHeadingLevel = headingLevels.find((level) =>
@@ -609,50 +626,35 @@ export function WorkspaceEditor({
             >
               <Redo2 className="size-4" />
             </EditorIconButton>
-          </div>
-          <div className="flex items-center justify-between gap-2 border-t border-border/50 bg-muted/10 px-3">
-            <div className="flex items-end gap-1 self-stretch">
-              <button
-                type="button"
-                className={cn(
-                  "border-b-2 px-3 py-2 text-sm font-medium",
-                  mode === "write"
-                    ? "border-background bg-background text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setMode("write")}
-              >
-                Write
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "border-b-2 px-3 py-2 text-sm font-medium",
-                  mode === "preview"
-                    ? "border-background bg-background text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setMode("preview")}
-              >
-                Preview
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "border-b-2 px-3 py-2 text-sm font-medium",
-                  mode === "markdown"
-                    ? "border-background bg-background text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setMode("markdown")}
-              >
-                Markdown
-              </button>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Pilcrow className="size-3.5" />
-              <span>Rich text</span>
-            </div>
+            <ToolbarDivider />
+            <EditorIconButton
+              active={mode === "write"}
+              label="Write"
+              onClick={() => setMode("write")}
+            >
+              <PenLine className="size-4" />
+            </EditorIconButton>
+            <EditorIconButton
+              active={mode === "markdown"}
+              label="Markdown"
+              onClick={() => setMode("markdown")}
+            >
+              <FileCode2 className="size-4" />
+            </EditorIconButton>
+            <EditorIconButton
+              active={mode === "html"}
+              label="Raw HTML and CSS"
+              onClick={() => setMode("html")}
+            >
+              <Braces className="size-4" />
+            </EditorIconButton>
+            <EditorIconButton
+              active={mode === "preview"}
+              label="Preview"
+              onClick={() => setMode("preview")}
+            >
+              <Eye className="size-4" />
+            </EditorIconButton>
           </div>
         </div>
         {mode === "write" ? (
@@ -667,13 +669,26 @@ export function WorkspaceEditor({
             value={markdown}
             onChange={(event) => updateMarkdown(event.target.value)}
           />
-        ) : (
-          <div
+        ) : mode === "html" ? (
+          <textarea
+            aria-label="Raw HTML and CSS"
             className={cn(
-              "typeset typeset-article min-h-[132px] max-w-[37em] px-4 py-4",
-              fullPreview && "min-h-[calc(100svh-18rem)] max-w-none overflow-y-auto"
+              "min-h-[132px] w-full resize-y bg-background px-4 py-4 font-mono text-sm leading-6 outline-none",
+              fullPreview && "min-h-[calc(100svh-18rem)]"
             )}
-            dangerouslySetInnerHTML={{ __html: activeEditor.getHTML() || "<p>No preview yet.</p>" }}
+            placeholder="Paste HTML, including a &lt;style&gt; block for CSS…"
+            value={rawHtml}
+            onChange={(event) => updateRawHtml(event.target.value)}
+          />
+        ) : (
+          <iframe
+            sandbox=""
+            srcDoc={rawHtml || "<p>No preview yet.</p>"}
+            title="Composed content preview"
+            className={cn(
+              "min-h-[132px] w-full border-0 bg-background",
+              fullPreview && "min-h-[calc(100svh-18rem)]"
+            )}
           />
         )}
       </div>
@@ -704,8 +719,8 @@ function EditorIconButton({
       className={cn(
         "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md px-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         active
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          ? "bg-neutral-300 text-neutral-800 hover:bg-neutral-300"
+          : "text-muted-foreground hover:bg-neutral-200 hover:text-neutral-800",
         disabled && "pointer-events-none opacity-40"
       )}
       disabled={disabled}
@@ -793,7 +808,7 @@ function ToolbarSelect({
       <select
         id={id}
         className={cn(
-          "h-8 appearance-none rounded-md border border-transparent bg-transparent py-0 text-xs font-medium text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring",
+          "h-8 appearance-none rounded-md border border-transparent bg-transparent py-0 text-xs font-medium text-foreground outline-none transition-colors hover:bg-neutral-200 focus-visible:ring-1 focus-visible:ring-ring",
           icon ? "pl-7 pr-7" : "pl-2 pr-7"
         )}
         title={label}
@@ -824,7 +839,7 @@ function ColorMenu({
     <details className="group relative">
       <summary
         aria-label={label}
-        className="inline-flex h-8 min-w-8 cursor-pointer list-none items-center justify-center rounded-md px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+        className="inline-flex h-8 min-w-8 cursor-pointer list-none items-center justify-center rounded-md px-1.5 text-muted-foreground transition-colors hover:bg-neutral-200 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
         title={label}
       >
         {icon}
@@ -832,7 +847,7 @@ function ColorMenu({
       <div className="absolute right-0 top-9 z-50 grid w-52 grid-cols-6 gap-1 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-md">
         <button
           aria-label={resetLabel}
-          className="flex h-8 min-w-8 items-center justify-center rounded-md text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-8 min-w-8 items-center justify-center rounded-md text-xs font-semibold text-muted-foreground transition-colors hover:bg-neutral-200 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           title={resetLabel}
           type="button"
           onClick={() => onPick("reset")}
@@ -842,7 +857,7 @@ function ColorMenu({
         {colors.map((color) => (
           <button
             aria-label={`${label} ${color}`}
-            className="flex h-8 min-w-8 items-center justify-center rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex h-8 min-w-8 items-center justify-center rounded-md transition-colors hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             key={color}
             title={`${label} ${color}`}
             type="button"
@@ -854,7 +869,7 @@ function ColorMenu({
             />
           </button>
         ))}
-        <label className="col-span-6 mt-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-within:ring-1 focus-within:ring-ring">
+        <label className="col-span-6 mt-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-neutral-200 hover:text-neutral-800 focus-within:ring-1 focus-within:ring-ring">
           <span>Custom</span>
           <input
             aria-label={`Custom ${label.toLowerCase()}`}

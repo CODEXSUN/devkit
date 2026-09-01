@@ -49,7 +49,13 @@ export type ProjectManagerAttachment = {
   storageKey: string;
 };
 
-export type ProjectManagerAttachmentKind = "activity" | "issue" | "project" | "review" | "task";
+export type ProjectManagerAttachmentKind =
+  | "activity"
+  | "discussion"
+  | "issue"
+  | "project"
+  | "review"
+  | "task";
 
 export type ProjectManagerAttachmentCreate = Omit<ProjectManagerAttachment, "createdAt">;
 

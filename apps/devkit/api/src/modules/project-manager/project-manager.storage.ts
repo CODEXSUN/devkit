@@ -18,7 +18,6 @@ export class ProjectManagerAttachmentStorage {
   constructor(
     private readonly root = resolve(
       process.env.DEVKIT_STORAGE_PATH ?? process.cwd(),
-      "devkit-attachments",
     ),
   ) {}
 
@@ -41,7 +40,10 @@ export class ProjectManagerAttachmentStorage {
   }
 
   private resolveKey(storageKey: string) {
-    const filePath = resolve(this.root, storageKey);
+    const scopedKey = storageKey.startsWith("storage/app/")
+      ? storageKey
+      : `devkit-attachments/${storageKey}`;
+    const filePath = resolve(this.root, scopedKey);
     const relativePath = relative(this.root, filePath);
     if (
       !relativePath ||

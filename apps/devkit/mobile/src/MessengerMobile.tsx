@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { type MessengerMessage, useMessenger } from "@codexsun/coworker-chat";
-import { useMemo, useRef, useState } from "react";
+import { isMessengerMessageOwn, type MessengerMessage, useMessenger } from "@codexsun/coworker-chat";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -31,6 +31,7 @@ export function MessengerMobile({
     conversations,
     error,
     messages,
+    onlineActorIds,
     peerActorId,
     profileId,
     refresh,
@@ -44,8 +45,13 @@ export function MessengerMobile({
     token
   });
   const list = useRef<FlatList<MessengerMessage>>(null);
+  const atBottom = useRef(true);
   const selectedContact = contacts.find((contact) => contact.uuid === peerActorId);
   const visibleContacts = useMemo(() => contacts.filter((contact) => `${contact.name} ${contact.email}`.toLocaleLowerCase().includes(contactQuery.trim().toLocaleLowerCase())), [contactQuery, contacts]);
+  useEffect(() => {
+    atBottom.current = true;
+    requestAnimationFrame(() => list.current?.scrollToEnd({ animated: false }));
+  }, [peerActorId]);
   async function submitMessage() {
     const text = body.trim();
     if (!text || sending) return;
@@ -61,7 +67,9 @@ export function MessengerMobile({
           <View>
             <Text style={styles.title}>{selectedContact?.name ?? "My Devices"}</Text>
             <Text style={styles.caption}>
-              {connected
+              {selectedContact
+                ? onlineActorIds.includes(selectedContact.uuid) ? "Online" : "Offline"
+                : connected
                 ? "Web, desktop, and mobile"
                 : syncing
                   ? "Syncing your messages"
@@ -76,17 +84,24 @@ export function MessengerMobile({
         <View style={styles.contactPicker}>
           <View style={styles.contactSearch}><Ionicons color="#777770" name="search-outline" size={15} /><TextInput onChangeText={setContactQuery} placeholder="Search people" style={styles.contactSearchInput} value={contactQuery} /></View>
           <ScrollView contentContainerStyle={styles.contactRows} horizontal showsHorizontalScrollIndicator={false}>
-            <ConversationChip label="My Devices" onPress={() => setPeerActorId("")} selected={!peerActorId} unread={conversations.find((item) => item.kind === "device")?.unreadCount ?? 0} />
-            {visibleContacts.map((contact) => <ConversationChip key={contact.uuid} label={contact.name} onPress={() => setPeerActorId(contact.uuid)} selected={peerActorId === contact.uuid} unread={conversations.find((item) => item.peerActorId === contact.uuid)?.unreadCount ?? 0} />)}
+            <ConversationChip label="My Devices" onPress={() => setPeerActorId("")} online={connected} selected={!peerActorId} unread={conversations.find((item) => item.kind === "device")?.unreadCount ?? 0} />
+            {visibleContacts.map((contact) => <ConversationChip key={contact.uuid} label={contact.name} onPress={() => setPeerActorId(contact.uuid)} online={onlineActorIds.includes(contact.uuid)} selected={peerActorId === contact.uuid} unread={conversations.find((item) => item.peerActorId === contact.uuid)?.unreadCount ?? 0} />)}
           </ScrollView>
         </View>
         <FlatList
           contentContainerStyle={styles.list}
           data={messages}
           keyExtractor={(item) => item.uuid}
-          onContentSizeChange={() => list.current?.scrollToEnd()}
+          onContentSizeChange={() => {
+            if (atBottom.current) list.current?.scrollToEnd({ animated: false });
+          }}
+          onScroll={(event) => {
+            const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+            atBottom.current = contentSize.height - contentOffset.y - layoutMeasurement.height < 80;
+          }}
+          scrollEventThrottle={100}
           ref={list}
-          renderItem={({ item }) => <MessageBubble message={item} profileId={profileId} />}
+          renderItem={({ item }) => <MessageBubble clientKind="mobile" message={item} peerActorId={peerActorId} profileId={profileId} />}
         />
         {error ? (
           <Pressable
@@ -121,12 +136,13 @@ export function MessengerMobile({
   );
 }
 
-function ConversationChip({ label, onPress, selected, unread }: { label: string; onPress: () => void; selected: boolean; unread: number }) {
-  return <Pressable onPress={onPress} style={[styles.contactChip, selected && styles.contactChipSelected]}><Text numberOfLines={1} style={[styles.contactChipText, selected && styles.contactChipTextSelected]}>{label}</Text>{unread ? <Text style={styles.unread}>{unread}</Text> : null}</Pressable>;
+function ConversationChip({ label, onPress, online, selected, unread }: { label: string; onPress: () => void; online: boolean; selected: boolean; unread: number }) {
+  const initials = label.split(/\s+/u).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  return <Pressable onPress={onPress} style={[styles.contactChip, selected && styles.contactChipSelected]}><View style={styles.chipAvatar}><Text style={styles.chipAvatarText}>{initials}</Text>{online ? <View style={styles.onlineDot} /> : null}</View><Text numberOfLines={1} style={[styles.contactChipText, selected && styles.contactChipTextSelected]}>{label}</Text>{unread ? <Text style={styles.unread}>{unread}</Text> : null}</Pressable>;
 }
 
-function MessageBubble({ message, profileId }: { message: MessengerMessage; profileId: string }) {
-  const outgoing = message.actorId === profileId;
+function MessageBubble({ clientKind, message, peerActorId, profileId }: { clientKind: "mobile"; message: MessengerMessage; peerActorId: string; profileId: string }) {
+  const outgoing = isMessengerMessageOwn(message, clientKind, profileId, peerActorId);
   return (
     <View style={[styles.message, outgoing ? styles.outgoingMessage : styles.incomingMessage]}>
       <Text style={[styles.label, outgoing && styles.outgoingMeta]}>{message.client}</Text>
@@ -157,6 +173,8 @@ const styles = StyleSheet.create({
   contactChipTextSelected: { color: "white" },
   contactPicker: { borderBottomColor: "#e5e5df", borderBottomWidth: 1, gap: 8, paddingHorizontal: 12, paddingVertical: 9 },
   contactRows: { gap: 7, paddingRight: 12 },
+  chipAvatar: { alignItems: "center", backgroundColor: "#e3e3dd", borderRadius: 999, height: 25, justifyContent: "center", position: "relative", width: 25 },
+  chipAvatarText: { color: "#3f3f3b", fontSize: 9, fontWeight: "700" },
   contactSearch: { alignItems: "center", backgroundColor: "#efefe9", borderRadius: 10, flexDirection: "row", gap: 7, paddingHorizontal: 10 },
   contactSearchInput: { color: "#20201e", flex: 1, fontSize: 14, height: 36, paddingVertical: 0 },
   composer: {
@@ -195,6 +213,7 @@ const styles = StyleSheet.create({
   label: { color: "#777770", fontSize: 12, textTransform: "capitalize" },
   list: { flexGrow: 1, justifyContent: "flex-end", padding: 14 },
   message: { gap: 3, marginVertical: 4, maxWidth: "84%" },
+  onlineDot: { backgroundColor: "#16a34a", borderColor: "#f7f7f4", borderRadius: 999, borderWidth: 1.5, bottom: -1, height: 8, position: "absolute", right: -1, width: 8 },
   outgoingMessage: {
     alignSelf: "flex-end",
     backgroundColor: "#e9e9e4",

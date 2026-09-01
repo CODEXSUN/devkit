@@ -8,6 +8,7 @@ import {
   devkitApiModuleKeys,
   registerDevkitApiForHost,
   subscribeMessengerEvents,
+  subscribeMessengerUnreadEvents,
   subscribeNotificationEvents
 } from "@codexsun/devkit-api";
 import type { DevkitDatabase } from "@codexsun/devkit-api";
@@ -87,6 +88,7 @@ export async function createApp() {
         async authorize({ request }) {
           if (request.url.includes("/sync/cloud/") || request.url.includes("/telegram/webhook"))
             return;
+          if (request.url.includes("/messenger/")) return;
           await identityContext(request).authorize(devkitPermission(request));
         },
         async resolve(request) {
@@ -149,6 +151,7 @@ function registerMessengerSocket(app: Awaited<ReturnType<typeof createApiApp>>) 
     cors: { credentials: true, origin: platformWebOrigins() },
     path: "/api/devkit/messenger/socket.io"
   });
+  const actorConnections = new Map<string, number>();
   io.use((socket, next) => {
     const authorization = String(socket.handshake.auth.token ?? "");
     const actor = verifyAuthToken(authorization.replace(/^Bearer\s+/iu, ""));
@@ -157,12 +160,30 @@ function registerMessengerSocket(app: Awaited<ReturnType<typeof createApiApp>>) 
     socket.join(`actor:${actor.userId}`);
     next();
   });
+  io.on("connection", (socket) => {
+    const actorId = String(socket.data.actorId);
+    const connectionCount = (actorConnections.get(actorId) ?? 0) + 1;
+    actorConnections.set(actorId, connectionCount);
+    socket.emit("messenger.presence.snapshot", [...actorConnections.keys()]);
+    if (connectionCount === 1) io.emit("messenger.presence", { actorId, online: true });
+    socket.on("disconnect", () => {
+      const remaining = Math.max(0, (actorConnections.get(actorId) ?? 1) - 1);
+      if (remaining) actorConnections.set(actorId, remaining);
+      else {
+        actorConnections.delete(actorId);
+        io.emit("messenger.presence", { actorId, online: false });
+      }
+    });
+  });
   const unsubscribe = subscribeMessengerEvents((event) => {
     for (const actorId of event.actorIds) {
       io.to(`actor:${actorId}`).emit("messenger.message", event.message);
     }
   });
-  app.addHook("onClose", async () => { unsubscribe(); await io.close(); });
+  const unsubscribeUnread = subscribeMessengerUnreadEvents((event) => {
+    io.to(`actor:${event.actorId}`).emit("messenger.unread", event);
+  });
+  app.addHook("onClose", async () => { unsubscribe(); unsubscribeUnread(); await io.close(); });
 }
 
 function registerNotificationSocket(app: Awaited<ReturnType<typeof createApiApp>>) {

@@ -24,11 +24,15 @@ export function LoginPage() {
   return <LoginSurface landing={false} />;
 }
 
+export function SuperAdminLoginPage() {
+  return <LoginSurface landing={false} superAdmin />;
+}
+
 export function LandingLoginPage() {
   return <LoginSurface landing />;
 }
 
-function LoginSurface({ landing }: { landing: boolean }) {
+function LoginSurface({ landing, superAdmin = false }: { landing: boolean; superAdmin?: boolean }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,11 +59,11 @@ function LoginSurface({ landing }: { landing: boolean }) {
       return;
     }
     let cancelled = false;
-    void apiGet<{ authenticated: boolean; role?: string }>("/auth/session")
+    void apiGet<{ authenticated: boolean; role?: string; superAdmin?: boolean }>("/auth/session")
       .then((session) => {
         if (cancelled) return;
-        if (session.authenticated) {
-          void navigate({ replace: true, to: applicationEntryPath() });
+        if (session.authenticated && (!superAdmin || session.superAdmin)) {
+          void navigate({ replace: true, to: superAdmin ? "/sa" : applicationEntryPath() });
           return;
         }
         clearToken();
@@ -73,7 +77,7 @@ function LoginSurface({ landing }: { landing: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, superAdmin]);
 
   useEffect(() => {
     if (
@@ -88,12 +92,15 @@ function LoginSurface({ landing }: { landing: boolean }) {
     setLoading(true);
     void developmentLogin()
       .then((result) => {
-        if (result.success) {
-          void navigate({ replace: true, to: applicationEntryPath() });
+        if (result.success && (!superAdmin || result.data.superAdmin)) {
+          void navigate({ replace: true, to: superAdmin ? "/sa" : applicationEntryPath() });
+        } else if (result.success) {
+          clearToken();
+          setMessage("The development account is not assigned to Super Admin.");
         } else setMessage(result.error.message);
       })
       .finally(() => setLoading(false));
-  }, [navigate, sessionChecked]);
+  }, [navigate, sessionChecked, superAdmin]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,7 +108,10 @@ function LoginSurface({ landing }: { landing: boolean }) {
     setMessage("");
     const result = await login({ email, password });
     if (result.success) {
-      void navigate({ replace: true, to: applicationEntryPath() });
+      if (superAdmin && !result.data.superAdmin) {
+        clearToken();
+        setMessage("This account is not assigned to Super Admin.");
+      } else void navigate({ replace: true, to: superAdmin ? "/sa" : applicationEntryPath() });
     } else setMessage(result.error.message);
     setLoading(false);
   }
@@ -152,7 +162,7 @@ function LoginSurface({ landing }: { landing: boolean }) {
   return landing ? (
     <PlatformLandingLayout>{form}</PlatformLandingLayout>
   ) : (
-    <PlatformAuthLayout surface="app" title="CodeLogicX Login">
+    <PlatformAuthLayout surface="app" title={superAdmin ? "Super Admin Login" : "CodeLogicX Login"}>
       {form}
     </PlatformAuthLayout>
   );

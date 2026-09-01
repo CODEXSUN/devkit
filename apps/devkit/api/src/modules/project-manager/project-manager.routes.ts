@@ -21,7 +21,7 @@ const kindSchema = z.enum([
   "timeline",
   "todo"
 ]);
-const attachmentKindSchema = z.enum(["activity", "issue", "project", "review", "task"]);
+const attachmentKindSchema = z.enum(["activity", "discussion", "issue", "project", "review", "task"]);
 const idParamsSchema = z.object({ id: z.string().min(1) }).strict();
 const kindParamsSchema = z.object({ kind: kindSchema }).strict();
 const itemParamsSchema = z.object({ id: z.string().min(1), kind: kindSchema }).strict();
@@ -117,7 +117,7 @@ export async function registerProjectManagerRoutes(app: FastifyInstance) {
   );
 
   app.get("/admin/project-manager/result", async (request) =>
-    ok(await service.result(), { requestId: request.id })
+    ok(await service.resultForActor(requireDevkitActor()), { requestId: request.id })
   );
   app.get("/admin/repository-connections", async (request) =>
     ok(await repositoryConnections.listForSettings(), { requestId: request.id })
@@ -274,12 +274,14 @@ export async function registerProjectManagerRoutes(app: FastifyInstance) {
 
   app.get("/admin/project-manager/:kind/:id/attachments", async (request) => {
     const params = attachmentRecordParamsSchema.parse(request.params);
+    await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
     return ok(await service.listAttachments(params.kind, params.id), {
       requestId: request.id
     });
   });
   app.post("/admin/project-manager/:kind/:id/attachments", async (request) => {
     const params = attachmentRecordParamsSchema.parse(request.params);
+    await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
     const headers = attachmentHeadersSchema.parse(request.headers);
     if (!Buffer.isBuffer(request.body)) {
       throw AppError.validation("Attachment request body must be binary.");
@@ -302,6 +304,7 @@ export async function registerProjectManagerRoutes(app: FastifyInstance) {
     "/admin/project-manager/:kind/:id/attachments/:attachmentId/download",
     async (request, reply) => {
       const params = attachmentParamsSchema.parse(request.params);
+      await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
       const result = await service.downloadAttachment(params.kind, params.id, params.attachmentId);
       return reply
         .header("cache-control", "private, no-store")
@@ -316,6 +319,7 @@ export async function registerProjectManagerRoutes(app: FastifyInstance) {
   );
   app.delete("/admin/project-manager/:kind/:id/attachments/:attachmentId", async (request) => {
     const params = attachmentParamsSchema.parse(request.params);
+    await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
     return ok(
       await service.deleteAttachment(params.kind, params.id, params.attachmentId, actor(request)),
       { requestId: request.id }
@@ -323,27 +327,37 @@ export async function registerProjectManagerRoutes(app: FastifyInstance) {
   });
 
   app.get("/admin/project-manager/:kind", async (request) =>
-    ok(await service.list(kindParamsSchema.parse(request.params).kind), {
+    ok(await service.listForActor(kindParamsSchema.parse(request.params).kind, requireDevkitActor()), {
       requestId: request.id
     })
   );
-  app.post("/admin/project-manager/:kind", async (request) =>
-    ok(
+  app.post("/admin/project-manager/:kind", async (request) => {
+    const kind = kindParamsSchema.parse(request.params).kind;
+    const input = itemSaveSchema.parse(request.body);
+    const currentActor = requireDevkitActor();
+    if (kind !== "project") await service.requireReferenceAccess(input.referenceId, currentActor);
+    return ok(
       await service.create(
-        kindParamsSchema.parse(request.params).kind,
-        itemSaveSchema.parse(request.body),
+        kind,
+        kind === "project" && !input.assignee?.trim()
+          ? { ...input, assignee: currentActor.email?.trim() || currentActor.id }
+          : input,
         actor(request)
       ),
       { requestId: request.id }
-    )
-  );
+    );
+  });
   app.put("/admin/project-manager/:kind/:id", async (request) => {
     const params = itemParamsSchema.parse(request.params);
+    const input = itemSaveSchema.partial().parse(request.body);
+    const currentActor = requireDevkitActor();
+    await service.requireActorAccess(params.kind, params.id, currentActor);
+    if (params.kind !== "project") await service.requireReferenceAccess(input.referenceId, currentActor);
     return ok(
       await service.update(
         params.kind,
         params.id,
-        itemSaveSchema.partial().parse(request.body),
+        input,
         actor(request)
       ),
       { requestId: request.id }
@@ -351,18 +365,21 @@ export async function registerProjectManagerRoutes(app: FastifyInstance) {
   });
   app.post("/admin/project-manager/:kind/:id/deactivate", async (request) => {
     const params = itemParamsSchema.parse(request.params);
+    await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
     return ok(await service.deactivate(params.kind, params.id, actor(request)), {
       requestId: request.id
     });
   });
   app.post("/admin/project-manager/:kind/:id/restore", async (request) => {
     const params = itemParamsSchema.parse(request.params);
+    await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
     return ok(await service.restore(params.kind, params.id, actor(request)), {
       requestId: request.id
     });
   });
   app.delete("/admin/project-manager/:kind/:id", async (request) => {
     const params = itemParamsSchema.parse(request.params);
+    await service.requireActorAccess(params.kind, params.id, requireDevkitActor());
     return ok(await service.delete(params.kind, params.id, actor(request)), {
       requestId: request.id
     });

@@ -46,12 +46,14 @@ export class ProjectClient {
     });
   }
 
-  create(title: string) {
+  create(title: string, repositoryUrl: string) {
     return this.request<MobileProject>("/api/devkit/admin/project-manager/project", {
       body: JSON.stringify({
         description: "Project workspace",
         key: title.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, ""),
         moduleKey: "project-manager",
+        repositoryName: repositoryNameFromUrl(repositoryUrl),
+        repositoryUrl: repositoryUrl.trim(),
         status: "planning",
         title,
         type: "project"
@@ -80,4 +82,8 @@ export class ProjectClient {
 
 export function providerLabel(provider: MobileRepository["provider"]) {
   return provider === "github" ? "GitHub" : "Private Git";
+}
+
+function repositoryNameFromUrl(value: string) {
+  return value.trim().replace(/[\\/]+$/u, "").split(/[\\/:]/u).filter(Boolean).at(-1)?.replace(/\.git$/iu, "") ?? "";
 }

@@ -132,6 +132,7 @@ function AppRoot() {
           logoSrc={devkitLogo}
           onConnectionStateChange={setMessengerConnectionState}
           onDrawerCollapsedChange={setMessengerDrawerCollapsed}
+          onUnreadCountChange={updateUnreadTaskbar}
           onToggleSidePanel={() => setAgentPanelOpen((open) => !open)}
           product="DevKit"
           sidePanel={<MessengerConnectionPanel client="desktop" state={messengerConnectionState} />}
@@ -151,6 +152,74 @@ function AppRoot() {
       />
     </Suspense>
   );
+}
+
+let previousUnreadCount = 0;
+
+function updateUnreadTaskbar(count: number) {
+  const previous = previousUnreadCount;
+  previousUnreadCount = count;
+  void syncUnreadTaskbar(count, previous).catch(() => undefined);
+}
+
+async function syncUnreadTaskbar(count: number, previous: number) {
+  const [{ Image }, { getCurrentWindow, UserAttentionType }] = await Promise.all([
+    import("@tauri-apps/api/image"),
+    import("@tauri-apps/api/window")
+  ]);
+  const window = getCurrentWindow();
+  if (!count) {
+    await window.setOverlayIcon();
+    return;
+  }
+  const image = await Image.new(unreadBadgePixels(count), 32, 32);
+  try {
+    await window.setOverlayIcon(image);
+    if (count > previous && !(await window.isFocused())) {
+      await window.requestUserAttention(UserAttentionType.Informational);
+    }
+  } finally {
+    await image.close();
+  }
+}
+
+const digitPixels: Record<string, string[]> = {
+  "0": ["111", "101", "101", "101", "111"],
+  "1": ["010", "110", "010", "010", "111"],
+  "2": ["111", "001", "111", "100", "111"],
+  "3": ["111", "001", "111", "001", "111"],
+  "4": ["101", "101", "111", "001", "001"],
+  "5": ["111", "100", "111", "001", "111"],
+  "6": ["111", "100", "111", "101", "111"],
+  "7": ["111", "001", "010", "010", "010"],
+  "8": ["111", "101", "111", "101", "111"],
+  "9": ["111", "101", "111", "001", "111"]
+};
+
+function unreadBadgePixels(count: number) {
+  const pixels = new Uint8Array(32 * 32 * 4);
+  for (let y = 0; y < 32; y += 1) {
+    for (let x = 0; x < 32; x += 1) {
+      if ((x - 16) ** 2 + (y - 16) ** 2 <= 14 ** 2) setPixel(pixels, x, y, [255, 90, 31, 255]);
+    }
+  }
+  const label = String(Math.min(count, 99));
+  const scale = label.length === 1 ? 4 : 3;
+  const width = label.length * 3 * scale + (label.length - 1) * scale;
+  const startX = Math.floor((32 - width) / 2);
+  const startY = Math.floor((32 - 5 * scale) / 2);
+  [...label].forEach((digit, digitIndex) => digitPixels[digit]?.forEach((row, rowIndex) => [...row].forEach((bit, columnIndex) => {
+    if (bit !== "1") return;
+    for (let offsetY = 0; offsetY < scale; offsetY += 1) for (let offsetX = 0; offsetX < scale; offsetX += 1) {
+      setPixel(pixels, startX + digitIndex * 4 * scale + columnIndex * scale + offsetX, startY + rowIndex * scale + offsetY, [255, 255, 255, 255]);
+    }
+  })));
+  return pixels;
+}
+
+function setPixel(pixels: Uint8Array, x: number, y: number, color: [number, number, number, number]) {
+  const index = (y * 32 + x) * 4;
+  pixels.set(color, index);
 }
 
 createRoot(document.getElementById("root")!).render(

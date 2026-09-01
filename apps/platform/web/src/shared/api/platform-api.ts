@@ -46,12 +46,12 @@ export function tokenExpiresAt(token = getToken()): number | null {
   }
 }
 
-export function redirectToLoginForExpiredSession(): void {
+export function redirectToLoginForExpiredSession(path = "/login"): void {
   clearToken();
   try {
     sessionStorage.setItem(SESSION_EXPIRED_WARNING_KEY, "1");
   } catch {}
-  window.location.replace("/login");
+  window.location.replace(path);
 }
 
 export function hasSessionExpiredWarning(): boolean {
@@ -126,6 +126,7 @@ export async function login(input: { email: string; password: string }) {
       name: string;
       permissions: string[];
       role: string;
+      superAdmin: boolean;
     }>("/auth/login", input);
     setToken(data.accessToken);
     return { data, success: true } as const;
@@ -140,7 +141,7 @@ export async function login(input: { email: string; password: string }) {
 export async function developmentLogin() {
   clearToken();
   try {
-    const data = await apiPost<{ accessToken: string; role?: string }>("/auth/development/login");
+    const data = await apiPost<{ accessToken: string; role?: string; superAdmin?: boolean }>("/auth/development/login");
     setToken(data.accessToken);
     return { data, success: true } as const;
   } catch (error) {

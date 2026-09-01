@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { AppError } from "@codexsun/framework/errors";
+import type { DevkitActor } from "../../request-context.js";
 import { ProjectManagerRepository } from "./project-manager.repository.js";
 import {
   ProjectManagerAttachmentStorage,
@@ -37,6 +38,7 @@ const kinds: ProjectManagerKind[] = [
 ];
 const attachmentKinds: ProjectManagerAttachmentKind[] = [
   "activity",
+  "discussion",
   "issue",
   "project",
   "review",
@@ -52,6 +54,32 @@ export class ProjectManagerService {
   list(kind: ProjectManagerKind) {
     assertKind(kind);
     return this.repository.list(kind);
+  }
+
+  async listForActor(kind: ProjectManagerKind, actor: DevkitActor) {
+    assertKind(kind);
+    const records = await this.repository.list(kind);
+    if (isProjectAdministrator(actor)) return records;
+    const context = await this.accessContext(actor);
+    return records.filter((record) => canAccessRecord(record, context));
+  }
+
+  async requireActorAccess(kind: ProjectManagerKind, id: string, actor: DevkitActor) {
+    if (isProjectAdministrator(actor)) return;
+    const record = await this.repository.find(kind, id);
+    if (!record) throw AppError.notFound(`${kind} record was not found.`);
+    if (!canAccessRecord(record, await this.accessContext(actor))) {
+      throw AppError.forbidden("This record belongs to a project that is not associated with you.");
+    }
+  }
+
+  async requireReferenceAccess(referenceId: string | undefined, actor: DevkitActor) {
+    if (!referenceId || isProjectAdministrator(actor)) return;
+    const context = await this.accessContext(actor);
+    const referencedRecord = context.records.find((record) => record.id === referenceId || record.key === referenceId);
+    if (!context.projectIds.has(referenceId) && !context.projectKeys.has(referenceId) && (!referencedRecord || !canAccessRecord(referencedRecord, context))) {
+      throw AppError.forbidden("The selected project is not associated with you.");
+    }
   }
 
   async create(kind: ProjectManagerKind, input: ProjectManagerSavePayload, actorEmail: string) {
@@ -139,7 +167,9 @@ export class ProjectManagerService {
       input.originalName
     );
     const attachmentId = newUuid();
-    const storageKey = `project-manager/${kind}/${id}/${attachmentId}.${validated.extension}`;
+    const storageKey = kind === "discussion"
+      ? `storage/app/ideas/${id}/${attachmentId}.${validated.extension}`
+      : `project-manager/${kind}/${id}/${attachmentId}.${validated.extension}`;
     await this.attachmentStorage.write(storageKey, input.data);
     try {
       const attachment = await this.repository.createAttachment(
@@ -212,6 +242,35 @@ export class ProjectManagerService {
         ).length,
         total: all.length
       }
+    };
+  }
+
+  async resultForActor(actor: DevkitActor): Promise<ProjectManagerResult> {
+    const entries = await Promise.all(
+      kinds.map(async (kind) => [kind, await this.listForActor(kind, actor)] as const)
+    );
+    const records = Object.fromEntries(entries) as Record<ProjectManagerKind, ProjectManagerRecord[]>;
+    const all = Object.values(records).flat();
+    return {
+      generatedAt: now(),
+      records,
+      summary: {
+        active: all.filter((record) => record.active).length,
+        blocked: all.filter((record) => ["blocked", "critical", "needs-review"].includes(record.status) || record.priority === "critical").length,
+        completed: all.filter((record) => ["completed", "done", "released", "approved"].includes(record.status)).length,
+        total: all.length
+      }
+    };
+  }
+
+  private async accessContext(actor: DevkitActor) {
+    const entries = await Promise.all(kinds.map((kind) => this.repository.list(kind)));
+    const records = entries.flat();
+    const projects = records.filter((record) => record.kind === "project" && isAssociated(record, actor));
+    return {
+      projectIds: new Set(projects.map((project) => project.id)),
+      projectKeys: new Set(projects.map((project) => project.key)),
+      records
     };
   }
 
@@ -434,6 +493,36 @@ function normalizeRecord(
     type: input.type ?? kind,
     updatedAt: input.updatedAt ?? timestamp
   };
+}
+
+type ProjectAccessContext = {
+  projectIds: Set<string>;
+  projectKeys: Set<string>;
+  records: ProjectManagerRecord[];
+};
+
+function canAccessRecord(record: ProjectManagerRecord, context: ProjectAccessContext) {
+  if (record.kind === "project") return context.projectIds.has(record.id);
+  if (!record.referenceId) return true;
+  let referenceId = record.referenceId;
+  const visited = new Set<string>();
+  while (referenceId && !visited.has(referenceId)) {
+    if (context.projectIds.has(referenceId) || context.projectKeys.has(referenceId)) return true;
+    visited.add(referenceId);
+    const parent = context.records.find((candidate) => candidate.id === referenceId || candidate.key === referenceId);
+    if (!parent) return false;
+    referenceId = parent.referenceId;
+  }
+  return false;
+}
+
+function isAssociated(project: ProjectManagerRecord, actor: DevkitActor) {
+  const identities = new Set([actor.id, actor.email ?? ""].map((value) => value.trim().toLowerCase()).filter(Boolean));
+  return project.assignee.split(/[,;\n]/u).some((value) => identities.has(value.trim().toLowerCase()));
+}
+
+function isProjectAdministrator(actor: DevkitActor) {
+  return actor.roles.some((role) => ["admin", "superadmin"].includes(role.trim().toLowerCase().replace(/[-_\s]/gu, "")));
 }
 
 function normalizePlatform(

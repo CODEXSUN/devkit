@@ -3,5 +3,12 @@
   "identifier": "main-window",
   "description": "Minimum capability set for the local IDE window.",
   "windows": ["main"],
-  "permissions": ["core:default", "process:allow-restart", "updater:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-is-focused",
+    "core:window:allow-request-user-attention",
+    "core:window:allow-set-overlay-icon",
+    "process:allow-restart",
+    "updater:default"
+  ]
 }

@@ -1,14 +1,18 @@
-import { Archive, ArrowLeft, Search, Settings } from "lucide-react";
+import { Archive, ArrowLeft, Bell, Search, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function WorkspaceSettingsDrawer({
   archivedChatCount,
+  notificationPermission,
   onClose,
+  onEnableNotifications,
   onOpenArchived,
   open
 }: {
   archivedChatCount: number;
+  notificationPermission: NotificationPermission | "unsupported";
   onClose: () => void;
+  onEnableNotifications: () => void;
   onOpenArchived: () => void;
   open: boolean;
 }) {
@@ -23,7 +27,9 @@ export function WorkspaceSettingsDrawer({
   }, [onClose, open]);
   if (!open) return null;
 
-  const showArchived = "archived chats".includes(query.trim().toLocaleLowerCase());
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const showArchived = "archived chats".includes(normalizedQuery);
+  const showNotifications = "message notifications alerts".includes(normalizedQuery);
   return (
     <>
       <button
@@ -50,6 +56,8 @@ export function WorkspaceSettingsDrawer({
           />
         </label>
         <section>
+          <h2>Messages</h2>
+          {showNotifications ? <button disabled={notificationPermission !== "default"} onClick={onEnableNotifications} type="button"><Bell size={16} /><span>{notificationLabel(notificationPermission)}</span></button> : null}
           <h2>Archived</h2>
           {showArchived ? (
             <button onClick={onOpenArchived} type="button">
@@ -57,9 +65,16 @@ export function WorkspaceSettingsDrawer({
               <span>Archived chats</span>
               {archivedChatCount ? <small>{archivedChatCount}</small> : null}
             </button>
-          ) : <p>No matching settings</p>}
+          ) : !showNotifications ? <p>No matching settings</p> : null}
         </section>
       </aside>
     </>
   );
+}
+
+function notificationLabel(permission: NotificationPermission | "unsupported") {
+  if (permission === "granted") return "Notifications enabled";
+  if (permission === "denied") return "Notifications blocked by system";
+  if (permission === "unsupported") return "Notifications unavailable";
+  return "Enable message notifications";
 }

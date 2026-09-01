@@ -32,6 +32,7 @@ export function ProjectsPage({
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [repositoryUrl, setRepositoryUrl] = useState("");
 
   useEffect(() => {
     void client
@@ -65,10 +66,11 @@ export function ProjectsPage({
     setConnectingId("new-project");
     setError("");
     try {
-      const project = await client.create(projectName.trim());
+      const project = await client.create(projectName.trim(), repositoryUrl);
       setProjects((current) => [project, ...current]);
       onConnect(project);
       setProjectName("");
+      setRepositoryUrl("");
       setAdding(false);
     } catch (reason) {
       setError(messageOf(reason));
@@ -89,7 +91,7 @@ export function ProjectsPage({
           <Text style={styles.summaryLabel}>connected</Text>
         </View><Pressable accessibilityLabel="Add project or repository" onPress={() => setAdding((open) => !open)} style={styles.addButton}><Ionicons color="#fff" name={adding ? "close" : "add"} size={20} /></Pressable></View>
       </View>
-      {adding ? <View style={styles.createPanel}><TextInput onChangeText={setProjectName} placeholder="New project name" placeholderTextColor="#85857e" style={styles.createInput} value={projectName} /><Pressable disabled={!projectName.trim() || connectingId === "new-project"} onPress={() => void createProject()} style={styles.createButton}><Text style={styles.createButtonText}>Create</Text></Pressable><Text style={styles.repositoryHint}>Or choose an available repository below.</Text></View> : null}
+      {adding ? <View style={styles.createPanel}><TextInput onChangeText={setProjectName} placeholder="New project name" placeholderTextColor="#85857e" style={styles.createInput} value={projectName} /><TextInput autoCapitalize="none" autoCorrect={false} keyboardType="url" onChangeText={setRepositoryUrl} placeholder="Git repository URL" placeholderTextColor="#85857e" style={[styles.createInput, styles.repositoryUrlInput]} value={repositoryUrl} /><Pressable disabled={!projectName.trim() || connectingId === "new-project"} onPress={() => void createProject()} style={styles.createButton}><Text style={styles.createButtonText}>Create</Text></Pressable><Text style={styles.repositoryHint}>Or choose an available repository below.</Text></View> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {loading ? (
         <View style={styles.loading}>
@@ -288,6 +290,7 @@ const styles = StyleSheet.create({
   page: { flex: 1, gap: 16, paddingHorizontal: 16, paddingTop: 22 },
   repositoryIcon: { backgroundColor: "#f4f4f0" },
   repositoryHint: { color: "#85857e", fontSize: 11, width: "100%" },
+  repositoryUrlInput: { flexBasis: "100%" },
   subtitle: { color: "#777770", fontSize: 13, paddingTop: 4 },
   summary: { alignItems: "flex-end" },
   summaryLabel: { color: "#85857e", fontSize: 11 },

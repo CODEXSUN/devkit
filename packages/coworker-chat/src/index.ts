@@ -11,7 +11,9 @@ export type { AgentAction, AgentApproval, AgentMessage } from "./agent-chat-even
 export { CoworkerChat } from "./CoworkerChat";
 export { IdeasWorkspace } from "./IdeasWorkspace";
 export { ConnectionServiceWorkspace } from "./ConnectionServiceWorkspace";
+export { SettingsWorkspace } from "./SettingsWorkspace";
 export {
+  isMessengerMessageOwn,
   MessengerClient,
   mergeMessengerMessage,
   reconcileMessengerMessages

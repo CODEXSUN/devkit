@@ -1,8 +1,47 @@
 # Changelog
 
-Current version: 1.0.85
-Release tag: v-1.0.85
-Changelog label: v 1.0.85
+Current version: 1.0.86
+Release tag: v-1.0.86
+Changelog label: v 1.0.86
+
+## v-1.0.86
+
+### [v 1.0.86] 2026-09-01 11:44 am - Project planning workspaces
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.86.
+- Added project Modules with list, create, edit, status, hierarchy, route, and planning fields.
+- Restricted project records and attachments to associated users, with administrator access across projects.
+- Added an Identity-backed multi-user selector to the project editor.
+- Added a visual Architect planner with draggable blocks, properties, and saved connectors.
+- Added project White Board files with Excalidraw, file lists, multiple boards, and saved scenes.
+- Added a visual Schema planner with table columns, relation properties, cardinality, and review states.
+- Added contextual Add actions for each supported Project tab.
+- Added compact Project Overview counts from Modules through Changelog.
+- Made every Project tab and editor full width with responsive layouts.
+- Kept one separator and one consistent gap between Project tabs and their workspaces.
+- Added authenticated Super Admin routes for identity, application features, and updates.
+
+#### Verification
+
+- Passed `npm.cmd run check:versions` after completing this entry.
+- Passed Coworker Chat typecheck, lint, and build checks.
+- Passed the Platform Web production build with existing large-chunk warnings.
+- Passed two focused Project Manager access tests.
+- Passed two focused planning scene tests.
+- Confirmed the live Vite server returns the Project Overview and White Board modules with HTTP 200.
+- Passed `git diff --check` for the changed workspace.
+- `npm.cmd run release:scope` found 76 changed paths, including 60 unclassified paths from the shared worktree.
+- The mixed unclassified scope blocks a commit, tag, release, or deployment.
+- Passed `npm.cmd run github:now -- --dry-run` with commit subject `#86 - Project planning workspaces`.
+- Did not run an authenticated browser or live database check for the final Project workspace state.
+- Did not publish a GitHub release or update the VPS.
 
 ## v-1.0.85
 
@@ -14,6 +53,9 @@ Changelog label: v 1.0.85
 - Added migration `devkit.orchestration-chat.sql.v5`.
 - Added migration `devkit.task-manager.sql.v4`.
 - Added migration `devkit.messenger.sql.v5`.
+- Added migration `devkit.messenger.sql.v6`.
+- Added `devkit_messenger_attachments` for private message file metadata and storage references.
+- Added `devkit_messenger_reactions` for actor-owned emoji reactions.
 - Added `devkit_messenger_conversations` with conversation type, title, creator, and update timestamps.
 - Added `devkit_messenger_participants` with participant, read, mute, archive, and join timestamps.
 - Added `devkit_messenger_activity` with actor, conversation, action, structured details, and creation timestamps.
@@ -57,6 +99,63 @@ Changelog label: v 1.0.85
 - Reduced the Messenger header to its title and connection dot, and moved conversation selection and activity into the right properties drawer.
 - Removed the Agent Chat workspace subtitle and replaced the full project name with the shared folder dropdown from Todos.
 - Applied the compact title, project folder dropdown, and status dot header to Todos and Projects, with Todo project filtering.
+- Changed Messenger messages to left-aligned received bubbles and right-aligned sent bubbles.
+- Added sent, received, and blue read receipt ticks.
+- Added hover emoji reactions with stored reaction chips.
+- Added image, PDF, and text attachments with previews, downloads, and a 2 MB file limit.
+- Added a conversation chevron menu for details, mute, archive, and transcript export actions.
+- Broadcast attachment and reaction updates to every conversation participant through the existing realtime channel.
+- Aligned My Devices messages by the active client: desktop on desktop, mobile on mobile, and web on web appear on the right.
+- Kept direct user-chat alignment actor-based so the signed-in sender remains on the right.
+- Aligned receipt ticks with the message timestamp baseline and added date plus relative-time labels.
+- Added a hover-only message chevron with reactions, message info, reply, copy, and forward-to-composer actions.
+- Closed message and conversation popups when the user clicks outside them or presses Escape.
+- Preserved the Messenger viewport during refreshes and incoming messages while the user reads older history.
+- Added a New messages control instead of forcing the viewport to the bottom.
+- Added drag-and-drop attachments with an unobtrusive full-thread drop target and local image previews before sending.
+- Added in-app image lightbox previews, quoted reply blocks, date separators, and one-click hover forwarding.
+- Replaced the text history control with a compact bottom-scroll button that remains available while viewing older messages.
+- Reduced Messenger scrollbars to a minimal 3px treatment on supported browsers.
+- Enabled HTML file drops in the Windows desktop webview so Explorer files reach Messenger.
+- Stabilized attachment object URLs and unchanged message refreshes to prevent chat-image and history flicker.
+- Kept background read, activity, and conversation refresh failures from replacing an otherwise healthy message thread with a permanent error banner.
+- Added immediate Messenger catch-up after socket reconnect, browser focus, visibility restoration, and network recovery.
+- Guarded rapid conversation switches so late responses cannot replace the currently selected chat.
+- Added immediate local confirmation for sent messages while the durable server refresh completes.
+- Broadcast read-receipt updates to conversation participants instead of waiting for the next polling cycle.
+- Preserved polling as a realtime fallback while deduplicating unchanged message snapshots.
+- Kept conversations unread while Messenger is hidden, unfocused, or another workspace is active.
+- Refreshed unread conversation badges for realtime events even when a different chat is selected.
+- Ordered conversation shortcuts by unread state and latest activity.
+- Added a compact total-unread badge to the Messenger navigation icon.
+- Added an explicit Settings action for browser and desktop message-notification permission.
+- Showed background message notifications only for unmuted conversations after permission is granted.
+- Changed the Messenger side-rail unread indicator to the compact orange notification treatment.
+- Connected the total unread count to a generated Windows taskbar overlay icon without external assets.
+- Requested Windows taskbar attention when unread messages increase while the desktop window is unfocused.
+- Cleared side-rail and taskbar notification counts immediately after messages are read or Messenger closes.
+- Added the authenticated `messenger.unread` WebSocket event with actor-scoped conversation counts.
+- Published unread-state events after message delivery, read transitions, conversation creation, and mute or archive changes.
+- Removed the per-message HTTP conversation refresh from the notification path.
+- Synchronized side-menu and Windows taskbar badges directly from WebSocket unread events, while retaining HTTP catch-up after reconnect.
+- Suppressed successful Socket.IO transport handshakes and polling frames from general request logs while preserving all 4xx and 5xx socket failures.
+- Removed all Socket.IO transport frames, including stale polling responses, from the general HTTP request log.
+- Kept one actor-wide Messenger socket alive across chat selection, contact loading, and workspace navigation instead of reconnecting on UI state changes.
+- Reduced `messenger.unread` payloads from full conversation lists to one changed-conversation delta plus the total unread count.
+- Extended healthy socket fallback polling from 30 to 60 seconds while retaining five-second disconnected recovery.
+- Corrected Messenger history loading to return the latest 300 messages in stable ascending order instead of the oldest 300.
+- Limited attachment and reaction detail queries to the messages in the current response or realtime update.
+- Removed newly written attachment files when their database metadata insert fails.
+- Made shared Messenger recovery listeners safe for native mobile runtimes without browser globals.
+- Preserved the mobile history position while reading older messages and aligned device-chat bubbles by the active client.
+- Kept Messenger available to every authenticated local user without incorrectly requiring Project Manager permissions.
+- Prevented failed or late attachment previews from creating unhandled errors or leaking object URLs.
+- Added authenticated Messenger presence snapshots and online/offline events with multi-session connection counting.
+- Added initials avatars and compact online dots to desktop, web, contact-picker, header, and mobile conversation surfaces.
+- Added last-message sent, delivered, and blue read ticks to the conversation list.
+- Kept persisted unread counts visible as compact per-conversation badges and prioritized unread chats.
+- Made message ordering deterministic by creation time ascending and message ID ascending for timestamp ties.
+- Kept attachment downloads private through conversation participant checks and stored file bytes under `DEVKIT_STORAGE_PATH`.
 - Added `@`, `/`, and `#` composer suggestions, symbol help, mention highlighting, tag filtering, and keyboard selection.
 - Added a compact Todo composer with icon controls and color-coded priority choices.
 - Changed the Category and Project controls to compact icon triggers with animated, labeled menus.
@@ -85,12 +184,43 @@ Changelog label: v 1.0.85
 - Changed DevKit API module startup to load each module through one ordered composition list.
 - Changed API development startup to load the DevKit API workspace from source.
 - Recorded review gaps for Messenger history pagination, Messenger permissions, Agent Chat connector reuse, stream cancellation, restored action evidence, and focused test coverage.
+- Added project Module records with list, create, edit, status, hierarchy, route, and planning fields.
+- Added one contextual Add action for Notes, Modules, Tasks, Architect, White Board, Schema, and Changelog.
+- Made project Notes public inside their associated project and removed note visibility controls.
+- Restricted project records and attachments to associated users, with administrator and super administrator access.
+- Replaced the project association text field with an Identity-backed multi-user autocomplete selector.
+- Added authenticated `/sa` routes for the Super Admin portal, identity controls, application features, and updates.
+- Added a visual Architect planner with draggable blocks, edge handles, connectors, properties, and saved project records.
+- Added project White Board files with an Excalidraw editor, multiple boards, file lists, and automatic scene saves.
+- Added a visual Schema planner with table cards, column properties, relation labels, cardinality, and review status.
+- Kept project tabs visible while the Architect and Schema editors are open.
+- Added compact Project Overview statistics for Modules, Tasks, Reviews, Architectures, Whiteboards, Schemas, and Changelog entries.
 
 #### Verification
 
 - Passed `npm.cmd run typecheck --workspace @codexsun/coworker-chat`.
 - Passed `npm.cmd run lint --workspace @codexsun/coworker-chat`.
+- Passed repeated Coworker Chat typecheck, lint, and build checks after the Project workspace changes.
+- Passed the Platform Web production build with the embedded Excalidraw project editor.
+- Passed the two focused planning scene tests.
+- Passed the two focused Project Manager access tests.
+- Passed `git diff --check` for the changed Project workspace files.
+- Did not run an authenticated browser or live database check for the final Project workspace state.
 - Passed desktop, web, and mobile typechecks after adding the Messenger contact picker.
+- Passed DevKit API typecheck and lint after adding Messenger attachments and reactions.
+- Passed Coworker Chat typecheck and lint after the full Messenger interaction update.
+- Passed Platform API, Platform Web, desktop, and mobile typechecks.
+- Built the DevKit API and applied `devkit.messenger.sql.v6` to `devkit_db`.
+- Confirmed `devkit.messenger.sql.v6` in the migration journal.
+- Passed 11 focused Messenger tests, including stable message-ID ordering, device alignment, relative-time formatting, and date separators.
+- Passed Coworker Chat and DevKit API typecheck and lint after the realtime recovery changes.
+- Built the DevKit API after adding realtime read-receipt publication.
+- Passed DevKit web, desktop, and mobile typechecks after the reconnect and stale-response guards.
+- Passed Coworker Chat typecheck and lint plus web, desktop, and mobile typechecks after unread notification badges.
+- Passed desktop lint after adding the Windows taskbar overlay integration.
+- Desktop production build reached bundle generation, then the existing bundle-budget gate rejected `assets/use-messenger-B4lZ6I3U.js` at 879 kB against the 500 kB limit.
+- Passed DevKit API build, typecheck, and lint plus Platform API typecheck and lint after adding `messenger.unread` WebSocket delivery.
+- Passed Coworker Chat typecheck and lint, 11 focused Messenger tests, and desktop, web, and mobile typechecks after direct unread synchronization.
 - A final Coworker Chat rerun found a concurrent missing `MessengerConversationList` symbol and three unused Messenger icon imports.
 - Passed `npm.cmd run typecheck --workspace @codexsun/devkit-api`.
 - A final API typecheck rerun found four concurrent Messenger route signature errors in `messenger.routes.ts`.
@@ -111,6 +241,19 @@ Changelog label: v 1.0.85
 - Passed `npm.cmd run build --workspace @devkit/mobile`.
 - Passed `npm.cmd run check:versions` for version 1.0.85.
 - Passed `git diff --check`.
+- Passed Framework, Coworker Chat, DevKit API, and Platform API typecheck and lint after the WebSocket logging and lifecycle optimization.
+- Passed DevKit web, Platform web, desktop, and mobile typechecks after the WebSocket lifecycle optimization.
+- Passed all 10 Framework tests and 11 focused Messenger tests.
+- Passed DevKit API build, typecheck, and lint after the full Messenger refinement review.
+- Passed Coworker Chat, Platform API, DevKit web, Platform web, desktop, and mobile typechecks; passed Coworker Chat and Platform API lint.
+- Passed 11 focused Messenger tests and `git diff --check` after the full Messenger refinement review.
+- `npm.cmd run check:module-boundaries` remains blocked by the existing unregistered `apps/devkit/api/src/modules/docs` module outside the Messenger scope.
+- Passed desktop lint and focused lint for `apps/devkit/mobile/src/MessengerMobile.tsx`.
+- Full mobile lint remains blocked because its workspace lint script includes the generated `apps/devkit/mobile/dist` Expo bundle.
+- Passed DevKit API build, typecheck, and lint plus Platform API typecheck and lint after Messenger presence and conversation metadata updates.
+- Passed Coworker Chat typecheck and lint, web, desktop, and mobile typechecks, focused mobile Messenger lint, and 11 focused Messenger tests.
+- Passed the Platform web production build with existing large-chunk warnings.
+- Passed Framework typecheck, lint, all 10 Framework tests, and `git diff --check` after removing Socket.IO frames from HTTP logs.
 - Ran `npm.cmd run db:migrations:list`. It confirmed `devkit.task-manager.sql.v4` in `devkit_db`.
 - Queried `information_schema.columns` for the live Todo table and checked visibility row counts.
 - Passed 10 focused Todo service, live migration, sync-row, and dropdown-navigation tests with Vitest.

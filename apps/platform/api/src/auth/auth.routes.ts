@@ -90,6 +90,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         name: payload.name,
         permissions: payload.permissions ?? [],
         role: payload.role,
+        superAdmin: payload.superAdmin ?? false,
         sessionIssuedAt: payload.sessionIssuedAt
       },
       { requestId: request.id }
