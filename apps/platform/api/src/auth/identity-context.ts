@@ -8,7 +8,11 @@ export function identityContext(request: FastifyRequest) {
     ? request.headers.authorization.slice("Bearer ".length).trim()
     : "";
   const claims = token ? verifyAuthToken(token) : null;
-  if (!claims) throw AppError.unauthorized("Session expired. Please sign in again.");
+  if (!claims) {
+    throw AppError.unauthorized(
+      "Please sign in. Contact an administrator for access, answers, or support."
+    );
+  }
 
   const database = getPlatformDatabase();
   const actorUser = () =>

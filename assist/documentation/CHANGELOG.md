@@ -1,8 +1,44 @@
 # Changelog
 
-Current version: 1.0.94
-Release tag: v-1.0.94
-Changelog label: v 1.0.94
+Current version: 1.0.95
+Release tag: v-1.0.95
+Changelog label: v 1.0.95
+
+## v-1.0.95
+
+### [v 1.0.95] 2026-09-01 2:41 pm - Agent database access policy
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.95.
+- Added the `devkit-database-access` agent skill for local and managed VPS database work.
+- The skill discovers connection details from runtime configuration without exposing credentials.
+- The skill requires read-only inspection first and explicit approval for each persistent change.
+- The skill blocks destructive, broad, or ambiguous database operations.
+- Cloud runtimes now reject all Skill Library writes and keep skills read-only.
+- Anonymous agent access now directs requesters to sign in or contact an administrator.
+- A cloud Skill Library override now requires a Super Administrator role, an emergency reason, and a verified one-way emergency-key hash.
+- The Connection Service page now opens the cloud device-code page through a secure link activation.
+- Added `release:manual`, which reuses the repository release checks, GitHub commit flow, and guarded VPS updater.
+
+#### Verification
+
+- Passed `npm.cmd run typecheck --workspace @codexsun/devkit-api`.
+- Passed `npm.cmd run lint --workspace @codexsun/devkit-api`.
+- Passed `npm.cmd run typecheck --workspace @devkit/platform-api`.
+- Passed `npm.cmd run lint --workspace @devkit/platform-api`.
+- Passed `npm.cmd run check:database-lifecycle`.
+- Passed `npm.cmd run check:versions`.
+- Passed `npm.cmd run db:seed` against the local DevKit database.
+- Passed `node --check tools/manual-release-deploy.mjs`.
+- Passed `npm.cmd run release:manual` in check-only mode, including its release-scope and GitHub dry-run gates.
+- Passed `npx.cmd prettier --check tools/manual-release-deploy.mjs package.json assist/documentation/CHANGELOG.md`.
+- VPS deployment is performed only by `release:manual -- --deploy --yes` after the local release checks pass.
 
 ## v-1.0.94
 

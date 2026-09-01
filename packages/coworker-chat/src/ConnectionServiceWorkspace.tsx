@@ -112,11 +112,7 @@ export function ConnectionServiceWorkspace({
                 disabled={busy === "connect"}
                 onClick={() => {
                   try {
-                    window.open(
-                      connectUrl(cloudUrl, deviceIdentity(clientKind)),
-                      "_blank",
-                      "noopener,noreferrer"
-                    );
+                    openSecureCodePage(connectUrl(cloudUrl, deviceIdentity(clientKind)));
                   } catch {
                     setMessage("Enter a valid cloud domain, including https://.");
                   }
@@ -312,6 +308,16 @@ function connectUrl(cloudUrl: string, instanceId: string) {
   const url = new URL("/connect", normalizedCloudUrl(cloudUrl));
   url.searchParams.set("device", instanceId.trim());
   return url.toString();
+}
+
+function openSecureCodePage(url: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.rel = "noopener noreferrer";
+  link.target = "_blank";
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function deviceIdentity(clientKind: "desktop" | "mobile" | "web") {

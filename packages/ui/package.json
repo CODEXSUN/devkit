@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/ui",
-  "version": "1.0.94",
+  "version": "1.0.95",
   "private": true,
   "description": "DevKit-owned design system and workspace primitives",
   "type": "module",

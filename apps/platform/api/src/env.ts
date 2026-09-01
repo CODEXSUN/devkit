@@ -24,6 +24,7 @@ const envSchema = z.object({
   INITIAL_ADMIN_EMAIL: z.string().default(""),
   INITIAL_ADMIN_NAME: z.string().default(""),
   INITIAL_ADMIN_PASSWORD: z.string().default(""),
+  DEVKIT_SUPER_ADMIN_EMERGENCY_KEY_HASH: z.string().default(""),
   OPENAI_API_KEY: z.string().default(""),
   OPENAI_BASE_URL: z
     .string()
