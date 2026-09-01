@@ -1,8 +1,43 @@
 # Changelog
 
-Current version: 1.0.93
-Release tag: v-1.0.93
-Changelog label: v 1.0.93
+Current version: 1.0.94
+Release tag: v-1.0.94
+Changelog label: v 1.0.94
+
+## v-1.0.94
+
+### [v 1.0.94] 2026-09-01 2:28 pm - One-time device pairing and cloud sync
+
+#### Database Changes
+
+- Database update: Yes.
+- Updated the repeatable `devkit.sync.sql.v1` migration.
+- Added `devkit_sync_tokens.token_kind` and `devkit_sync_tokens.expires_at` without changing existing token rows.
+- Pairing codes use `token_kind = pairing`, expire after ten minutes, and change to `consumed` after one successful exchange.
+- Device secrets use `token_kind = device`. Existing device tokens remain active and continue to work.
+- No seed or data transformation runs. The additive migration is safe to run again.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.94.
+- Added a cloud pairing endpoint that exchanges a signed-in web code once for a separate device secret.
+- Stored only the encrypted device secret on the local installation. The one-time code cannot authorize later sync requests.
+- Updated web, desktop, mobile, and cloud connection text to distinguish one-time codes from connected devices.
+- Added a green paired-device card for the bound connection state.
+
+#### Verification
+
+- Passed DevKit API typecheck and lint.
+- Passed DevKit Web typecheck and lint.
+- Passed shared coworker-chat typecheck and lint.
+- Passed Platform Web typecheck and lint.
+- Passed Platform Web production build with the existing large-chunk warning.
+- Passed desktop typecheck, lint, and 42 tests.
+- Passed an isolated desktop production build. The standard desktop build output was locked by the active Tauri development session.
+- Passed `npm.cmd run check:module-boundaries`, `npm.cmd run check:database-lifecycle`, and `git diff --check`.
+- Confirmed the currently deployed cloud rejects an unsigned status request with `401`.
+- Confirmed the currently deployed cloud does not yet include the new pairing endpoint. It returned `404` before this release.
+- Pending the guarded VPS Docker update and signed-in browser-to-device pairing check.
 
 ## v-1.0.93
 

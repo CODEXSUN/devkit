@@ -26,6 +26,7 @@ export type SyncTokenSummary = {
 
 export type GeneratedSyncToken = {
   createdAt: string;
+  expiresAt: string;
   label: string;
   token: string;
 };

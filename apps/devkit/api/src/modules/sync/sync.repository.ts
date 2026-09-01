@@ -189,15 +189,17 @@ export class DevkitSyncRepository {
     return count;
   }
 
-  async createToken(input: { actor: string; hash: string; label: string }) {
+  async createToken(input: { actor: string; expiresAt?: Date; hash: string; kind: "device" | "pairing"; label: string }) {
     const uuid = newUuid();
     await this.database
       .insertInto("devkit_sync_tokens")
       .values({
         created_by: input.actor,
+        expires_at: input.expiresAt ?? null,
         label: input.label,
         last_used_at: null,
         status: "active",
+        token_kind: input.kind,
         token_hash: input.hash,
         uuid
       })
@@ -209,6 +211,7 @@ export class DevkitSyncRepository {
     return this.database
       .selectFrom("devkit_sync_tokens")
       .select(["uuid", "label", "status", "created_by", "created_at", "last_used_at"])
+      .where("token_kind", "=", "device")
       .orderBy("created_at", "desc")
       .execute();
   }
@@ -223,13 +226,33 @@ export class DevkitSyncRepository {
     return Number(result.numUpdatedRows) > 0;
   }
 
-  async findActiveToken(hash: string) {
+  async findActiveDeviceToken(hash: string) {
     return this.database
       .selectFrom("devkit_sync_tokens")
       .selectAll()
       .where("token_hash", "=", hash)
       .where("status", "=", "active")
+      .where("token_kind", "=", "device")
       .executeTakeFirst();
+  }
+
+  async exchangePairingToken(hash: string) {
+    const pairing = await this.database
+      .selectFrom("devkit_sync_tokens")
+      .select(["label", "uuid"])
+      .where("token_hash", "=", hash)
+      .where("status", "=", "active")
+      .where("token_kind", "=", "pairing")
+      .where("expires_at", ">", new Date())
+      .executeTakeFirst();
+    if (!pairing) return null;
+    const consumed = await this.database
+      .updateTable("devkit_sync_tokens")
+      .set({ last_used_at: new Date(), status: "consumed" })
+      .where("uuid", "=", pairing.uuid)
+      .where("status", "=", "active")
+      .executeTakeFirst();
+    return Number(consumed.numUpdatedRows) > 0 ? pairing : null;
   }
 
   async touchToken(uuid: string) {

@@ -134,12 +134,12 @@ function BindingForm({
           value={instanceId}
         />
       </Field>
-      <Field label="Cloud token" name="sync-token">
+      <Field label="One-time connection code" name="sync-token">
         <Input
           id="sync-token"
           maxLength={16}
           onChange={(event) => setToken(event.target.value)}
-          placeholder="Paste 16-character token"
+          placeholder="Paste 16-character code"
           type="password"
           value={token}
         />
@@ -152,7 +152,7 @@ function BindingForm({
         onClick={() =>
           void runAction(
             () => actions.bind.mutateAsync({ instanceId, token }),
-            "Connection verified and saved on this installation.",
+            "Code verified. The device secret is saved on this installation.",
             "Cloud binding failed.",
             () => setToken("")
           )
@@ -175,7 +175,7 @@ export function CloudConnectionPanel() {
       const result = await actions.generate.mutateAsync(label);
       setGeneratedToken(result.token);
       setLabel("");
-      toast.success("Connection token generated and registered.");
+      toast.success("One-time connection code generated.");
     } catch (error) {
       showFailure(error, "Token generation failed.");
     }
@@ -198,14 +198,14 @@ export function CloudConnectionPanel() {
           icon={<KeyRoundIcon />}
           onClick={() => void generate()}
         >
-          Generate connection token
+          Generate one-time code
         </Button>
       </div>
 
       {generatedToken ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3">
           <div>
-            <p className="text-sm font-medium">Copy this token now</p>
+            <p className="text-sm font-medium">Copy this code now. It expires in 10 minutes.</p>
             <code className="text-base font-semibold tracking-widest">{generatedToken}</code>
           </div>
           <Button
@@ -220,7 +220,7 @@ export function CloudConnectionPanel() {
       ) : null}
 
       <div className="space-y-2 border-t pt-4">
-        <h3 className="text-sm font-semibold">Issued connection tokens</h3>
+        <h3 className="text-sm font-semibold">Connected devices</h3>
         {tokens.data?.length ? (
           tokens.data.map((item) => (
             <div className="flex items-center gap-3 py-2 text-sm" key={item.uuid}>
@@ -255,7 +255,7 @@ export function CloudConnectionPanel() {
             </div>
           ))
         ) : (
-          <p className="text-sm text-muted-foreground">No connection tokens have been issued.</p>
+          <p className="text-sm text-muted-foreground">No devices are connected yet.</p>
         )}
       </div>
     </div>
@@ -300,7 +300,7 @@ function showFailure(error: unknown, fallback: string) {
 }
 async function copyToken(token: string) {
   await navigator.clipboard.writeText(token);
-  toast.success("Token copied. It will not be shown again.");
+  toast.success("Code copied. It expires in 10 minutes.");
 }
 function formatTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Never";

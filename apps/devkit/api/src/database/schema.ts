@@ -690,10 +690,12 @@ export type TaskManagerActivityTable = SyncColumns & {
 export type DevkitSyncTokensTable = {
   created_at: TimestampColumn;
   created_by: string;
+  expires_at: TimestampColumn | null;
   id: Generated<number>;
   label: string;
   last_used_at: TimestampColumn | null;
   status: string;
+  token_kind: string;
   token_hash: string;
   uuid: string;
 };

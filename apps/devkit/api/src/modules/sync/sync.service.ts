@@ -69,16 +69,34 @@ export class DevkitSyncService {
   async generateCloudToken(label: string, actor: string) {
     this.requireRole("cloud");
     const token = generateSyncToken();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.repository.createToken({
       actor,
+      expiresAt,
       hash: syncTokenHash(token),
+      kind: "pairing",
       label: requiredLabel(label)
     });
     return {
       createdAt: new Date().toISOString(),
+      expiresAt: expiresAt.toISOString(),
       label: requiredLabel(label),
       token
     };
+  }
+
+  async exchangePairingCode(code: string, instanceId: string) {
+    this.requireRole("cloud");
+    const pairing = await this.repository.exchangePairingToken(syncTokenHash(requiredToken(code)));
+    if (!pairing) throw AppError.unauthorized("This connection code is invalid, expired, or already used.");
+    const token = generateSyncToken();
+    await this.repository.createToken({
+      actor: pairing.uuid,
+      hash: syncTokenHash(token),
+      kind: "device",
+      label: requiredLabel(instanceId)
+    });
+    return { token };
   }
 
   async cloudTokens(): Promise<DevkitSyncTokenSummary[]> {
@@ -107,9 +125,15 @@ export class DevkitSyncService {
     const normalizedToken = requiredToken(token);
     const normalizedInstance = requiredInstanceId(instanceId);
     const normalizedCloudUrl = requiredCloudUrl(cloudUrl);
-    await cloudRequest<{ valid: true }>("/v1/status", normalizedToken, undefined, normalizedCloudUrl);
+    const exchanged = await cloudRequest<{ token: string }>(
+      "/v1/pair",
+      normalizedToken,
+      { instanceId: normalizedInstance },
+      normalizedCloudUrl
+    );
+    await cloudRequest<{ valid: true }>("/v1/status", exchanged.token, undefined, normalizedCloudUrl);
     await this.repository.saveConnection({
-      encryptedToken: encryptSyncToken(normalizedToken),
+      encryptedToken: encryptSyncToken(exchanged.token),
       instanceId: normalizedInstance,
       serverUrl: normalizedCloudUrl
     });
@@ -325,7 +349,7 @@ export class DevkitSyncService {
   async authenticateCloudToken(token: string) {
     this.requireRole("cloud");
     const normalized = requiredToken(token);
-    const record = await this.repository.findActiveToken(syncTokenHash(normalized));
+    const record = await this.repository.findActiveDeviceToken(syncTokenHash(normalized));
     if (!record) throw AppError.unauthorized("DevKit sync token is invalid.");
     await this.repository.touchToken(record.uuid);
     return record;

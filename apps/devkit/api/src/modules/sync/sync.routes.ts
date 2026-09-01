@@ -78,6 +78,12 @@ export async function registerSyncRoutes(app: FastifyInstance) {
       requestId: request.id
     })
   );
+  app.post("/sync/cloud/v1/pair", async (request) => {
+    const body = z.object({ instanceId: z.string().min(2).max(80) }).strict().parse(request.body);
+    return ok(await service.exchangePairingCode(syncToken(request), body.instanceId), {
+      requestId: request.id
+    });
+  });
   app.get("/sync/cloud/v1/snapshot", async (request) =>
     ok(await service.cloudSnapshot(syncToken(request)), {
       requestId: request.id

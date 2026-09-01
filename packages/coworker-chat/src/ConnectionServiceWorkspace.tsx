@@ -100,11 +100,11 @@ export function ConnectionServiceWorkspace({
               </label>
               <p className="connection-service-device">Connecting as <strong>{deviceIdentity(clientKind)}</strong></p>
               <label>
-                <span>One-time connection code</span>
+                <span>One-time code</span>
                 <input
                   maxLength={16}
                   onChange={(event) => setConnectionToken(event.target.value.replace(/\s/gu, ""))}
-                  placeholder="Paste 16-character code"
+                  placeholder="Paste the 16-character code"
                   value={connectionToken}
                 />
               </label>
@@ -123,7 +123,7 @@ export function ConnectionServiceWorkspace({
                 }}
                 type="button"
               >
-                <ExternalLink size={17} /> Get connection code
+                <ExternalLink size={17} /> Open secure code page
               </button>
               <button
                 disabled={
@@ -146,7 +146,7 @@ export function ConnectionServiceWorkspace({
                 }
                 type="button"
               >
-                <Link2 size={17} /> Connect device
+                <Link2 size={17} /> Verify and connect
               </button>
             </div>
           ) : null}
@@ -213,7 +213,7 @@ export function ConnectionServiceWorkspace({
           ) : null}
           {status?.role === "cloud" ? (
             <div className="connection-service-cloud">
-              <p className="connection-service-device">This installation is the <strong>web-devkit cloud server</strong>. It issues signed-in device codes from <code>/connect</code>.</p>
+              <p className="connection-service-device">This installation is the <strong>web-devkit cloud server</strong>. Signed-in users issue one-time codes from <code>/connect</code>. Each code expires after 10 minutes and becomes unusable after exchange.</p>
               <div className="connection-service-devices">
                 <h3>Your device codes</h3>
                 {issuedTokens.length ? (

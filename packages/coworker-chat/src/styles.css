@@ -4053,7 +4053,11 @@ body {
   opacity: 0.55;
 }
 .connection-service-connected {
+  background: #f1f8f2;
+  border: 1px solid #9fcba7;
+  border-radius: 10px;
   margin-top: 26px;
+  padding: 18px;
 }
 .connection-service-connected dl {
   display: grid;
@@ -4069,7 +4073,7 @@ body {
   overflow-wrap: anywhere;
 }
 .connection-service-actions {
-  border-top: 1px solid #e5e5df;
+  border-top: 1px solid #c9e0cd;
   display: flex;
   flex-wrap: wrap;
   gap: 9px;

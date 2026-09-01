@@ -44,13 +44,21 @@ export async function migrateSyncModule(database: Kysely<DevkitDatabase>) {
       uuid CHAR(8) NOT NULL,
       label VARCHAR(160) NOT NULL,
       token_hash CHAR(64) NOT NULL,
+      token_kind VARCHAR(24) NOT NULL DEFAULT 'device',
       status VARCHAR(24) NOT NULL DEFAULT 'active',
       created_by VARCHAR(240) NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       last_used_at DATETIME NULL,
+      expires_at DATETIME NULL,
       UNIQUE KEY uq_devkit_sync_tokens_uuid (uuid),
       UNIQUE KEY uq_devkit_sync_tokens_hash (token_hash)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `.execute(database);
+
+  await sql`
+    ALTER TABLE devkit_sync_tokens
+    ADD COLUMN IF NOT EXISTS token_kind VARCHAR(24) NOT NULL DEFAULT 'device' AFTER token_hash,
+    ADD COLUMN IF NOT EXISTS expires_at DATETIME NULL AFTER last_used_at
   `.execute(database);
 
   await sql`
