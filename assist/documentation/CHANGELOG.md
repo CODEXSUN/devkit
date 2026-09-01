@@ -1,8 +1,25 @@
 # Changelog
 
-Current version: 1.0.89
-Release tag: v-1.0.89
-Changelog label: v 1.0.89
+Current version: 1.0.90
+Release tag: v-1.0.90
+Changelog label: v 1.0.90
+
+## v-1.0.90
+
+### [v 1.0.90] 2026-09-01 12:57 pm - Chat identity proxy route
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.90.
+- Proxied same-origin identity routes to the Platform API so shared Messenger contacts and profile calls no longer fall through to the SPA document.
+
+#### Verification
+
+- Pending deployment verification of authenticated identity, Messenger, and whiteboard requests.
 
 ## v-1.0.89
 
@@ -198,6 +215,14 @@ Changelog label: v 1.0.89
 - Synchronized side-menu and Windows taskbar badges directly from WebSocket unread events, while retaining HTTP catch-up after reconnect.
 - Suppressed successful Socket.IO transport handshakes and polling frames from general request logs while preserving all 4xx and 5xx socket failures.
 - Removed all Socket.IO transport frames, including stale polling responses, from the general HTTP request log.
+- Added a separate `/connect` cloud page that creates a connection code for the requested device after sign-in.
+- Added `https://devkit.codexsun.com` as the default connection domain for desktop, web, and mobile.
+- Added a cloud domain override to the desktop, web, and mobile Connect Service pages.
+- Opened `<cloud-domain>/connect?device=<name>` from each local Connect Service page.
+- Stored the normalized cloud origin with the encrypted connection token.
+- Used the stored cloud origin for verify, publish, pull, and project connection requests.
+- Preserved the existing bind request contract by using the default domain when `cloudUrl` is absent.
+- Returned users to the `/connect` page after a required cloud sign-in.
 - Kept one actor-wide Messenger socket alive across chat selection, contact loading, and workspace navigation instead of reconnecting on UI state changes.
 - Reduced `messenger.unread` payloads from full conversation lists to one changed-conversation delta plus the total unread count.
 - Extended healthy socket fallback polling from 30 to 60 seconds while retaining five-second disconnected recovery.
