@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/coworker-chat",
-  "version": "1.0.90",
+  "version": "1.0.91",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,7 +9,7 @@
     "./messenger": "./src/MessengerChat.tsx"
   },
   "dependencies": {
-    "@codexsun/ui": "1.0.90",
+    "@codexsun/ui": "1.0.91",
     "@excalidraw/excalidraw": "^0.18.1",
     "lucide-react": "^1.35.0",
     "react": "19.2.3",

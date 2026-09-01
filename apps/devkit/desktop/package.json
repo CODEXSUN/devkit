@@ -1,6 +1,6 @@
 {
   "name": "@devkit/desktop",
-  "version": "1.0.90",
+  "version": "1.0.91",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,8 +15,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codexsun/coworker-chat": "1.0.90",
-    "@codexsun/ui": "1.0.90",
+    "@codexsun/coworker-chat": "1.0.91",
+    "@codexsun/ui": "1.0.91",
     "@monaco-editor/react": "^4.7.0",
     "@openai/codex": "^0.150.1",
     "@tauri-apps/api": "^2.11.1",

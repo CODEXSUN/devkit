@@ -1,8 +1,29 @@
 # Changelog
 
-Current version: 1.0.90
-Release tag: v-1.0.90
-Changelog label: v 1.0.90
+Current version: 1.0.91
+Release tag: v-1.0.91
+Changelog label: v 1.0.91
+
+## v-1.0.91
+
+### [v 1.0.91] 2026-09-01 1:07 pm - Identity API path rewrite
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.91.
+- Rewrote the public same-origin identity path before proxying so it reaches the Platform API identity routes.
+
+#### Verification
+
+- Passed `npm.cmd run check:deployment`.
+- Passed `npm.cmd run check:module-boundaries`.
+- Passed `npm.cmd run check:versions`.
+- Passed `npm.cmd run release:scope`.
+- Passed `git diff --check`.
 
 ## v-1.0.90
 
