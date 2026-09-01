@@ -20,10 +20,20 @@ export class AgentWorktreeService {
     projectReferenceType: string;
     runId: string;
   }): Promise<AgentWorkspace> {
-    const sourceRoot = await this.resolveSourceRoot(input.projectReferenceId, input.projectReferenceType);
+    const sourceRoot = await this.resolveSourceRoot(
+      input.projectReferenceId,
+      input.projectReferenceType
+    );
     const baseRevision = await git(sourceRoot, ["rev-parse", "HEAD"]);
     if (!needsWorktree(input.access)) {
-      return { baseRevision, branchName: null, mode: "source", path: sourceRoot, sourceRoot, status: "source" };
+      return {
+        baseRevision,
+        branchName: null,
+        mode: "source",
+        path: sourceRoot,
+        sourceRoot,
+        status: "source"
+      };
     }
     const root = worktreeRoot();
     await mkdir(root, { recursive: true });
@@ -31,17 +41,35 @@ export class AgentWorktreeService {
     const target = resolve(root, safeSegment(basename(sourceRoot)), input.runId);
     requireInside(root, target);
     await git(sourceRoot, ["worktree", "add", "-b", branchName, target, baseRevision], 60_000);
-    return { baseRevision, branchName, mode: "worktree", path: target, sourceRoot, status: "clean" };
+    return {
+      baseRevision,
+      branchName,
+      mode: "worktree",
+      path: target,
+      sourceRoot,
+      status: "clean"
+    };
   }
 
   async prepareChild(input: { access: AgentAccessMode; runId: string; sourceRoot: string }) {
     const sourceRoot = resolve(input.sourceRoot);
     if (!allowedRoots().some((allowed) => contains(allowed, sourceRoot))) {
-      throw new AppError({ code: "AGENT_REPOSITORY_NOT_ALLOWED", message: "The parent repository is outside DEVKIT_AGENT_ALLOWED_ROOTS.", statusCode: 403 });
+      throw new AppError({
+        code: "AGENT_REPOSITORY_NOT_ALLOWED",
+        message: "The parent repository is outside DEVKIT_AGENT_ALLOWED_ROOTS.",
+        statusCode: 403
+      });
     }
     const baseRevision = await git(sourceRoot, ["rev-parse", "HEAD"]);
     if (!needsWorktree(input.access)) {
-      return { baseRevision, branchName: null, mode: "source" as const, path: sourceRoot, sourceRoot, status: "source" as const };
+      return {
+        baseRevision,
+        branchName: null,
+        mode: "source" as const,
+        path: sourceRoot,
+        sourceRoot,
+        status: "source" as const
+      };
     }
     const root = worktreeRoot();
     await mkdir(root, { recursive: true });
@@ -49,15 +77,30 @@ export class AgentWorktreeService {
     const target = resolve(root, safeSegment(basename(sourceRoot)), input.runId);
     requireInside(root, target);
     await git(sourceRoot, ["worktree", "add", "-b", branchName, target, baseRevision], 60_000);
-    return { baseRevision, branchName, mode: "worktree" as const, path: target, sourceRoot, status: "clean" as const };
+    return {
+      baseRevision,
+      branchName,
+      mode: "worktree" as const,
+      path: target,
+      sourceRoot,
+      status: "clean" as const
+    };
   }
 
   async inspect(workspace: Pick<AgentWorkspace, "mode" | "path" | "sourceRoot">) {
-    if (workspace.mode !== "worktree") return { changedFiles: [], clean: true, status: "source" as const };
+    if (workspace.mode !== "worktree")
+      return { changedFiles: [], clean: true, status: "source" as const };
     this.requireManagedPath(workspace.path);
     const output = await git(workspace.path, ["status", "--porcelain=v1"]);
-    const changedFiles = output.split(/\r?\n/gu).filter(Boolean).map((line) => line.slice(3).trim());
-    return { changedFiles, clean: changedFiles.length === 0, status: changedFiles.length ? "changed" as const : "clean" as const };
+    const changedFiles = output
+      .split(/\r?\n/gu)
+      .filter(Boolean)
+      .map((line) => line.slice(3).trim());
+    return {
+      changedFiles,
+      clean: changedFiles.length === 0,
+      status: changedFiles.length ? ("changed" as const) : ("clean" as const)
+    };
   }
 
   async cleanup(workspace: {
@@ -67,15 +110,32 @@ export class AgentWorktreeService {
     sourceRoot: string | null;
     status: string;
   }) {
-    if (workspace.mode !== "worktree" || !workspace.path || !workspace.sourceRoot || !workspace.branchName) {
+    if (
+      workspace.mode !== "worktree" ||
+      !workspace.path ||
+      !workspace.sourceRoot ||
+      !workspace.branchName
+    ) {
       throw AppError.validation("This Agent run does not own an isolated worktree.");
     }
     if (!isTerminal(workspace.status)) {
-      throw new AppError({ code: "AGENT_WORKTREE_ACTIVE", message: "Wait for the Agent run to finish before cleanup.", statusCode: 409 });
+      throw new AppError({
+        code: "AGENT_WORKTREE_ACTIVE",
+        message: "Wait for the Agent run to finish before cleanup.",
+        statusCode: 409
+      });
     }
     this.requireManagedPath(workspace.path);
-    await this.requireRegisteredWorktree(workspace.sourceRoot, workspace.path, workspace.branchName);
-    const inspection = await this.inspect({ mode: "worktree", path: workspace.path, sourceRoot: workspace.sourceRoot });
+    await this.requireRegisteredWorktree(
+      workspace.sourceRoot,
+      workspace.path,
+      workspace.branchName
+    );
+    const inspection = await this.inspect({
+      mode: "worktree",
+      path: workspace.path,
+      sourceRoot: workspace.sourceRoot
+    });
     if (!inspection.clean) {
       throw new AppError({
         code: "AGENT_WORKTREE_DIRTY",
@@ -88,10 +148,21 @@ export class AgentWorktreeService {
   }
 
   private async resolveSourceRoot(referenceId: string, referenceType: string) {
-    const usesReference = ["git", "repository", "workspace"].includes(referenceType.trim().toLowerCase()) && referenceId.trim();
+    if (isCloudRuntime()) {
+      throw new AppError({
+        code: "AGENT_DESKTOP_EXECUTION_REQUIRED",
+        message:
+          "Project-aware agent work needs your connected desktop execution node. Connect the desktop from Cloud & devices, then retry. Cloud keeps chats and synced work records, but never opens local repositories or server checkouts.",
+        statusCode: 409
+      });
+    }
+    const usesReference =
+      ["git", "repository", "workspace"].includes(referenceType.trim().toLowerCase()) &&
+      referenceId.trim();
     const candidate = resolve(usesReference ? referenceId.trim() : process.cwd());
     const details = await stat(candidate).catch(() => null);
-    if (!details?.isDirectory()) throw AppError.validation("The project repository path does not exist.");
+    if (!details?.isDirectory())
+      throw AppError.validation("The project repository path does not exist.");
     const root = resolve(await git(candidate, ["rev-parse", "--show-toplevel"]));
     if (!allowedRoots().some((allowed) => contains(allowed, root))) {
       throw new AppError({
@@ -112,37 +183,55 @@ export class AgentWorktreeService {
     const blocks = output.split(/\r?\n\r?\n/gu);
     const registered = blocks.some((block) => {
       const lines = block.split(/\r?\n/gu);
-      return samePath(lines.find((line) => line.startsWith("worktree "))?.slice(9) ?? "", path) &&
-        lines.includes(`branch refs/heads/${branchName}`);
+      return (
+        samePath(lines.find((line) => line.startsWith("worktree "))?.slice(9) ?? "", path) &&
+        lines.includes(`branch refs/heads/${branchName}`)
+      );
     });
-    if (!registered) throw AppError.validation("The worktree registration does not match this Agent run.");
+    if (!registered)
+      throw AppError.validation("The worktree registration does not match this Agent run.");
   }
 }
 
 async function git(cwd: string, args: string[], timeoutMs = 15_000) {
   const result = await execute("git", ["-C", cwd, ...args], timeoutMs);
   if (result.exitCode !== 0) {
-    throw new AppError({ code: "AGENT_GIT_FAILED", message: result.stderr.trim() || "Git command failed.", statusCode: 409 });
+    throw new AppError({
+      code: "AGENT_GIT_FAILED",
+      message: result.stderr.trim() || "Git command failed.",
+      statusCode: 409
+    });
   }
   return result.stdout.trimEnd();
 }
 
 function execute(command: string, args: string[], timeoutMs: number) {
-  return new Promise<{ exitCode: number; stderr: string; stdout: string }>((resolveResult, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => child.kill(), timeoutMs);
-    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8"); });
-    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8"); });
-    child.once("error", reject);
-    child.once("close", (code) => { clearTimeout(timer); resolveResult({ exitCode: code ?? -1, stderr, stdout }); });
-  });
+  return new Promise<{ exitCode: number; stderr: string; stdout: string }>(
+    (resolveResult, reject) => {
+      const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      let stdout = "";
+      let stderr = "";
+      const timer = setTimeout(() => child.kill(), timeoutMs);
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString("utf8");
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString("utf8");
+      });
+      child.once("error", reject);
+      child.once("close", (code) => {
+        clearTimeout(timer);
+        resolveResult({ exitCode: code ?? -1, stderr, stdout });
+      });
+    }
+  );
 }
 
 function allowedRoots() {
   const configured = process.env.DEVKIT_AGENT_ALLOWED_ROOTS?.trim();
-  return (configured ? configured.split(delimiter) : [process.cwd()]).filter(Boolean).map((path) => resolve(path));
+  return (configured ? configured.split(delimiter) : [process.cwd()])
+    .filter(Boolean)
+    .map((path) => resolve(path));
 }
 
 function worktreeRoot() {
@@ -150,11 +239,15 @@ function worktreeRoot() {
   if (configured) return resolve(configured);
   const applicationData = process.env.LOCALAPPDATA?.trim();
   if (applicationData) return resolve(applicationData, "CodeLogicX", "DevKit", "worktrees");
-  return resolve(process.env.DEVKIT_STORAGE_PATH?.trim() || join(process.cwd(), "storage", "devkit"), "agent-worktrees");
+  return resolve(
+    process.env.DEVKIT_STORAGE_PATH?.trim() || join(process.cwd(), "storage", "devkit"),
+    "agent-worktrees"
+  );
 }
 
 function requireInside(root: string, target: string) {
-  if (!contains(root, target) || samePath(root, target)) throw AppError.validation("Agent worktree path is outside the managed root.");
+  if (!contains(root, target) || samePath(root, target))
+    throw AppError.validation("Agent worktree path is outside the managed root.");
 }
 
 function contains(root: string, target: string) {
@@ -167,8 +260,22 @@ function samePath(left: string, right: string) {
   return normalize(left) === normalize(right);
 }
 
-function safeSegment(value: string) { return value.toLowerCase().replace(/[^a-z0-9-]+/gu, "-").replace(/^-|-$/gu, "") || "repository"; }
-function needsWorktree(access: AgentAccessMode) { return access === "ask-approval" || access === "auto-approve" || access === "full-access"; }
-function isTerminal(status: string) { return status === "cancelled" || status === "completed" || status === "failed"; }
+function safeSegment(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/gu, "-")
+      .replace(/^-|-$/gu, "") || "repository"
+  );
+}
+function needsWorktree(access: AgentAccessMode) {
+  return access === "ask-approval" || access === "auto-approve" || access === "full-access";
+}
+function isTerminal(status: string) {
+  return status === "cancelled" || status === "completed" || status === "failed";
+}
+function isCloudRuntime() {
+  return process.env.DEVKIT_SYNC_ROLE?.trim().toLowerCase() === "cloud";
+}
 
 export const agentWorktreeService = new AgentWorktreeService();

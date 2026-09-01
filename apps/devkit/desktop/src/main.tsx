@@ -1,5 +1,7 @@
 import { Component, lazy, StrictMode, Suspense, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { DevelopmentIdsOverlay } from "@codexsun/ui";
 import {
   MessengerChat,
   MessengerConnectionPanel,
@@ -132,6 +134,18 @@ function AppRoot() {
           logoSrc={devkitLogo}
           onConnectionStateChange={setMessengerConnectionState}
           onDrawerCollapsedChange={setMessengerDrawerCollapsed}
+          onOpenExternalUrl={openUrl}
+          onSignOut={async () => {
+            try {
+              await fetch(`${centralApiUrl.replace(/\/+$/u, "")}/auth/logout`, {
+                headers: { Authorization: `Bearer ${sessionToken}` },
+                method: "POST"
+              });
+            } finally {
+              localStorage.removeItem("devkit_session");
+              setSessionToken(null);
+            }
+          }}
           onUnreadCountChange={updateUnreadTaskbar}
           onToggleSidePanel={() => setAgentPanelOpen((open) => !open)}
           product="DevKit"
@@ -208,16 +222,31 @@ function unreadBadgePixels(count: number) {
   const width = label.length * 3 * scale + (label.length - 1) * scale;
   const startX = Math.floor((32 - width) / 2);
   const startY = Math.floor((32 - 5 * scale) / 2);
-  [...label].forEach((digit, digitIndex) => digitPixels[digit]?.forEach((row, rowIndex) => [...row].forEach((bit, columnIndex) => {
-    if (bit !== "1") return;
-    for (let offsetY = 0; offsetY < scale; offsetY += 1) for (let offsetX = 0; offsetX < scale; offsetX += 1) {
-      setPixel(pixels, startX + digitIndex * 4 * scale + columnIndex * scale + offsetX, startY + rowIndex * scale + offsetY, [255, 255, 255, 255]);
-    }
-  })));
+  [...label].forEach((digit, digitIndex) =>
+    digitPixels[digit]?.forEach((row, rowIndex) =>
+      [...row].forEach((bit, columnIndex) => {
+        if (bit !== "1") return;
+        for (let offsetY = 0; offsetY < scale; offsetY += 1)
+          for (let offsetX = 0; offsetX < scale; offsetX += 1) {
+            setPixel(
+              pixels,
+              startX + digitIndex * 4 * scale + columnIndex * scale + offsetX,
+              startY + rowIndex * scale + offsetY,
+              [255, 255, 255, 255]
+            );
+          }
+      })
+    )
+  );
   return pixels;
 }
 
-function setPixel(pixels: Uint8Array, x: number, y: number, color: [number, number, number, number]) {
+function setPixel(
+  pixels: Uint8Array,
+  x: number,
+  y: number,
+  color: [number, number, number, number]
+) {
   const index = (y * 32 + x) * 4;
   pixels.set(color, index);
 }
@@ -225,5 +254,9 @@ function setPixel(pixels: Uint8Array, x: number, y: number, color: [number, numb
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppRoot />
+    <DevelopmentIdsOverlay
+      enabled={import.meta.env.VITE_DEV_TECH_IDS === "1"}
+      surface="desktop"
+    />
   </StrictMode>
 );

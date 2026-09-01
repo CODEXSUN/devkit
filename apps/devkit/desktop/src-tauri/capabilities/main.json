@@ -8,6 +8,7 @@
     "core:window:allow-is-focused",
     "core:window:allow-request-user-attention",
     "core:window:allow-set-overlay-icon",
+    "opener:allow-open-url",
     "process:allow-restart",
     "updater:default"
   ]

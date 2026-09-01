@@ -1,6 +1,6 @@
 {
   "name": "@devkit/desktop",
-  "version": "1.0.95",
+  "version": "1.0.96",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,12 +15,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codexsun/coworker-chat": "1.0.95",
-    "@codexsun/ui": "1.0.95",
+    "@codexsun/coworker-chat": "1.0.96",
+    "@codexsun/ui": "1.0.96",
     "@monaco-editor/react": "^4.7.0",
     "@openai/codex": "^0.150.1",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@xterm/xterm": "^6.0.0",
     "framer-motion": "^13.1.1",

@@ -1,4 +1,4 @@
-import { Cloud, ExternalLink, Link2, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import { Cloud, Copy, ExternalLink, Link2, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 type ConnectionStatus = {
@@ -22,10 +22,12 @@ type ConnectionToken = {
 export function ConnectionServiceWorkspace({
   apiUrl,
   clientKind,
+  onOpenExternalUrl,
   token
 }: {
   apiUrl: string;
   clientKind: "desktop" | "mobile" | "web";
+  onOpenExternalUrl?: ((url: string) => Promise<void> | void) | undefined;
   token: string;
 }) {
   const request = useConnectionRequest(apiUrl, token);
@@ -35,6 +37,7 @@ export function ConnectionServiceWorkspace({
   const [issuedTokens, setIssuedTokens] = useState<ConnectionToken[]>([]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const connectionPageUrl = safeConnectUrl(cloudUrl, deviceIdentity(clientKind));
   const refresh = useCallback(async () => {
     const next = await request<ConnectionStatus>("/admin/sync/status");
     setStatus(next);
@@ -96,9 +99,16 @@ export function ConnectionServiceWorkspace({
             <div className="connection-service-form">
               <label>
                 <span>Cloud domain</span>
-                <input onChange={(event) => setCloudUrl(event.target.value)} placeholder="https://devkit.codexsun.com" type="url" value={cloudUrl} />
+                <input
+                  onChange={(event) => setCloudUrl(event.target.value)}
+                  placeholder="https://devkit.codexsun.com"
+                  type="url"
+                  value={cloudUrl}
+                />
               </label>
-              <p className="connection-service-device">Connecting as <strong>{deviceIdentity(clientKind)}</strong></p>
+              <p className="connection-service-device">
+                Connecting as <strong>{deviceIdentity(clientKind)}</strong>
+              </p>
               <label>
                 <span>One-time code</span>
                 <input
@@ -108,24 +118,49 @@ export function ConnectionServiceWorkspace({
                   value={connectionToken}
                 />
               </label>
-              <button
-                disabled={busy === "connect"}
-                onClick={() => {
-                  try {
-                    openSecureCodePage(connectUrl(cloudUrl, deviceIdentity(clientKind)));
-                  } catch {
+              <a
+                aria-disabled={!connectionPageUrl}
+                href={connectionPageUrl || undefined}
+                onClick={(event) => {
+                  if (!connectionPageUrl) {
+                    event.preventDefault();
                     setMessage("Enter a valid cloud domain, including https://.");
+                    return;
                   }
+                  if (!onOpenExternalUrl) return;
+                  event.preventDefault();
+                  setMessage("");
+                  void Promise.resolve(onOpenExternalUrl(connectionPageUrl))
+                    .then(() => setMessage("Opened the secure code page in your browser."))
+                    .catch((error) => setMessage(errorMessage(error)));
+                }}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <ExternalLink size={17} /> Open secure code page
+              </a>
+              <button
+                disabled={busy === "connect" || !connectionPageUrl}
+                onClick={() => {
+                  if (!connectionPageUrl) return;
+                  setMessage("");
+                  void copyText(connectionPageUrl)
+                    .then(() =>
+                      setMessage(
+                        "Secure code page link copied. Open it in any browser to continue manually."
+                      )
+                    )
+                    .catch((error) => setMessage(errorMessage(error)));
                 }}
                 type="button"
               >
-                <ExternalLink size={17} /> Open secure code page
+                <Copy size={17} /> Copy secure link
               </button>
+              <p className="connection-service-manual-help">
+                Copy the link if you need to complete the connection in another browser or device.
+              </p>
               <button
-                disabled={
-                  busy === "connect" ||
-                  connectionToken.length !== 16
-                }
+                disabled={busy === "connect" || connectionToken.length !== 16}
                 onClick={() =>
                   void act("connect", async () => {
                     await request("/admin/sync/bind", {
@@ -209,7 +244,11 @@ export function ConnectionServiceWorkspace({
           ) : null}
           {status?.role === "cloud" ? (
             <div className="connection-service-cloud">
-              <p className="connection-service-device">This installation is the <strong>web-devkit cloud server</strong>. Signed-in users issue one-time codes from <code>/connect</code>. Each code expires after 10 minutes and becomes unusable after exchange.</p>
+              <p className="connection-service-device">
+                This installation is the <strong>web-devkit cloud server</strong>. Signed-in users
+                issue one-time codes from <code>/connect</code>. Each code expires after 10 minutes
+                and becomes unusable after exchange.
+              </p>
               <div className="connection-service-devices">
                 <h3>Your device codes</h3>
                 {issuedTokens.length ? (
@@ -310,14 +349,29 @@ function connectUrl(cloudUrl: string, instanceId: string) {
   return url.toString();
 }
 
-function openSecureCodePage(url: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.rel = "noopener noreferrer";
-  link.target = "_blank";
-  document.body.append(link);
-  link.click();
-  link.remove();
+function safeConnectUrl(cloudUrl: string, instanceId: string) {
+  try {
+    return connectUrl(cloudUrl, instanceId);
+  } catch {
+    return "";
+  }
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Copy failed. Select and copy the cloud domain manually.");
 }
 
 function deviceIdentity(clientKind: "desktop" | "mobile" | "web") {

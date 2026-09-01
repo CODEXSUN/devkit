@@ -24,7 +24,16 @@ import {
   Plus,
   X
 } from "lucide-react";
-import { lazy, Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { WorkspaceDrawerHeader } from "./WorkspaceDrawerHeader";
 import { SettingsWorkspace } from "./SettingsWorkspace";
 import { WorkspaceSearchPalette, type WorkspaceSearchItem } from "./WorkspaceSearchPalette";
@@ -81,6 +90,8 @@ type MessengerProps = {
     state: import("./MessengerConnectionPanel").MessengerConnectionState
   ) => void;
   onDrawerCollapsedChange?: (collapsed: boolean) => void;
+  onOpenExternalUrl?: ((url: string) => Promise<void> | void) | undefined;
+  onSignOut?: (() => Promise<void> | void) | undefined;
   onUnreadCountChange?: (count: number) => void;
   onToggleSidePanel?: () => void;
   product?: string;
@@ -101,6 +112,8 @@ export function MessengerChat({
   logoSrc,
   onConnectionStateChange,
   onDrawerCollapsedChange,
+  onOpenExternalUrl,
+  onSignOut,
   onUnreadCountChange,
   onToggleSidePanel,
   product = "DevKit",
@@ -144,7 +157,7 @@ export function MessengerChat({
       setRouteProjectId(route.projectId);
       setOverviewProject(
         route.projectId
-          ? agentProjects.find((project) => project.id === route.projectId) ?? null
+          ? (agentProjects.find((project) => project.id === route.projectId) ?? null)
           : null
       );
     };
@@ -198,7 +211,7 @@ export function MessengerChat({
         activeSpace === "agent"
           ? agentConversationId
           : activeSpace === "messenger"
-            ? (peerActorId || pendingMessengerConversation.current)
+            ? peerActorId || pendingMessengerConversation.current
             : null,
       projectId: activeSpace === "projects" ? routeProjectId : null,
       space: activeSpace
@@ -332,7 +345,9 @@ export function MessengerChat({
   const selectedContact = contacts.find((contact) => contact.uuid === peerActorId);
   const selectedContactOnline = Boolean(peerActorId && onlineActorIds.includes(peerActorId));
   const headerTitle =
-    activeSpace === "messenger" ? selectedContact?.name ?? conversationName : workspaceTitle(activeSpace);
+    activeSpace === "messenger"
+      ? (selectedContact?.name ?? conversationName)
+      : workspaceTitle(activeSpace);
   const openedProject = overviewProject?.title ?? workspaceName;
   const openProject = useCallback((project: CoworkerProject) => {
     setOverviewProject(project);
@@ -544,7 +559,9 @@ export function MessengerChat({
       />
       <section className="messenger-workspace">
         <header className="messenger-header">
-          <div className={`messenger-header-title${activeSpace === "messenger" && peerActorId ? " user" : ""}`}>
+          <div
+            className={`messenger-header-title${activeSpace === "messenger" && peerActorId ? " user" : ""}`}
+          >
             {activeSpace === "settings" ? null : (
               <>
                 {activeSpace === "messenger" && peerActorId ? (
@@ -664,13 +681,20 @@ export function MessengerChat({
             notificationPermission={notificationPermission}
             onEnableNotifications={() => void requestNotifications()}
             onOpenArchived={() => setActiveSpace("archives")}
+            onOpenExternalUrl={onOpenExternalUrl}
+            onSignOut={onSignOut}
             token={token}
             user={currentUser}
           />
         ) : activeSpace === "docs" ? (
           <DocumentationWorkspace apiUrl={baseUrl} token={token} />
         ) : activeSpace === "connection" ? (
-          <ConnectionServiceWorkspace apiUrl={baseUrl} clientKind={clientKind} token={token} />
+          <ConnectionServiceWorkspace
+            apiUrl={baseUrl}
+            clientKind={clientKind}
+            onOpenExternalUrl={onOpenExternalUrl}
+            token={token}
+          />
         ) : activeSpace === "archives" ? (
           <ArchivedChatsPage
             chats={archivedAgentChats}
@@ -701,7 +725,9 @@ export function MessengerChat({
             token={token}
           />
         ) : activeSpace === "ideas" ? (
-          <section className="ideas-scroll"><IdeasWorkspace client={agentClient} /></section>
+          <section className="ideas-scroll">
+            <IdeasWorkspace client={agentClient} />
+          </section>
         ) : activeSpace === "projects" && overviewProject ? (
           <Suspense fallback={<section className="project-overview-space" aria-busy="true" />}>
             <ProjectOverviewSpace
@@ -947,11 +973,9 @@ function readWorkspaceRoute() {
   const routeName = query.get("view");
   const space =
     (Object.entries(workspaceRouteNames).find(([, name]) => name === routeName)?.[0] as
-      | WorkspaceSpace
-      | undefined) ?? workspaceSpaceFromPath(window.location.pathname);
+      WorkspaceSpace | undefined) ?? workspaceSpaceFromPath(window.location.pathname);
   return {
-    conversationId:
-      space === "agent" || space === "messenger" ? query.get("conversation") : null,
+    conversationId: space === "agent" || space === "messenger" ? query.get("conversation") : null,
     projectId: space === "projects" ? query.get("project") : null,
     space
   };
@@ -983,8 +1007,7 @@ function updateWorkspaceRoute({
   url.searchParams.set("view", workspaceRouteNames[space]);
   if ((space === "agent" || space === "messenger") && conversationId) {
     url.searchParams.set("conversation", conversationId);
-  }
-  else url.searchParams.delete("conversation");
+  } else url.searchParams.delete("conversation");
   if (space === "projects" && projectId) url.searchParams.set("project", projectId);
   else {
     url.searchParams.delete("project");
@@ -1404,7 +1427,13 @@ function MessengerConversationList({
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const device = conversations.find((conversation) => conversation.kind === "device");
   const rows = [
-    { conversation: device, email: "Web, desktop, and mobile", name: conversationName, online: false, peerId: "" },
+    {
+      conversation: device,
+      email: "Web, desktop, and mobile",
+      name: conversationName,
+      online: false,
+      peerId: ""
+    },
     ...contacts.map((contact) => ({
       conversation: conversations.find((item) => item.peerActorId === contact.uuid),
       email: contact.email,
@@ -1494,7 +1523,13 @@ function MessengerConversationRow({
         onClick={() => onOpen(row.peerId)}
         type="button"
       >
-        {row.peerId ? <MessengerAvatar name={row.name} online={row.online} /> : <span><Users size={16} /></span>}
+        {row.peerId ? (
+          <MessengerAvatar name={row.name} online={row.online} />
+        ) : (
+          <span>
+            <Users size={16} />
+          </span>
+        )}
         <div>
           <strong>{row.name}</strong>
           <small className="messenger-conversation-preview">
@@ -1536,8 +1571,20 @@ function MessengerConversationRow({
 }
 
 function MessengerAvatar({ name, online }: { name: string; online: boolean }) {
-  const initials = name.split(/\s+/u).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
-  return <span aria-label={`${name}${online ? ", online" : ""}`} className="messenger-user-avatar"><b aria-hidden="true">{initials}</b>{online ? <i aria-hidden="true" /> : null}</span>;
+  const initials =
+    name
+      .split(/\s+/u)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "U";
+  return (
+    <span aria-label={`${name}${online ? ", online" : ""}`} className="messenger-user-avatar">
+      <b aria-hidden="true">{initials}</b>
+      {online ? <i aria-hidden="true" /> : null}
+    </span>
+  );
 }
 
 function ConversationReceipt({ delivered, read }: { delivered: boolean; read: boolean }) {

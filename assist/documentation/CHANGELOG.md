@@ -1,8 +1,41 @@
 # Changelog
 
-Current version: 1.0.95
-Release tag: v-1.0.95
-Changelog label: v 1.0.95
+Current version: 1.0.96
+Release tag: v-1.0.96
+Changelog label: v 1.0.96
+
+## v-1.0.96
+
+### [v 1.0.96] 2026-09-01 3:21 pm - Cloud agent execution and desktop links
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.96.
+- Added a cloud execution boundary for project-aware agent chats.
+- Cloud now requires a connected desktop execution node before it opens a project repository.
+- Cloud no longer returns a raw Git repository error when no desktop node is connected.
+- Desktop now opens connection and Codex authentication URLs through the native Tauri opener.
+- Added copy-link actions for manual cloud connection and device verification.
+- Added `release:next` for the existing version, changelog, commit, and push workflow.
+
+#### Verification
+
+- Passed `npm.cmd run typecheck --workspace @codexsun/devkit-api`.
+- Passed `npm.cmd run lint --workspace @codexsun/devkit-api`.
+- Passed `npm.cmd run typecheck --workspace @codexsun/coworker-chat`.
+- Passed `npm.cmd run lint --workspace @codexsun/coworker-chat`.
+- Passed `npm.cmd run typecheck --workspace @devkit/desktop`.
+- Passed `npm.cmd run lint --workspace @devkit/desktop`.
+- Passed `cargo check --locked --package devkit-desktop`.
+- Confirmed the local desktop development surface responds on port 1420.
+- Confirmed `https://devkit.codexsun.com/connect` and `/health` responded before deployment.
+- Passed `npm.cmd run check:versions` and `git diff --check`.
+- VPS deployment requires an accepted SSH identity for `69.62.81.166`; the guarded deployment command reports a clear block when that identity is unavailable.
 
 ## v-1.0.95
 

@@ -2,18 +2,20 @@ import {
   Archive,
   Bell,
   Check,
+  ChevronUp,
   Cloud,
   Copy,
   ExternalLink,
   KeyRound,
   Laptop,
   LoaderCircle,
+  LogOut,
   RefreshCw,
   ShieldCheck,
   Smartphone,
   X
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { ConnectionServiceWorkspace } from "./ConnectionServiceWorkspace";
 import type { MessengerClientKind, MessengerProfile } from "./messenger-client";
 
@@ -46,6 +48,8 @@ export function SettingsWorkspace({
   notificationPermission,
   onEnableNotifications,
   onOpenArchived,
+  onOpenExternalUrl,
+  onSignOut,
   token,
   user
 }: {
@@ -55,6 +59,8 @@ export function SettingsWorkspace({
   notificationPermission: NotificationPermission | "unsupported";
   onEnableNotifications: () => void;
   onOpenArchived: () => void;
+  onOpenExternalUrl?: ((url: string) => Promise<void> | void) | undefined;
+  onSignOut?: (() => Promise<void> | void) | undefined;
   token: string;
   user: MessengerProfile | undefined;
 }) {
@@ -141,7 +147,7 @@ export function SettingsWorkspace({
             {...(archivedChatCount ? { suffix: archivedChatCount } : {})}
           />
         </nav>
-        {user ? <SignedInUser user={user} /> : null}
+        {user && onSignOut ? <SignedInUser onSignOut={onSignOut} user={user} /> : null}
       </aside>
       <main className="settings-content">
         {section === "codex" ? (
@@ -156,7 +162,7 @@ export function SettingsWorkspace({
                   body: JSON.stringify({ connectionId }),
                   method: "POST"
                 });
-                window.open(login.authUrl, "_blank", "noopener,noreferrer");
+                await openExternalUrl(login.authUrl, onOpenExternalUrl);
                 setMessage("Finish signing in in the browser, then refresh this page.");
               })
             }
@@ -178,7 +184,9 @@ export function SettingsWorkspace({
                   method: "POST"
                 });
                 setDeviceLogin(login);
-                setMessage("Device code ready. Connection status refreshes automatically during this session.");
+                setMessage(
+                  "Device code ready. Connection status refreshes automatically during this session."
+                );
               })
             }
             onLogout={(connectionId) =>
@@ -191,11 +199,17 @@ export function SettingsWorkspace({
                 setMessage("Codex account disconnected from this device.");
               })
             }
+            onOpenExternalUrl={onOpenExternalUrl}
             onRefresh={() => void run("refresh", async () => {})}
           />
         ) : null}
         {section === "cloud" ? (
-          <ConnectionServiceWorkspace apiUrl={apiUrl} clientKind={clientKind} token={token} />
+          <ConnectionServiceWorkspace
+            apiUrl={apiUrl}
+            clientKind={clientKind}
+            onOpenExternalUrl={onOpenExternalUrl}
+            token={token}
+          />
         ) : null}
         {section === "messages" ? (
           <MessageSettings
@@ -211,7 +225,9 @@ export function SettingsWorkspace({
   );
 }
 
-function SignedInUser({ user }: { user: MessengerProfile }) {
+function SignedInUser({ onSignOut, user }: { onSignOut: () => Promise<void> | void; user: MessengerProfile }) {
+  const [open, setOpen] = useState(false);
+  const hostRef = useRef<HTMLElement>(null);
   const initials = user.name
     .split(/\s+/u)
     .map((part) => part[0])
@@ -219,13 +235,29 @@ function SignedInUser({ user }: { user: MessengerProfile }) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!hostRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
   return (
-    <section className="settings-user" aria-label="Signed-in user">
-      <span aria-hidden="true">{initials || "U"}</span>
-      <div>
-        <strong>{user.name}</strong>
-        <small>{user.email}</small>
-      </div>
+    <section className="settings-user" aria-label="Signed-in user" ref={hostRef}>
+      {open ? <div className="settings-user-menu" role="menu"><button onClick={() => void onSignOut()} role="menuitem" type="button"><LogOut size={15} /> Sign out</button></div> : null}
+      <button aria-expanded={open} aria-haspopup="menu" className="settings-user-trigger" onClick={() => setOpen((current) => !current)} type="button">
+        <span aria-hidden="true">{initials || "U"}</span>
+        <span><strong>{user.name}</strong><small>{user.email}</small></span>
+        <ChevronUp size={15} />
+      </button>
     </section>
   );
 }
@@ -239,6 +271,7 @@ function CodexSettings({
   onCancelDeviceLogin,
   onDeviceLogin,
   onLogout,
+  onOpenExternalUrl,
   onRefresh
 }: {
   busy: string;
@@ -249,6 +282,7 @@ function CodexSettings({
   onCancelDeviceLogin: () => void;
   onDeviceLogin: (id: CodexConnection["id"]) => void;
   onLogout: (id: CodexConnection["id"]) => void;
+  onOpenExternalUrl?: ((url: string) => Promise<void> | void) | undefined;
   onRefresh: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -267,10 +301,10 @@ function CodexSettings({
     }
   }
 
-  function openVerification() {
+  async function openVerification() {
     if (!deviceLogin) return;
     void copyDeviceCode();
-    window.open(deviceLogin.verificationUrl, "_blank", "noopener,noreferrer");
+    await openExternalUrl(deviceLogin.verificationUrl, onOpenExternalUrl);
   }
 
   return (
@@ -359,18 +393,42 @@ function CodexSettings({
             <small>DEVICE AUTHENTICATION</small>
             <span className="device-login-code">
               <strong>{deviceLogin.userCode}</strong>
-              <button aria-label="Copy device authentication code" onClick={() => void copyDeviceCode()} title="Copy code" type="button">
+              <button
+                aria-label="Copy device authentication code"
+                onClick={() => void copyDeviceCode()}
+                title="Copy code"
+                type="button"
+              >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
                 <span>{copied ? "Copied" : "Copy"}</span>
               </button>
             </span>
             <p>Open the verification page, sign in, and enter this one-time code.</p>
-            <small className="device-login-refresh">Checking connection automatically every 3 seconds</small>
+            <small className="device-login-refresh">
+              Checking connection automatically every 3 seconds
+            </small>
           </div>
-          <button className="device-login-open" onClick={openVerification} type="button">
+          <button
+            className="device-login-open"
+            onClick={() => void openVerification()}
+            type="button"
+          >
             Open verification <ExternalLink size={15} />
           </button>
-          <button aria-label="Cancel device sign-in" className="device-login-cancel" onClick={onCancelDeviceLogin} type="button">
+          <button
+            aria-label="Copy verification page link"
+            className="device-login-open"
+            onClick={() => void copyText(deviceLogin.verificationUrl)}
+            type="button"
+          >
+            Copy link <Copy size={15} />
+          </button>
+          <button
+            aria-label="Cancel device sign-in"
+            className="device-login-cancel"
+            onClick={onCancelDeviceLogin}
+            type="button"
+          >
             <X size={16} />
           </button>
         </div>
@@ -539,4 +597,21 @@ async function copyText(value: string) {
   input.select();
   document.execCommand("copy");
   input.remove();
+}
+
+async function openExternalUrl(
+  url: string,
+  openExternalUrlHandler?: ((url: string) => Promise<void> | void) | undefined
+) {
+  if (openExternalUrlHandler) {
+    await openExternalUrlHandler(url);
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = url;
+  link.rel = "noopener noreferrer";
+  link.target = "_blank";
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
