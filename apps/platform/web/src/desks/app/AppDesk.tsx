@@ -38,6 +38,7 @@ type IdentityPage =
   | "identity.profile";
 
 type Claims = { email: string; name?: string; permissions?: string[]; role?: string };
+const sameOriginApiUrl = "";
 
 export function AppDesk() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -58,7 +59,7 @@ function MessengerAppDesk() {
           agentSidePanel={
             <AgentConnectionPanel agent="Codex" model="gpt-5.6-terra" state={connectionState} />
           }
-          apiUrl={import.meta.env.VITE_PLATFORM_API_URL}
+          apiUrl={sameOriginApiUrl}
           clientKind="web"
           connectionHref="/app/devkit/project-sync"
           drawerCollapsed={drawerCollapsed}
@@ -71,7 +72,7 @@ function MessengerAppDesk() {
           token={token}
         />
       ) : (
-        <CoworkerChat apiUrl={import.meta.env.VITE_PLATFORM_API_URL} />
+        <CoworkerChat apiUrl={sameOriginApiUrl} />
       )}
     </AuthGate>
   );

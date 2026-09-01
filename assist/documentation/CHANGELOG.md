@@ -1,8 +1,26 @@
 # Changelog
 
-Current version: 1.0.88
-Release tag: v-1.0.88
-Changelog label: v 1.0.88
+Current version: 1.0.89
+Release tag: v-1.0.89
+Changelog label: v 1.0.89
+
+## v-1.0.89
+
+### [v 1.0.89] 2026-09-01 12:45 pm - Chat same-origin API routes
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.89.
+- Made the shared chat shell use the same-origin API root instead of treating the platform proxy prefix as an origin.
+- Restored correct Messenger Socket.IO, contacts, profile, and whiteboard route composition in the browser shell.
+
+#### Verification
+
+- Pending focused platform-web verification and production browser checks after deployment.
 
 ## v-1.0.88
 
