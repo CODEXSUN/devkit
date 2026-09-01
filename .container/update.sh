@@ -11,6 +11,7 @@ BACKUP_DIR="$CONTAINER_DIR/backups"
 ASSUME_YES=false
 CHECK_ONLY=false
 ALLOW_DIRTY=false
+PREPARE_RELEASE=false
 LOCK_FILE="${TMPDIR:-/tmp}/devkit-update.lock"
 backup_file="not-created"
 backup_temp=""
@@ -32,7 +33,7 @@ trap cleanup_partial_files EXIT
 
 usage() {
   cat <<'EOF'
-Usage: bash update.sh [--check] [--yes] [--allow-dirty]
+Usage: bash update.sh [--prepare] [--check] [--yes] [--allow-dirty]
 
 Safely update an existing DevKit Docker installation while preserving:
 
@@ -51,6 +52,7 @@ The updater never runs the interactive installer, resets or recreates MariaDB,
 removes volumes, changes credentials, pulls source, or updates unrelated containers.
 
 Options:
+      --prepare Back up deploy.env and align its release fields with package.json.
       --check Validate the existing deployment without rebuilding containers.
       --allow-dirty Build uncommitted source after recording a prominent warning.
   -y, --yes  Apply the update without an interactive confirmation.
@@ -68,6 +70,9 @@ while (($# > 0)); do
     --check)
       CHECK_ONLY=true
       ;;
+    --prepare)
+      PREPARE_RELEASE=true
+      ;;
     --allow-dirty)
       ALLOW_DIRTY=true
       ;;
@@ -84,16 +89,29 @@ while (($# > 0)); do
   shift
 done
 
+if [[ "$PREPARE_RELEASE" == true && ("$CHECK_ONLY" == true || "$ASSUME_YES" == true || "$ALLOW_DIRTY" == true) ]]; then
+  echo "--prepare must be run by itself before --check or an update." >&2
+  exit 64
+fi
+
 if [[ "$CHECK_ONLY" != true ]]; then
-  command -v flock >/dev/null 2>&1 || {
+  if command -v flock >/dev/null 2>&1; then
+    exec 9>"$LOCK_FILE"
+    flock -n 9 || {
+      echo "Another DevKit update is already running (lock: $LOCK_FILE)." >&2
+      exit 75
+    }
+  elif [[ "$PREPARE_RELEASE" == true ]]; then
+    prepare_lock="${LOCK_FILE}.d"
+    mkdir "$prepare_lock" 2>/dev/null || {
+      echo "Another DevKit release preparation is active (lock: $prepare_lock)." >&2
+      exit 75
+    }
+    trap 'rmdir "$prepare_lock" 2>/dev/null || true; cleanup_partial_files' EXIT
+  else
     echo "flock is required to serialize DevKit deployment updates." >&2
     exit 69
-  }
-  exec 9>"$LOCK_FILE"
-  flock -n 9 || {
-    echo "Another DevKit update is already running (lock: $LOCK_FILE)." >&2
-    exit 75
-  }
+  fi
 fi
 
 require_command() {
@@ -147,12 +165,13 @@ verify_agent_runtime_image() {
 }
 
 verify_agent_runtime_container() {
-  docker exec "$api_container" sh -lc '
+  docker exec --user node "$api_container" sh -lc '
     test "$(id -u)" = "1000"
     command -v git >/dev/null
     test -w "$DEVKIT_CODEX_HOME"
     test -w "$DEVKIT_AGENT_WORKTREE_ROOT"
     test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"
+    test -w "$DEVKIT_STORAGE_PATH"
   '
 }
 
@@ -180,6 +199,34 @@ positive_integer() {
 read_source_version() {
   sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
     "$ROOT_DIR/package.json" | head -n 1
+}
+
+prepare_release_contract() {
+  source_version="$(read_source_version)"
+  [[ -n "$source_version" ]] || {
+    echo "Could not read the source version from $ROOT_DIR/package.json." >&2
+    exit 78
+  }
+
+  local key timestamp config_backup
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  mkdir -p "$BACKUP_DIR/config"
+  config_backup="$BACKUP_DIR/config/deploy.env.pre-${source_version}-${timestamp}"
+  cp -p -- "$DEPLOY_ENV" "$config_backup"
+  chmod 600 "$config_backup" 2>/dev/null || true
+
+  for key in DEVKIT_VERSION DEVKIT_IMAGE_TAG DEVKIT_MIGRATION_COMPATIBLE_VERSION; do
+    grep -qE "^${key}=" "$DEPLOY_ENV" || {
+      echo "$key is missing from $DEPLOY_ENV; restoring the original file." >&2
+      cp -p -- "$config_backup" "$DEPLOY_ENV"
+      exit 78
+    }
+    sed -i -E "s|^${key}=.*$|${key}=${source_version}|" "$DEPLOY_ENV"
+  done
+
+  echo "Prepared DevKit $source_version for manual deployment."
+  echo "Deployment configuration backup: $config_backup"
+  echo "Next: bash update.sh --check"
 }
 
 validate_release_contract() {
@@ -248,6 +295,23 @@ require_free_space() {
   echo "  Disk space for $label: ${available_mb} MB available (${required_mb} MB minimum)"
 }
 
+require_docker_free_space() {
+  local required_mb="$1" docker_root docker_os
+  docker_root="$(docker info --format '{{.DockerRootDir}}')"
+  docker_os="$(docker info --format '{{.OperatingSystem}}')"
+  if [[ -n "$docker_root" && -d "$docker_root" ]]; then
+    require_free_space "$docker_root" "$required_mb" "Docker build storage"
+    return
+  fi
+  if [[ "$docker_os" == *"Docker Desktop"* ]]; then
+    docker system df >/dev/null
+    echo "  Docker storage: managed by Docker Desktop VM (quota check required in Docker Desktop)"
+    return
+  fi
+  echo "Docker did not report a readable storage root: ${docker_root:-unset}" >&2
+  exit 69
+}
+
 write_deployment_metadata() {
   local status="$1" api_digest="$2" web_digest="$3"
   [[ "$metadata_file" != "not-created" ]] || return 0
@@ -304,6 +368,11 @@ docker compose version >/dev/null 2>&1 || {
 require_file "$RUNTIME_ENV"
 require_file "$DEPLOY_ENV"
 require_file "$COMPOSE_FILE"
+
+if [[ "$PREPARE_RELEASE" == true ]]; then
+  prepare_release_contract
+  exit 0
+fi
 
 for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET INITIAL_ADMIN_EMAIL INITIAL_ADMIN_PASSWORD; do
   require_setting "$RUNTIME_ENV" "$key"
@@ -434,13 +503,8 @@ resolved_backup_dir="$(cd "$BACKUP_DIR" && pwd -P)"
   echo "Refusing to use unsafe backup directory: $resolved_backup_dir" >&2
   exit 78
 }
-docker_root="$(docker info --format '{{.DockerRootDir}}')"
-[[ -n "$docker_root" && -d "$docker_root" ]] || {
-  echo "Docker did not report a readable storage root: ${docker_root:-unset}" >&2
-  exit 69
-}
 require_free_space "$resolved_backup_dir" "$minimum_backup_mb" "MariaDB backup"
-require_free_space "$docker_root" "$minimum_docker_mb" "Docker build storage"
+require_docker_free_space "$minimum_docker_mb"
 
 echo
 echo "DevKit Docker update plan"

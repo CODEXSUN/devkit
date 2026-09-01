@@ -17,10 +17,13 @@ requireTokens(".container/update.sh", updater, [
   "umask 077",
   "flock -n 9",
   "--allow-dirty",
+  "--prepare",
   "DEVKIT_MIGRATION_COMPATIBLE_VERSION",
   "sha256sum --check",
   "write_deployment_metadata",
+  'docker exec --user node "$api_container"',
   "require_free_space",
+  "require_docker_free_space",
   "rollback_application"
 ]);
 requireTokens(".container/setup.sh", setup, [
@@ -31,6 +34,8 @@ requireTokens(".container/setup.sh", setup, [
 requireTokens(".container/docker-compose.yml", compose, [
   "name: ${DEVKIT_COMPOSE_PROJECT:-devkit}",
   "DEVKIT_ENV_FILE_PATH: /workspace/devkit/.env",
+  "media-data:/workspace/devkit/storage",
+  "DEVKIT_MEDIA_DATA_VOLUME:-cxapp-media-data",
   "networks: [devkit]"
 ]);
 requireTokens(".container/deploy.env.example", deployExample, [
@@ -47,6 +52,7 @@ requireTokens(".container/update-watcher/devkit-update-watcher.sh", watcher, [
   "worktree add --detach",
   "docker build --target verify",
   "merge --ff-only",
+  'bash "$REPO_DIR/update.sh" --prepare',
   "bash \"$REPO_DIR/update.sh\" --check",
   "bash \"$REPO_DIR/update.sh\" --yes",
   '"$STATE_DIR/config-backups/deploy.env.pre-${target_commit:0:12}"',
@@ -55,6 +61,7 @@ requireTokens(".container/update-watcher/devkit-update-watcher.sh", watcher, [
 ]);
 requireTokens(".container/update-watcher/install.sh", watcherInstaller, [
   "/usr/local/sbin/devkit-update-watcher",
+  "systemctl disable --now devkit-update-watcher.timer",
   "systemctl enable --now devkit-update-watcher.timer"
 ]);
 requireTokens(".container/update-watcher/devkit-update-watcher.service", watcherService, [

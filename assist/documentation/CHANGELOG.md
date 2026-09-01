@@ -1,8 +1,41 @@
 # Changelog
 
-Current version: 1.0.98
-Release tag: v-1.0.98
-Changelog label: v 1.0.98
+Current version: 1.0.99
+Release tag: v-1.0.99
+Changelog label: v 1.0.99
+
+## v-1.0.99
+
+### [v 1.0.99] 2026-09-01 11:42 pm - Local Docker deployment hardening
+
+#### Database Changes
+
+- Database update: No.
+- Reused CXApp-owned MariaDB locally with a separate `devkit_db` schema; no new migration was added.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.99.
+- Added the missing `ioredis` runtime dependency required by BullMQ when Redis is configured.
+- Mounted the CXApp File Browser data volume into the DevKit API storage path.
+- Forwarded WebSocket upgrade headers through the `/api/platform` Nginx proxy.
+- Removed the redundant recursive ownership pass over the copied application tree.
+- Excluded generated Rust, temporary, and browser-test artifacts from Docker build contexts.
+- Added `update.sh --prepare` to back up deployment settings and align release contract fields.
+- Made the watcher reuse the manual preparation command and install with automatic scheduling disabled.
+- Corrected running-container checks to execute as the unprivileged `node` user.
+- Made Docker storage preflight compatible with Docker Desktop while retaining strict Linux checks.
+
+#### Verification
+
+- Passed the complete local repository `npm run check` gate before deployment-script hardening.
+- Passed deployment-script contract checks and Bash syntax validation.
+- Built the Linux Docker `verify`, API runtime, and Web runtime targets locally.
+- Started healthy DevKit API/Web containers on the CXApp network with healthy MariaDB, Redis, and File Browser containers.
+- Applied all migrations and repeatable seeds to the isolated local `devkit_db` schema.
+- Passed API and Web health checks, Redis `PONG`, shared File Browser volume access, and the manual updater `--check` preflight.
+- Passed authenticated login, users, contacts, roles, native WebSocket upgrade, Administrator visibility boundaries, Developer default-role creation, and global Idea create/list/delete checks.
+- Production deployment was intentionally not run; the server watcher and timer remain disabled.
 
 ## v-1.0.98
 

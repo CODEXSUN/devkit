@@ -412,12 +412,13 @@ verify_agent_runtime_image() {
 verify_agent_runtime_container() {
   local container
   container="$(file_value "$DEPLOY_ENV" DEVKIT_API_CONTAINER_NAME devkit-api)"
-  docker exec "$container" sh -lc '
+  docker exec --user node "$container" sh -lc '
     test "$(id -u)" = "1000"
     command -v git >/dev/null
     test -w "$DEVKIT_CODEX_HOME"
     test -w "$DEVKIT_AGENT_WORKTREE_ROOT"
     test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"
+    test -w "$DEVKIT_STORAGE_PATH"
   '
 }
 

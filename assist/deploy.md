@@ -10,6 +10,11 @@ Compose owns three persistent Agent volumes:
 - `/srv/devkit/repositories` for complete Git repositories;
 - `/var/lib/devkit/worktrees` for isolated Agent worktrees.
 
+The API also mounts CXApp's external File Browser data volume at `/workspace/devkit/storage`.
+`DEVKIT_STORAGE_PATH=/workspace/devkit/storage/devkit` keeps DevKit files in its own subdirectory
+while making them inspectable through `cxapp-media`. Redis is reached on the shared network through
+`REDIS_URL`; MariaDB remains a separate `devkit_db` schema in `cxapp-mariadb`.
+
 Setup and update preflight checks confirm that the API runs as UID 1000, Git is executable, and all
 three directories are writable. A project must reference a complete clone below the repository
 root. An empty `git init` in the application image is not a valid source repository.
@@ -26,11 +31,29 @@ docker exec devkit-api sh -lc 'test -w "$DEVKIT_AGENT_ALLOWED_ROOTS"'
 Do not run the API as root, apply recursive `chmod 777`, bake secrets into the image, or mount Git
 metadata without its matching checkout.
 
-## Ubuntu production update watcher
+## Manual Ubuntu production update
 
-The production checkout stays at `/home/devkit`. A systemd timer checks `origin/main` every five
-minutes. It accepts fast-forward commits only and builds the candidate Docker `verify` target in a
-detached temporary worktree before changing the live checkout.
+The production checkout stays at `/home/devkit`. Deploy only after the matching source version has
+passed local repository, Docker, runtime, and watcher tests. The normal production flow is manual:
+
+```sh
+cd /home/devkit
+git pull --ff-only origin main
+bash update.sh --prepare
+bash update.sh --check
+bash update.sh --yes
+```
+
+`--prepare` creates a permission-restricted backup of `deploy.env` and changes only the release
+version fields. The guarded updater then builds the candidate, backs up MariaDB, runs migrations and
+seeds, replaces only API and Web, checks health, and restores the previous application images when
+replacement health checks fail.
+
+## Optional Ubuntu update watcher
+
+The watcher accepts fast-forward commits only and builds the candidate Docker `verify` target in a
+detached temporary worktree before changing the live checkout. Installation leaves its timer
+disabled so an operator can validate and start exactly one run manually.
 
 Install the watcher after the first manual deployment:
 
@@ -38,7 +61,8 @@ Install the watcher after the first manual deployment:
 cd /home/devkit
 sudo bash .container/update-watcher/install.sh
 sudo /usr/local/sbin/devkit-update-watcher --check
-systemctl list-timers devkit-update-watcher.timer --no-pager
+sudo systemctl start devkit-update-watcher.service
+sudo journalctl -u devkit-update-watcher.service -f
 ```
 
 Each accepted update follows this order:
@@ -55,10 +79,10 @@ Each accepted update follows this order:
    DevKit image namespace. Never prune volumes or unrelated Docker resources.
 9. Record the successful commit and version below `/var/lib/devkit-update-watcher`.
 
-Inspect every automatic run through the system journal:
+Inspect a watcher run through the system journal:
 
 ```sh
-systemctl status devkit-update-watcher.timer --no-pager
+systemctl status devkit-update-watcher.service --no-pager
 journalctl -u devkit-update-watcher.service -n 200 --no-pager
 cat /var/lib/devkit-update-watcher/last-successful-commit
 cat /var/lib/devkit-update-watcher/last-successful-version
@@ -67,3 +91,5 @@ cat /var/lib/devkit-update-watcher/last-successful-version
 If Git diverges, the checkout is dirty, isolated verification fails, backup or migration fails, or
 health checks fail, the run stops. Do not force-reset production or automatically reverse a
 completed migration. Review the journal, retained backup, and deployment metadata before retrying.
+
+Enable `devkit-update-watcher.timer` only when automatic deployment is explicitly approved.

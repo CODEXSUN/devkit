@@ -33,14 +33,24 @@ log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 fail() { log "ERROR: $*" >&2; exit 1; }
 require_command() { command -v "$1" >/dev/null 2>&1 || fail "Required command is unavailable: $1"; }
 
-for command in bash docker flock git sed; do require_command "$command"; done
+for command in bash docker git sed; do require_command "$command"; done
 [[ -d "$REPO_DIR/.git" ]] || fail "DevKit checkout was not found at $REPO_DIR"
 [[ -f "$DEPLOY_ENV" ]] || fail "Deployment environment was not found at $DEPLOY_ENV"
 [[ -f "$REPO_DIR/update.sh" ]] || fail "Updater was not found at $REPO_DIR/update.sh"
 docker info >/dev/null 2>&1 || fail "Docker Engine is not reachable"
 
-exec 9>"$LOCK_FILE"
-flock -n 9 || fail "Another watcher run is active"
+lock_directory=""
+cleanup_lock() {
+  [[ -z "$lock_directory" ]] || rmdir "$lock_directory" 2>/dev/null || true
+}
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK_FILE"
+  flock -n 9 || fail "Another watcher run is active"
+else
+  lock_directory="${LOCK_FILE}.d"
+  mkdir "$lock_directory" 2>/dev/null || fail "Another watcher run is active"
+  trap cleanup_lock EXIT
+fi
 [[ -z "$(git -C "$REPO_DIR" status --porcelain --untracked-files=normal)" ]] ||
   fail "Production checkout is dirty; preserve and review those files before automated deployment"
 [[ "$(git -C "$REPO_DIR" branch --show-current)" == "$BRANCH" ]] ||
@@ -67,11 +77,12 @@ cleanup_candidate() {
   git -C "$REPO_DIR" worktree remove --force "$candidate_dir" >/dev/null 2>&1 || true
   rm -rf -- "$candidate_dir"
 }
-trap cleanup_candidate EXIT
+trap 'cleanup_candidate; cleanup_lock' EXIT
 git -C "$REPO_DIR" worktree add --detach "$candidate_dir" "$target_commit" >/dev/null
 log "Building isolated verification target for $target_commit"
 docker build --target verify -f "$candidate_dir/.container/scripts/Dockerfile.stack" "$candidate_dir"
 cleanup_candidate
+cleanup_lock
 trap - EXIT
 
 git -C "$REPO_DIR" merge --ff-only "$target_commit"
@@ -79,11 +90,9 @@ version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".
 [[ -n "$version" ]] || fail "Could not read package version after fast-forward"
 mkdir -p "$STATE_DIR/config-backups"
 cp -p -- "$DEPLOY_ENV" "$STATE_DIR/config-backups/deploy.env.pre-${target_commit:0:12}"
-for key in DEVKIT_VERSION DEVKIT_IMAGE_TAG DEVKIT_MIGRATION_COMPATIBLE_VERSION; do
-  grep -qE "^${key}=" "$DEPLOY_ENV" || fail "$key is missing from $DEPLOY_ENV"
-  sed -i -E "s|^${key}=.*$|${key}=${version}|" "$DEPLOY_ENV"
-done
 
+log "Preparing the release contract for DevKit $version"
+bash "$REPO_DIR/update.sh" --prepare
 log "Running deployment preflight for DevKit $version"
 bash "$REPO_DIR/update.sh" --check
 log "Applying DevKit $version"

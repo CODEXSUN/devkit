@@ -12,9 +12,12 @@ install -o root -g root -m 0644 "$SOURCE_DIR/devkit-update-watcher.service" /etc
 install -o root -g root -m 0644 "$SOURCE_DIR/devkit-update-watcher.timer" /etc/systemd/system/devkit-update-watcher.timer
 install -d -o root -g root -m 0750 /var/lib/devkit-update-watcher
 systemctl daemon-reload
-systemctl enable --now devkit-update-watcher.timer
-systemctl status devkit-update-watcher.timer --no-pager
+systemctl disable --now devkit-update-watcher.timer >/dev/null 2>&1 || true
 
-echo "Installed DevKit update watcher. Inspect it with:"
+echo "Installed DevKit update watcher with automatic scheduling disabled."
+echo "Validate and run it manually with:"
+echo "  /usr/local/sbin/devkit-update-watcher --check"
 echo "  systemctl start devkit-update-watcher.service"
 echo "  journalctl -u devkit-update-watcher.service -n 100 --no-pager"
+echo "Enable the timer only after automatic deployment is explicitly approved:"
+echo "  systemctl enable --now devkit-update-watcher.timer"

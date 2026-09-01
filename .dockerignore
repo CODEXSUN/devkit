@@ -7,4 +7,15 @@ coverage
 dist
 node_modules
 storage
+target
+target-*
+**/target
+**/target-*
+cargo-*
+.tmp-*
+**/.tmp-*
+test-results
+**/test-results
+playwright-report
+**/playwright-report
 *.log

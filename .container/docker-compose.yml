@@ -63,6 +63,7 @@ services:
       - codex-state:/var/lib/devkit/codex
       - agent-worktrees:/var/lib/devkit/worktrees
       - agent-repositories:/srv/devkit/repositories
+      - media-data:/workspace/devkit/storage
     networks: [devkit]
     healthcheck:
       test:
@@ -114,6 +115,9 @@ volumes:
     name: ${DEVKIT_AGENT_WORKTREE_VOLUME:-devkit-agent-worktrees}
   agent-repositories:
     name: ${DEVKIT_AGENT_REPOSITORY_VOLUME:-devkit-agent-repositories}
+  media-data:
+    name: ${DEVKIT_MEDIA_DATA_VOLUME:-cxapp-media-data}
+    external: ${DEVKIT_MEDIA_DATA_VOLUME_EXTERNAL:-true}
 
 networks:
   devkit:

@@ -25,7 +25,7 @@ RUN npm install --global npm@${NPM_RUNTIME_VERSION} && \
 COPY --chown=node:node --from=build /workspace/devkit /workspace/devkit
 COPY --chmod=755 .container/scripts/api-entrypoint.sh /usr/local/bin/devkit-api-entrypoint
 RUN mkdir -p /var/lib/devkit/codex /var/lib/devkit/worktrees /srv/devkit/repositories && \
-  chown -R node:node /workspace/devkit /var/lib/devkit /srv/devkit/repositories
+  chown -R node:node /var/lib/devkit /srv/devkit/repositories
 ENV DEVKIT_CODEX_HOME=/var/lib/devkit/codex \
   DEVKIT_AGENT_ALLOWED_ROOTS=/srv/devkit/repositories \
   DEVKIT_AGENT_WORKTREE_ROOT=/var/lib/devkit/worktrees

@@ -73,14 +73,16 @@ bash setup.sh
 After updating the repository source, validate and apply an in-place deployment update with:
 
 ```sh
+bash update.sh --prepare
 bash update.sh --check
-bash update.sh
+bash update.sh --yes
 ```
 
 `bash updat.sh` is retained as a compatibility alias for operators using the earlier deployment
 command spelling.
 
-The updater preserves `.env`, `.container/deploy.env`, MariaDB data, credentials, ports, and named
+`--prepare` first backs up `.container/deploy.env` and aligns only the three version-contract fields
+with `package.json`. The updater preserves `.env`, MariaDB data, credentials, ports, and named
 volumes. It refuses concurrent or dirty-source updates by default, locks source and image versions,
 requires explicit migration-compatibility approval, verifies free space, creates a SHA-256 checked
 database backup and deployment metadata, replaces only the API and Web containers, and restores
