@@ -57,6 +57,9 @@ export class UserRoleService {
     const p = await this.repository.parents(v);
     if (!p.user) throw AppError.validation("Active user was not found.");
     if (!p.role) throw AppError.validation("Active role was not found.");
+    if (p.roleKey === "super-admin") {
+      throw AppError.forbidden("Super Administrator is reserved for the protected system account.");
+    }
   }
   private async mutable(id: string): Promise<UserRole> {
     const r = await this.repository.find(id);

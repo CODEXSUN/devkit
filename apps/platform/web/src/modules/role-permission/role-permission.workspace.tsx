@@ -275,6 +275,6 @@ function isLockedPermission(roleKey: string, permissionKey: string) {
 
 function roleDescription(roleKey: string) {
   if (roleKey === "super-admin") return "All platform and DevKit controls.";
-  if (roleKey === "admin") return "Administration and engineering access.";
+  if (roleKey === "admin") return "User, role, permission, and access administration.";
   return "Choose the DevKit features this role can use.";
 }

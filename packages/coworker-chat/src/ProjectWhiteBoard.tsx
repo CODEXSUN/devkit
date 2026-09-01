@@ -15,6 +15,8 @@ export function ProjectWhiteBoard({ client, createRequest, project }: { client: 
   const [state, setState] = useState<SaveState>("loading");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingScene = useRef<CoworkerPlanningScene | null>(null);
+  const pendingBoardId = useRef("");
+  const savedSceneSignature = useRef("");
   const handledCreateRequest = useRef(createRequest);
   const selected = boards.find((board) => board.uuid === selectedId);
 
@@ -24,9 +26,10 @@ export function ProjectWhiteBoard({ client, createRequest, project }: { client: 
       setBoards(result);
       setSelectedId("");
       pendingScene.current = null;
+      savedSceneSignature.current = "";
       setState("saved");
     }).catch(() => setState("error"));
-    return () => { if (timer.current) clearTimeout(timer.current); };
+    return flushDraft;
   }, [client, project.id]);
 
   const createBoard = useCallback(async () => {
@@ -36,6 +39,9 @@ export function ProjectWhiteBoard({ client, createRequest, project }: { client: 
       setBoards((current) => [board, ...current]);
       setSelectedId(board.uuid);
       pendingScene.current = null;
+      pendingBoardId.current = board.uuid;
+      savedSceneSignature.current = sceneSignature(board.scene);
+      clearBoardDraft(board.uuid);
       setState("saved");
     } catch { setState("error"); }
   }, [boards.length, client, project.id, project.title]);
@@ -46,54 +52,102 @@ export function ProjectWhiteBoard({ client, createRequest, project }: { client: 
     void createBoard();
   }, [createBoard, createRequest, state]);
 
-  async function saveScene(board: CoworkerPlanningBoard, scene: CoworkerPlanningScene) {
+  const saveScene = useCallback(async (board: CoworkerPlanningBoard, scene: CoworkerPlanningScene) => {
     setState("saving");
     try {
       const saved = await client.updatePlanningBoard(board.uuid, scene);
+      savedSceneSignature.current = sceneSignature(saved.scene);
       setBoards((current) => current.map((entry) => entry.uuid === saved.uuid ? saved : entry));
       if (pendingScene.current === scene) {
         pendingScene.current = null;
+        clearBoardDraft(board.uuid);
         setState("saved");
       } else {
         setState("draft");
       }
     } catch {
+      saveBoardDraft(board.uuid, pendingScene.current ?? scene);
       setState(pendingScene.current && pendingScene.current !== scene ? "draft" : "error");
     }
-  }
+  }, [client]);
 
-  function queueSave(board: CoworkerPlanningBoard, scene: CoworkerPlanningScene) {
+  function queueDraft(board: CoworkerPlanningBoard, scene: CoworkerPlanningScene) {
     if (timer.current) clearTimeout(timer.current);
+    if (sceneSignature(scene) === savedSceneSignature.current) {
+      timer.current = null;
+      pendingScene.current = null;
+      clearBoardDraft(board.uuid);
+      setState("saved");
+      return;
+    }
     pendingScene.current = scene;
+    pendingBoardId.current = board.uuid;
     setState("draft");
     timer.current = setTimeout(() => {
       timer.current = null;
-      void saveScene(board, scene);
-    }, 900);
+      saveBoardDraft(board.uuid, scene);
+    }, 400);
   }
 
-  function saveNow() {
+  const saveNow = useCallback(() => {
     if (!selected) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     void saveScene(selected, pendingScene.current ?? selected.scene);
+  }, [saveScene, selected]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (selected && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        saveNow();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [saveNow, selected]);
+
+  function openBoard(uuid: string) {
+    flushDraft();
+    const recovery = readBoardDraft(uuid);
+    const board = boards.find((entry) => entry.uuid === uuid);
+    pendingBoardId.current = uuid;
+    pendingScene.current = recovery;
+    savedSceneSignature.current = board ? sceneSignature(board.scene) : "";
+    setState(recovery ? "draft" : "saved");
+    setSelectedId(uuid);
+  }
+
+  function closeBoard() {
+    flushDraft();
+    setSelectedId("");
+    pendingScene.current = null;
+    pendingBoardId.current = "";
+  }
+
+  function flushDraft() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (pendingBoardId.current && pendingScene.current) {
+      saveBoardDraft(pendingBoardId.current, pendingScene.current);
+    }
   }
 
   if (state === "loading") return <p className="project-tab-state">Loading whiteboards…</p>;
-  if (!selected) return <WhiteBoardList boards={boards} onOpen={setSelectedId} />;
+  if (!selected) return <WhiteBoardList boards={boards} onOpen={openBoard} />;
   return <section className="project-whiteboard">
     <header>
-      <button aria-label="Back to whiteboard files" className="project-whiteboard-back" onClick={() => setSelectedId("")} type="button"><ArrowLeft size={16} /></button>
+      <button aria-label="Back to whiteboard files" className="project-whiteboard-back" onClick={closeBoard} type="button"><ArrowLeft size={16} /></button>
       <strong>{selected.title}</strong>
-      <button className={`project-whiteboard-save ${state}`} disabled={state === "saving"} onClick={saveNow} type="button">
+      <button aria-label="Save whiteboard" className={`project-whiteboard-save ${state}`} disabled={state === "saving"} onClick={saveNow} title="Save whiteboard (Ctrl+S)" type="button">
         <i aria-hidden="true" />
-        {state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state === "error" ? "Retry save" : "Draft"}
+        {state === "saving" ? "Saving…" : state === "saved" ? "Saved" : "Draft"}
       </button>
     </header>
     <div className="project-whiteboard-canvas" key={selected.uuid}>
       <Excalidraw
-        initialData={{ appState: selected.scene.appState as Partial<AppState>, elements: selected.scene.elements as readonly ExcalidrawElement[], files: selected.scene.files as BinaryFiles }}
-        onChange={(elements, appState, files) => queueSave(selected, JSON.parse(serializeAsJSON(elements, appState, files, "database")) as CoworkerPlanningScene)}
+        initialData={{ appState: (pendingScene.current ?? selected.scene).appState as Partial<AppState>, elements: (pendingScene.current ?? selected.scene).elements as readonly ExcalidrawElement[], files: (pendingScene.current ?? selected.scene).files as BinaryFiles }}
+        onChange={(elements, appState, files) => queueDraft(selected, JSON.parse(serializeAsJSON(elements, appState, files, "database")) as CoworkerPlanningScene)}
       />
     </div>
   </section>;
@@ -112,4 +166,36 @@ function formatUpdated(value: string) {
   if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m ago`;
   if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h ago`;
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(new Date(value));
+}
+
+function boardDraftKey(uuid: string) {
+  return `devkit:whiteboard-recovery:${uuid}`;
+}
+
+function sceneSignature(scene: CoworkerPlanningScene) {
+  return JSON.stringify(scene);
+}
+
+function readBoardDraft(uuid: string) {
+  try {
+    return JSON.parse(localStorage.getItem(boardDraftKey(uuid)) ?? "null") as CoworkerPlanningScene | null;
+  } catch {
+    return null;
+  }
+}
+
+function saveBoardDraft(uuid: string, scene: CoworkerPlanningScene) {
+  try {
+    localStorage.setItem(boardDraftKey(uuid), JSON.stringify(scene));
+  } catch {
+    // Local recovery is optional.
+  }
+}
+
+function clearBoardDraft(uuid: string) {
+  try {
+    localStorage.removeItem(boardDraftKey(uuid));
+  } catch {
+    // Local recovery is optional.
+  }
 }

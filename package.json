@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.92",
+  "version": "1.0.93",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",

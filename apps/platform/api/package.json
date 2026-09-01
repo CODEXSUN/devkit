@@ -1,6 +1,6 @@
 {
   "name": "@devkit/platform-api",
-  "version": "1.0.92",
+  "version": "1.0.93",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@codexsun/devkit-api": "1.0.92",
-    "@codexsun/framework": "1.0.92",
+    "@codexsun/devkit-api": "1.0.93",
+    "@codexsun/framework": "1.0.93",
     "fastify": "^5.12.1",
     "kysely": "^0.29.5",
     "mysql2": "^3.24.2",

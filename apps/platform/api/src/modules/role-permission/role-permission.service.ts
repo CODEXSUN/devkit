@@ -55,6 +55,9 @@ export class RolePermissionService {
     const p = await this.repository.parents(v);
     if (!p.role) throw AppError.validation("Active role was not found.");
     if (!p.permission) throw AppError.validation("Active permission was not found.");
+    if (p.roleKey === "super-admin") {
+      throw AppError.forbidden("Super Administrator permissions are protected by the system seed.");
+    }
   }
   private async mutable(id: string): Promise<RolePermission> {
     const r = await this.repository.find(id);

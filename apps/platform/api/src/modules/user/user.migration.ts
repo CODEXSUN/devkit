@@ -4,7 +4,8 @@ import type { PlatformDatabase } from "../../database/schema.js";
 export const userMigrations = [
   { key: "identity.user.foundation-v1" },
   { key: "identity.user.single-client-v3" },
-  { key: "identity.user.local-auth-only-v4" }
+  { key: "identity.user.local-auth-only-v4" },
+  { key: "identity.user.super-admin-v5" }
 ] as const;
 export const userMigration = userMigrations[0];
 
@@ -30,7 +31,7 @@ export async function migrateUserModule(database: Kysely<PlatformDatabase>) {
       .raw("ALTER TABLE users ADD COLUMN is_protected BOOLEAN NOT NULL DEFAULT FALSE AFTER status")
       .execute(database);
   }
-  await sql`UPDATE users SET role='admin' WHERE role IN ('super-admin','super_admin','superadmin')`.execute(
+  await sql`UPDATE users SET role='super-admin' WHERE role IN ('super_admin','superadmin')`.execute(
     database
   );
   const removedIntegrationPrefix = ["fra", "ppe_"].join("");

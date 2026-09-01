@@ -16,14 +16,14 @@ export async function seedUserModule(database: Kysely<PlatformDatabase>) {
       is_protected: true,
       name,
       password_hash: hashPassword(password),
-      role: "admin",
+      role: "super-admin",
       status: "active",
       uuid: stable(email)
     })
     .onDuplicateKeyUpdate({
       is_protected: true,
       name,
-      role: "admin",
+      role: "super-admin",
       status: "active"
     })
     .execute();

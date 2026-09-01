@@ -1,8 +1,45 @@
 # Changelog
 
-Current version: 1.0.92
-Release tag: v-1.0.92
-Changelog label: v 1.0.92
+Current version: 1.0.93
+Release tag: v-1.0.93
+Changelog label: v 1.0.93
+
+## v-1.0.93
+
+### [v 1.0.93] 2026-09-01 1:58 pm - Ideas workflow and device authentication
+
+#### Database Changes
+
+- Database update: Yes.
+- Added migration marker `identity.user.super-admin-v5`.
+- Normalized legacy `super_admin` and `superadmin` user roles to `super-admin`.
+- Seeded the protected Super Administrator role with all active permissions.
+- Limited the Administrator role to protected `identity.*` permissions and deactivated its other protected assignments.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.93.
+- Added a protected Super Administrator role for the deployed device-authentication and administration flow.
+- Kept protected Super Administrator permissions and assignments out of editable role forms.
+- Updated initial administrator setup values and labels for the protected account.
+- Narrowed the public cloud-sync route match so anonymous callers cannot create desktop connection codes through an admin route.
+- Limited Ideas to Agent-posted `discussion` records with `type: idea` and prevented duplicate Agent shares for one project.
+- Kept schema, architecture, notes, modules, tasks, reviews, and changelog records out of the Ideas list.
+- Refined Ideas status, tags, list spacing, manual save behavior, local whiteboard recovery, and discard actions.
+- Added `devkit-agent-posting` guidance and the `devkit-commit-deploy-watch` release skill.
+- Classified DevKit API, workspace, Platform identity, and container files in the release-scope report.
+
+#### Verification
+
+- Passed DevKit API typecheck and lint.
+- Passed shared coworker-chat typecheck and lint.
+- Passed Platform API typecheck and lint.
+- Passed the Platform Web production build with the existing large-chunk warning.
+- Passed `npm.cmd run desktop:check`, including desktop typecheck, lint, 42 tests, and production build.
+- Passed deployment, module-boundary, and database-lifecycle checks.
+- Passed `npm.cmd run check:versions`, `npm.cmd run release:scope`, `npm.cmd run github:now -- --dry-run`, and `git diff --check`.
+- Confirmed the pre-release public cloud token endpoint returned `200` without a session. The release contains the authorization fix.
+- Pending guarded VPS deployment and post-deployment public web and desktop pairing checks.
 
 ## v-1.0.92
 

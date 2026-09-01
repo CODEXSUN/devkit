@@ -143,15 +143,23 @@ export function AgentChatWorkspace({
           visibility: "private"
         });
       } else {
+        const recordType = target === "module" ? "module-proposal" : target;
+        const existing = await coworkerClient.projectRecords("discussion");
+        const duplicate = existing.find((record) => record.referenceId === project.id && record.type === recordType && sameIdeaTitle(record.title, title));
+        if (duplicate) {
+          setShareNotice(`${shareTargetLabel(target)} already has: ${duplicate.title}.`);
+          return true;
+        }
         await coworkerClient.createProjectRecord("discussion", {
           description,
           key: `agent-${target}-${crypto.randomUUID().slice(0, 8)}`,
           lane: conversationId ? `agent:${conversationId}` : "agent",
+          moduleKey: target === "idea" ? "general" : "project-manager",
           referenceId: project.id,
           referenceType: "project",
           status: "open",
           title,
-          type: target === "module" ? "module-proposal" : target
+          type: recordType
         });
       }
       setShareNotice(`Saved to ${shareTargetLabel(target)}.`);
@@ -362,3 +370,5 @@ const agentStarters = [
 function messageFrom(reason: unknown) {
   return reason instanceof Error ? reason.message : "Tasks could not be created from this plan.";
 }
+
+function sameIdeaTitle(left: string, right: string) { return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase(); }

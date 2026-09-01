@@ -235,10 +235,10 @@ ensure_runtime_environment_file() {
 configure_runtime_environment() {
   echo
   echo "Administrator settings"
-  prompt_setting "$RUNTIME_ENV" INITIAL_ADMIN_NAME "Initial administrator name" Administrator
+  prompt_setting "$RUNTIME_ENV" INITIAL_ADMIN_NAME "Initial super administrator name" Administrator
   prompt_setting "$RUNTIME_ENV" INITIAL_ADMIN_EMAIL \
-    "Initial administrator email" admin@devkit.in
-  prompt_secret "$RUNTIME_ENV" INITIAL_ADMIN_PASSWORD "Initial administrator password"
+    "Initial super administrator email" admin@admin.com
+  prompt_secret "$RUNTIME_ENV" INITIAL_ADMIN_PASSWORD "Initial super administrator password"
 }
 
 validate_runtime_environment() {

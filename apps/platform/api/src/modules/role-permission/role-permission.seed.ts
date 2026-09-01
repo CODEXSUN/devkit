@@ -3,27 +3,9 @@ import { sql, type Kysely } from "kysely";
 import type { PlatformDatabase } from "../../database/schema.js";
 
 export async function seedRolePermissionModule(database: Kysely<PlatformDatabase>) {
-  await sql`DELETE rp FROM role_permissions rp
-    INNER JOIN roles r ON r.id=rp.role_id
-    WHERE r.\`key\` IN ('super-admin','super_admin','superadmin')`.execute(database);
-  await sql`DELETE FROM roles
-    WHERE \`key\` IN ('super-admin','super_admin','superadmin')
-      AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role_id=roles.id)
-      AND NOT EXISTS (SELECT 1 FROM role_permissions WHERE role_id=roles.id)`.execute(database);
-
-  const admin = await database
-    .selectFrom("roles")
-    .select("id")
-    .where("key", "=", "admin")
-    .where("status", "=", "active")
-    .executeTakeFirst();
-  if (!admin) return;
-  const permissions = await database.selectFrom("permissions").select("id").execute();
-  for (const permission of permissions) {
-    await sql`INSERT INTO role_permissions (uuid,role_id,permission_id,status,is_protected)
-      VALUES (${stable(`role-permission:${admin.id}:${permission.id}`)},${admin.id},${permission.id},'active',TRUE)
-      ON DUPLICATE KEY UPDATE status='active',is_protected=TRUE`.execute(database);
-  }
+  await retireLegacyAdministratorPermissions(database);
+  await assignProtectedPermissions(database, "super-admin", () => true);
+  await assignProtectedPermissions(database, "admin", (key) => key.startsWith("identity."));
 
   const devkitDefaults: Record<string, string[]> = {
     auditor: [
@@ -69,6 +51,41 @@ export async function seedRolePermissionModule(database: Kysely<PlatformDatabase
         ON DUPLICATE KEY UPDATE status='active',is_protected=TRUE`.execute(database);
     }
   }
+}
+
+async function assignProtectedPermissions(
+  database: Kysely<PlatformDatabase>,
+  roleKey: string,
+  includes: (permissionKey: string) => boolean
+) {
+  const role = await database
+    .selectFrom("roles")
+    .select("id")
+    .where("key", "=", roleKey)
+    .where("status", "=", "active")
+    .executeTakeFirst();
+  if (!role) return;
+
+  const permissions = await database
+    .selectFrom("permissions")
+    .select(["id", "key"])
+    .where("status", "=", "active")
+    .execute();
+  for (const permission of permissions.filter((entry) => includes(entry.key))) {
+    await sql`INSERT INTO role_permissions (uuid,role_id,permission_id,status,is_protected)
+      VALUES (${stable(`role-permission:${role.id}:${permission.id}`)},${role.id},${permission.id},'active',TRUE)
+      ON DUPLICATE KEY UPDATE status='active',is_protected=TRUE`.execute(database);
+  }
+}
+
+async function retireLegacyAdministratorPermissions(database: Kysely<PlatformDatabase>) {
+  await sql`UPDATE role_permissions rp
+    INNER JOIN roles r ON r.id=rp.role_id
+    INNER JOIN permissions p ON p.id=rp.permission_id
+    SET rp.status='inactive'
+    WHERE r.\`key\`='admin'
+      AND p.\`key\` NOT LIKE 'identity.%'
+      AND rp.is_protected=TRUE`.execute(database);
 }
 
 function devkitPermissions() {

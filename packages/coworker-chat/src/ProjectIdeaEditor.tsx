@@ -1,4 +1,4 @@
-import { ArrowLeft, FileUp, HelpCircle, History, ListTodo, LockKeyhole, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { ArrowLeft, FileUp, HelpCircle, History, ListTodo, LockKeyhole, PanelRightClose, PanelRightOpen, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WorkspaceEditor } from "@codexsun/ui/workspace";
 import type { CoworkerClient } from "./client";
@@ -33,6 +33,7 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
   const titleInputRef = useRef<HTMLInputElement>(null);
   const escapeTimerRef = useRef<number | null>(null);
   const escapeArmedRef = useRef(false);
+  const savedRecordRef = useRef(idea);
   const savedSignature = useRef(recordSignature(idea));
   const creating = recordId.startsWith("draft:");
   const supportsGlobalLink = noun === "idea";
@@ -42,6 +43,7 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
   useEffect(() => {
     setDraft(idea);
     setRecordId(idea.id);
+    savedRecordRef.current = idea;
     savedSignature.current = recordSignature(idea);
     const recovered = readRecovery(idea.id);
     if (recovered && recordSignature(recovered) !== recordSignature(idea)) setDraft(recovered);
@@ -72,16 +74,18 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
     setDraftState("saving");
     setError("");
     const title = current.title.trim() || titleFromContent(current.description) || `Untitled ${noun}`;
+    const moduleKey = noun === "idea" ? current.moduleKey || "general" : current.moduleKey;
     const payload = {
       assignee: current.assignee ?? "",
       description: current.description,
       key: current.key || recordKey(noun, title),
       lane: current.lane,
+      ...(moduleKey ? { moduleKey } : {}),
       referenceId: project?.id ?? current.referenceId,
       referenceType: project ? "project" : current.referenceId ? "project" : "",
       status: current.status === "draft" ? "open" : current.status || (creating ? "draft" : "open"),
       title,
-      type: current.type || "general"
+      type: noun === "idea" ? "idea" : current.type || "general"
     };
     try {
       const saved = creating
@@ -89,6 +93,7 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
         : await client.updateProjectRecord(recordKind, recordId, payload);
       setDraft(saved);
       setRecordId(saved.id);
+      savedRecordRef.current = saved;
       savedSignature.current = recordSignature(saved);
       setSnapshots((current) => saveSnapshot(saved, current));
       clearRecovery(recordId);
@@ -164,6 +169,19 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
     const changed = recordSignature(draft) !== savedSignature.current;
     if (changed) saveRecovery(recordId, draft);
     else if (!creating) onSaved(draft);
+    onBack();
+  }
+
+  function discardDraft() {
+    const saved = savedRecordRef.current;
+    clearRecovery(recordId);
+    if (saved.id !== recordId) clearRecovery(saved.id);
+    setDraft(saved);
+    setRecordId(saved.id);
+    savedSignature.current = recordSignature(saved);
+    setDraftState("idle");
+    setError("");
+    if (!saved.id.startsWith("draft:")) onSaved(saved);
     onBack();
   }
 
@@ -252,6 +270,7 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
         <button aria-expanded={historyOpen} aria-label="Local version history" onClick={() => setHistoryOpen((open) => !open)} title="Local version history" type="button"><History size={16} /></button>
         <button aria-expanded={shortcutOpen} aria-label="Keyboard shortcuts" onClick={() => setShortcutOpen((open) => !open)} title="Keyboard shortcuts" type="button"><HelpCircle size={16} /></button>
         <button aria-expanded={drawerOpen} aria-label={drawerOpen ? "Collapse properties" : "Open properties"} onClick={() => setDrawerOpen((open) => !open)} title={drawerOpen ? "Collapse properties" : "Open properties"} type="button">{drawerOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button>
+        <button className="idea-discard-button" disabled={savingRef.current} onClick={discardDraft} type="button"><RotateCcw size={14} /> Discard</button>
         <button aria-label={saveStateLabel(draftState)} className={`idea-save-button ${draftState}`} disabled={savingRef.current} onClick={() => void persist(draft)} type="button"><i aria-hidden="true" />{saveStateLabel(draftState)}</button>
       </div>
     </header>
@@ -259,7 +278,7 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
       <input aria-label={`${title(noun)} title`} autoFocus onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={`${title(noun)} title`} ref={titleInputRef} value={draft.title} />
       {historyOpen ? <section className="idea-floating-panel" aria-label="Local version history"><header><strong>Local history</strong><button aria-label="Close history" onClick={() => setHistoryOpen(false)} type="button"><X size={15} /></button></header>{snapshots.length ? snapshots.map((snapshot) => <button key={snapshot.savedAt} onClick={() => { setDraft((current) => ({ ...current, description: snapshot.description, title: snapshot.title })); setHistoryOpen(false); }} type="button"><strong>{snapshot.title || `Untitled ${noun}`}</strong><small>{new Date(snapshot.savedAt).toLocaleString()}</small></button>) : <p>Saved versions appear here on this device.</p>}</section> : null}
       {shortcutOpen ? <section className="idea-floating-panel idea-shortcut-panel" aria-label="Keyboard shortcuts"><header><strong>Keyboard shortcuts</strong><button aria-label="Close shortcuts" onClick={() => setShortcutOpen(false)} type="button"><X size={15} /></button></header><p><kbd>Ctrl</kbd> + <kbd>S</kbd> Save changes</p><p><kbd>Esc</kbd> Select title or editor text</p><p><kbd>Esc</kbd> <kbd>Esc</kbd> Return to {recordListLabel(noun)}</p></section> : null}
-      <div ref={editorHostRef}><WorkspaceEditor content={draft.description} fullPreview onChange={updateDescription} placeholder={recordKind === "release" ? "Write the change message, impact, and important upgrade notes…" : "Explain the problem, proposal, trade-offs, and feedback you need…"} /></div>
+      <div ref={editorHostRef}><WorkspaceEditor content={draft.description} fullPreview initialMode={creating ? "write" : "preview"} onChange={updateDescription} placeholder={recordKind === "release" ? "Write the change message, impact, and important upgrade notes…" : "Explain the problem, proposal, trade-offs, and feedback you need…"} /></div>
       {recordKind !== "release" ? <div className="idea-editor-actions">
         <input accept="application/pdf,image/gif,image/jpeg,image/png,image/webp,text/plain" aria-label="Add attachments" hidden multiple onChange={(event) => { if (event.target.files?.length) void uploadAttachments(event.target.files); event.target.value = ""; }} ref={attachmentInputRef} type="file" />
         <button onClick={() => attachmentInputRef.current?.click()} type="button"><FileUp size={15} /> Attach files</button>
@@ -270,7 +289,7 @@ export function ProjectIdeaEditor({ client, idea, noun = "idea", onBack, onSaved
     </main>
     <aside aria-hidden={!drawerOpen} onKeyDownCapture={handlePropertiesTab} ref={propertiesRef}>
       <button aria-label="Collapse properties" onClick={() => setDrawerOpen(false)} title="Collapse properties" type="button"><PanelRightClose size={17} /></button>
-      <IdeaField color="#2563eb" label={recordKind === "release" ? "Change type" : "Category"}><select aria-label={`${title(noun)} category`} onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value }))} value={draft.type || "general"}>{recordKind === "release" ? <><option value="feature">Feature</option><option value="fix">Fix</option><option value="improvement">Improvement</option><option value="security">Security</option><option value="maintenance">Maintenance</option></> : <>{noun === "architecture" ? <option value="architecture">Architecture</option> : null}<option value="general">General</option><option value="product">Product</option><option value="engineering">Engineering</option><option value="design">Design</option><option value="research">Research</option></>}</select></IdeaField>
+      <IdeaField color="#2563eb" label={recordKind === "release" ? "Change type" : "Category"}><select aria-label={`${title(noun)} category`} onChange={(event) => setDraft((current) => noun === "idea" ? { ...current, moduleKey: event.target.value } : { ...current, type: event.target.value })} value={noun === "idea" ? draft.moduleKey || "general" : draft.type || "general"}>{recordKind === "release" ? <><option value="feature">Feature</option><option value="fix">Fix</option><option value="improvement">Improvement</option><option value="security">Security</option><option value="maintenance">Maintenance</option></> : <>{noun === "architecture" ? <option value="architecture">Architecture</option> : null}<option value="general">General</option><option value="product">Product</option><option value="engineering">Engineering</option><option value="design">Design</option><option value="research">Research</option></>}</select></IdeaField>
       <IdeaField color="#0891b2" label="Status"><select aria-label={`${title(noun)} status`} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} value={draft.status || "draft"}>{recordKind === "release" ? <><option value="draft">Draft</option><option value="planned">Planned</option><option value="released">Released</option></> : <><option value="draft">Draft</option><option value="open">Open</option><option value="planning">Planning</option><option value="in-progress">In progress</option><option value="blocked">Blocked</option><option value="completed">Completed</option></>}</select></IdeaField>
       {recordKind === "release" ? <IdeaField label="Version"><input aria-label="Change version" onChange={(event) => setDraft((current) => ({ ...current, key: event.target.value }))} placeholder="v1.0.0" value={draft.key ?? ""} /></IdeaField> : null}
       <IdeaField label="Project"><select aria-label={`${title(noun)} project`} disabled={Boolean(project)} onChange={(event) => setDraft((current) => ({ ...current, referenceId: event.target.value }))} value={project?.id ?? linkedProject?.id ?? ""}><option value="">{supportsGlobalLink ? "Global idea" : "No project"}</option>{projects.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></IdeaField>
@@ -302,7 +321,7 @@ function selectEditableText(element: Element | null) {
   selection?.removeAllRanges();
   selection?.addRange(range);
 }
-function recordSignature(value: CoworkerProjectRecord) { return JSON.stringify([value.assignee, value.description, value.key, value.lane, value.referenceId, value.status, value.title, value.type]); }
+function recordSignature(value: CoworkerProjectRecord) { return JSON.stringify([value.assignee, value.description, value.key, value.lane, value.moduleKey, value.referenceId, value.status, value.title, value.type]); }
 function titleFromContent(value: string) { return plainText(value).split(/[.!?\n]/u).find((part) => part.trim())?.trim().slice(0, 96) ?? ""; }
 function readSnapshots(id: string) { try { return JSON.parse(localStorage.getItem(`devkit:idea-history:${id}`) ?? "[]") as IdeaSnapshot[]; } catch { return []; } }
 function saveSnapshot(value: CoworkerProjectRecord, current: IdeaSnapshot[]) {

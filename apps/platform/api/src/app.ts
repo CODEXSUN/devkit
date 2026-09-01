@@ -86,8 +86,7 @@ export async function createApp() {
     async (devkitApp) =>
       registerDevkitApiForHost(devkitApp, {
         async authorize({ request }) {
-          if (request.url.includes("/sync/cloud/") || request.url.includes("/telegram/webhook"))
-            return;
+          if (isPublicDevkitRequest(request)) return;
           if (request.url.includes("/messenger/")) return;
           await identityContext(request).authorize(devkitPermission(request));
         },
@@ -128,6 +127,13 @@ export async function createApp() {
   console.info("[devkit.boot] bootstrap completed");
 
   return app;
+}
+
+function isPublicDevkitRequest(request: { url: string }) {
+  return (
+    request.url.startsWith("/api/devkit/sync/cloud/") ||
+    request.url.includes("/telegram/webhook")
+  );
 }
 
 function registerDesktopNodeSocket(app: Awaited<ReturnType<typeof createApiApp>>) {

@@ -22,7 +22,7 @@ export function identityContext(request: FastifyRequest) {
   const can = async (permission: string) => {
     const user = await actorUser();
     if (!user) return false;
-    if (isAdministratorPermission(permission) && user.role !== "admin") return false;
+    if (isAdministratorPermission(permission) && !isIdentityAdministrator(user.role)) return false;
     const allowed = await database
       .selectFrom("user_roles as userRole")
       .innerJoin("roles as role", "role.id", "userRole.role_id")
@@ -55,4 +55,8 @@ export function identityContext(request: FastifyRequest) {
 
 function isAdministratorPermission(permission: string) {
   return permission.startsWith("identity.");
+}
+
+function isIdentityAdministrator(role: string) {
+  return role === "admin" || role === "super-admin";
 }

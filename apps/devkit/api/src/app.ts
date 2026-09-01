@@ -58,7 +58,7 @@ export async function registerDevkitApiForHost(app: FastifyInstance, adapter: De
       const resolve =
         request.url.includes("/telegram/webhook") && adapter.resolvePublicWebhook
           ? adapter.resolvePublicWebhook
-          : request.url.includes("/sync/cloud/") && adapter.resolveCloudSync
+          : isCloudSyncRequest(request) && adapter.resolveCloudSync
             ? adapter.resolveCloudSync
             : adapter.resolve;
       void Promise.resolve(resolve.call(adapter, request))
@@ -96,3 +96,7 @@ const devkitModules = [
   messengerModule,
   syncModule
 ] as const;
+
+function isCloudSyncRequest(request: FastifyRequest) {
+  return request.url.startsWith("/sync/cloud/");
+}

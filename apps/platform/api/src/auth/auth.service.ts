@@ -40,7 +40,7 @@ export class AuthService {
       .where("userRole.status", "=", "active")
       .where("role.status", "=", "active")
       .execute();
-    const superAdmin = user.role === "admin" || assignedRoles.some(({ key }) => key.replace(/[-_\s]/gu, "").toLowerCase() === "superadmin");
+    const superAdmin = assignedRoles.some(({ key }) => isSuperAdminRole(key));
     const permissionKeys = permissions.map(({ key }) => key);
     const accessToken = signAuthToken({
       email: user.email,
@@ -60,4 +60,8 @@ export class AuthService {
       superAdmin
     };
   }
+}
+
+function isSuperAdminRole(roleKey: string) {
+  return roleKey.replace(/[-_\s]/gu, "").toLowerCase() === "superadmin";
 }

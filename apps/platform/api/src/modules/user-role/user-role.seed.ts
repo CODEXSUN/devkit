@@ -3,10 +3,6 @@ import { sql, type Kysely } from "kysely";
 import type { PlatformDatabase } from "../../database/schema.js";
 
 export async function seedUserRoleModule(database: Kysely<PlatformDatabase>) {
-  await sql`DELETE ur FROM user_roles ur
-    INNER JOIN roles r ON r.id=ur.role_id
-    WHERE r.\`key\` IN ('super-admin','super_admin','superadmin')`.execute(database);
-
   const users = await database
     .selectFrom("users")
     .select(["id", "role", "is_protected"])

@@ -550,12 +550,12 @@ body {
   overflow: hidden;
 }
 .codex-connection-card.connected {
-  border-color: #afd5b8;
-  background: #f3faf4;
+  border-color: #8fc69d;
+  background: #eaf6ec;
 }
 .codex-connection-card.connected .codex-connected-actions {
-  border-top-color: #cde5d2;
-  background: #f7fcf8;
+  border-top-color: #badcc2;
+  background: #f0f8f1;
 }
 .codex-connection-summary {
   align-items: flex-start;
@@ -5411,7 +5411,7 @@ body {
   align-items: center;
   gap: 8px;
 }
-.project-idea-editor > header > div > button:not(.idea-save-button) {
+.project-idea-editor > header > div > button:not(.idea-save-button):not(.idea-discard-button) {
   width: 34px;
   border: 1px solid #deded8;
 }
@@ -5424,6 +5424,20 @@ body {
 .project-idea-editor .idea-privacy-button {
   border-color: #f3c86a;
   color: #d98200;
+}
+.project-idea-editor > header > div > .idea-discard-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #d8d8d1;
+  color: #595953;
+  font-size: 12px;
+  font-weight: 650;
+}
+.project-idea-editor > header > div > .idea-discard-button:disabled {
+  cursor: default;
+  opacity: .45;
 }
 .project-idea-editor > header > div > .idea-save-button {
   display: inline-flex;
@@ -5851,7 +5865,7 @@ body {
   gap: 14px;
   position: relative;
   border-bottom: 1px solid #e2e2dc;
-  padding: 26px 8px;
+  padding: 17px 8px;
 }
 .ideas-list > article:hover {
   background: #f7f7f4;
@@ -5898,7 +5912,8 @@ body {
   -webkit-line-clamp: 2;
 }
 .ideas-row-details {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-left: 78px;
@@ -5925,10 +5940,11 @@ body {
 }
 .ideas-tag-list {
   display: flex;
+  flex: 1 1 120px;
   flex-wrap: wrap;
   gap: 5px;
-  margin-left: 78px;
-  padding-top: 8px;
+  margin-left: 0;
+  padding-top: 0;
 }
 .ideas-tag-list button {
   border: 0;
@@ -5954,12 +5970,35 @@ body {
   font-style: normal;
   color: #666660;
 }
+.idea-status {
+  display: inline-flex;
+  align-items: center;
+  align-self: auto !important;
+  border: 0 !important;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 650;
+  font-style: normal;
+}
+.idea-status.status-draft { background: #fff1cf; color: #9a6200; }
+.idea-status.status-open { background: #eaf0fc; color: #245bb8; }
+.idea-status.status-planning { background: #eee9fb; color: #6846a3; }
+.idea-status.status-in-progress { background: #ddf3f3; color: #087b8c; }
+.idea-status.status-blocked { background: #fbe8e6; color: #a9473d; }
+.idea-status.status-completed { background: #e2f3e7; color: #287640; }
+.ideas-status-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 .ideas-row-meta {
-  display: grid;
+  display: flex;
   position: relative;
-  justify-items: end;
-  align-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 5px;
 }
 .ideas-row-meta small {
   display: inline-flex;
@@ -5986,7 +6025,7 @@ body {
 .ideas-row-menu {
   position: absolute;
   z-index: 4;
-  top: 92px;
+  top: 32px;
   right: 0;
   display: grid;
   width: 156px;
@@ -6229,7 +6268,7 @@ body {
     padding: 0 12px;
   }
   .project-idea-editor > header > div > .idea-privacy-button,
-  .project-idea-editor > header > div > button:not(.idea-save-button) {
+  .project-idea-editor > header > div > button:not(.idea-save-button):not(.idea-discard-button) {
     display: none;
   }
   .project-idea-editor > main {

@@ -39,12 +39,17 @@ export class RolePermissionRepository {
     const r = await sql<{
       permission_count: number | string;
       role_count: number | string;
-    }>`SELECT (SELECT COUNT(*) FROM roles WHERE id=${v.roleId} AND status='active') role_count,(SELECT COUNT(*) FROM permissions WHERE id=${v.permissionId} AND status='active') permission_count`.execute(
+      role_key: string | null;
+    }>`SELECT
+      (SELECT COUNT(*) FROM roles WHERE id=${v.roleId} AND status='active') role_count,
+      (SELECT \`key\` FROM roles WHERE id=${v.roleId} AND status='active' LIMIT 1) role_key,
+      (SELECT COUNT(*) FROM permissions WHERE id=${v.permissionId} AND status='active') permission_count`.execute(
       this.database
     );
     return {
       permission: Boolean(Number(r.rows[0]?.permission_count ?? 0)),
-      role: Boolean(Number(r.rows[0]?.role_count ?? 0))
+      role: Boolean(Number(r.rows[0]?.role_count ?? 0)),
+      roleKey: r.rows[0]?.role_key ?? null
     };
   }
   async create(v: RolePermissionSavePayload, uuid: string) {

@@ -89,6 +89,7 @@ export class ProjectManagerService {
       id: newUuid(),
       ...(kind === "project" ? { status: "new" } : kind === "issue" ? { status: "open" } : {})
     });
+    assertAgentIdeaRecord(record);
     if (await this.repository.itemKeyExists(kind, record.key)) {
       throw AppError.conflict(`${kind} key already exists.`);
     }
@@ -650,6 +651,13 @@ function defaultStatus(kind: ProjectManagerKind) {
   if (kind === "review") return "requested";
   if (kind === "release") return "planned";
   return "active";
+}
+
+function assertAgentIdeaRecord(record: ProjectManagerRecord) {
+  if (record.kind !== "discussion" || record.type !== "idea") return;
+  if (!record.lane.startsWith("agent")) {
+    throw AppError.validation("Ideas can only be created through the Agent share workflow.");
+  }
 }
 
 function required(value: unknown, fieldName: string) {

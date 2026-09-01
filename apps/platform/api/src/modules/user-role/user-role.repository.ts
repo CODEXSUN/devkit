@@ -45,12 +45,17 @@ export class UserRoleRepository {
   async parents(v: UserRoleSavePayload) {
     const r = await sql<{
       role_count: number | string;
+      role_key: string | null;
       user_count: number | string;
-    }>`SELECT (SELECT COUNT(*) FROM users WHERE id=${v.userId} AND status='active' AND is_protected=FALSE) user_count,(SELECT COUNT(*) FROM roles WHERE id=${v.roleId} AND status='active') role_count`.execute(
+    }>`SELECT
+      (SELECT COUNT(*) FROM users WHERE id=${v.userId} AND status='active' AND is_protected=FALSE) user_count,
+      (SELECT COUNT(*) FROM roles WHERE id=${v.roleId} AND status='active') role_count,
+      (SELECT \`key\` FROM roles WHERE id=${v.roleId} AND status='active' LIMIT 1) role_key`.execute(
       this.database
     );
     return {
       role: Boolean(Number(r.rows[0]?.role_count ?? 0)),
+      roleKey: r.rows[0]?.role_key ?? null,
       user: Boolean(Number(r.rows[0]?.user_count ?? 0))
     };
   }

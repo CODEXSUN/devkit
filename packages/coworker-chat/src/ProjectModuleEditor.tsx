@@ -1,4 +1,4 @@
-import { ArrowLeft, Boxes, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, Boxes, PanelRightClose, PanelRightOpen, RotateCcw } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { WorkspaceEditor } from "@codexsun/ui/workspace";
 import type { CoworkerClient } from "./client";
@@ -42,7 +42,7 @@ export function ProjectModuleEditor({ client, groups, module, modules, onBack, o
     <header>
       <button aria-label="Back to modules" onClick={onBack} title="Back to modules" type="button"><ArrowLeft size={17} /></button>
       <strong>{draft.name || "Untitled module"}</strong>
-      <div><button aria-label="Registry module" title="Registry module" type="button"><Boxes size={16} /></button><button aria-expanded={drawerOpen} aria-label={drawerOpen ? "Collapse properties" : "Open properties"} onClick={() => setDrawerOpen((open) => !open)} type="button">{drawerOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button><button className={`idea-save-button ${saveState}`} disabled={saveState === "saving"} onClick={() => void save()} type="button"><i aria-hidden="true" />{saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : "Save"}</button></div>
+      <div><button aria-label="Registry module" title="Registry module" type="button"><Boxes size={16} /></button><button aria-expanded={drawerOpen} aria-label={drawerOpen ? "Collapse properties" : "Open properties"} onClick={() => setDrawerOpen((open) => !open)} type="button">{drawerOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button><button className="idea-discard-button" disabled={saveState === "saving"} onClick={onBack} type="button"><RotateCcw size={14} /> Discard</button><button className={`idea-save-button ${saveState}`} disabled={saveState === "saving"} onClick={() => void save()} type="button"><i aria-hidden="true" />{saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : "Save"}</button></div>
     </header>
     <main>
       <input aria-label="Module name" autoFocus onChange={(event) => update({ name: event.target.value })} placeholder="Module name" value={draft.name} />
