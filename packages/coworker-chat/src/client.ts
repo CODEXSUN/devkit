@@ -69,7 +69,10 @@ export class CoworkerClient implements CoworkerBackend {
   }
 
   identityContacts() {
-    return this.request<CoworkerIdentityContact[]>("/identity/contacts");
+    return this.request<CoworkerIdentityContact[]>("/identity/contacts").catch((error: unknown) => {
+      if (!(error instanceof InvalidApiResponseError)) throw error;
+      return this.request<CoworkerIdentityContact[]>("/api/identity/contacts");
+    });
   }
 
   planningBoards(projectId: string) {
@@ -344,7 +347,7 @@ export class CoworkerClient implements CoworkerBackend {
         ...(authorize ? this.headers() : {})
       }
     });
-    const envelope = (await response.json()) as Envelope<T>;
+    const envelope = readEnvelope<T>(response, await response.text());
     if (!response.ok || !envelope.success) {
       throw new Error(
         envelope.success ? `Request failed (${response.status}).` : envelope.error.message
@@ -359,6 +362,19 @@ export class CoworkerClient implements CoworkerBackend {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
+  }
+}
+
+class InvalidApiResponseError extends Error {}
+
+function readEnvelope<T>(response: Response, body: string): Envelope<T> {
+  try {
+    return JSON.parse(body) as Envelope<T>;
+  } catch {
+    const contentType = response.headers.get("content-type") || "unknown content";
+    throw new InvalidApiResponseError(
+      `DevKit API returned ${contentType} instead of JSON (${response.status}).`
+    );
   }
 }
 
