@@ -10,6 +10,11 @@ Compose owns three persistent Agent volumes:
 - `/srv/devkit/repositories` for complete Git repositories;
 - `/var/lib/devkit/worktrees` for isolated Agent worktrees.
 
+Compose also bind-mounts the deployment checkout at `/srv/devkit/repositories/devkit`. This keeps
+the checkout and its matching `.git` metadata together for server-side Agent work. Set
+`DEVKIT_REPOSITORY_PATH` when the checkout is not the parent of `.container`. Agent Connector can
+install the latest Codex CLI into the persistent Codex state volume from its Update Codex action.
+
 The API also mounts CXApp's external File Browser data volume at `/workspace/devkit/storage`.
 `DEVKIT_STORAGE_PATH=/workspace/devkit/storage/devkit` keeps DevKit files in its own subdirectory
 while making them inspectable through `cxapp-media`. Redis is reached on the shared network through

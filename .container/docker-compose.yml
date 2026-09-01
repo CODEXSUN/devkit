@@ -52,6 +52,7 @@ services:
       DEVKIT_ENV_FILE_PATH: /workspace/devkit/.env
       DEVKIT_CODEX_HOME: /var/lib/devkit/codex
       DEVKIT_AGENT_ALLOWED_ROOTS: /srv/devkit/repositories
+      DEVKIT_AGENT_DEFAULT_REPOSITORY: /srv/devkit/repositories/devkit
       DEVKIT_AGENT_WORKTREE_ROOT: /var/lib/devkit/worktrees
     depends_on:
       mariadb:
@@ -63,6 +64,7 @@ services:
       - codex-state:/var/lib/devkit/codex
       - agent-worktrees:/var/lib/devkit/worktrees
       - agent-repositories:/srv/devkit/repositories
+      - ${DEVKIT_REPOSITORY_PATH:-..}:/srv/devkit/repositories/devkit
       - media-data:/workspace/devkit/storage
     networks: [devkit]
     healthcheck:

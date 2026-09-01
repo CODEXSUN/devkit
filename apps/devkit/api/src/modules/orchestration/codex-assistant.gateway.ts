@@ -3,7 +3,7 @@ import { codexAppServer } from "./codex-connector.pool.js";
 
 class CodexAssistantGateway {
   async ask(input: { message: string; system: string; threadId: string | null }) {
-    const cwd = process.cwd();
+    const cwd = process.env.DEVKIT_AGENT_DEFAULT_REPOSITORY?.trim() || process.cwd();
     const model = process.env.OPENAI_MODEL?.trim() || "gpt-5.6-terra";
     const prompt = `${input.system}\n\nUser message:\n${input.message}`;
     if (input.threadId) {

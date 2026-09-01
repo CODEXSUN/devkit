@@ -148,18 +148,13 @@ export class AgentWorktreeService {
   }
 
   private async resolveSourceRoot(referenceId: string, referenceType: string) {
-    if (isCloudRuntime()) {
-      throw new AppError({
-        code: "AGENT_DESKTOP_EXECUTION_REQUIRED",
-        message:
-          "Project-aware agent work needs your connected desktop execution node. Connect the desktop from Cloud & devices, then retry. Cloud keeps chats and synced work records, but never opens local repositories or server checkouts.",
-        statusCode: 409
-      });
-    }
     const usesReference =
       ["git", "repository", "workspace"].includes(referenceType.trim().toLowerCase()) &&
       referenceId.trim();
-    const candidate = resolve(usesReference ? referenceId.trim() : process.cwd());
+    const requested = resolve(usesReference ? referenceId.trim() : process.cwd());
+    const requestedDetails = await stat(requested).catch(() => null);
+    const fallback = process.env.DEVKIT_AGENT_DEFAULT_REPOSITORY?.trim();
+    const candidate = requestedDetails?.isDirectory() || !fallback ? requested : resolve(fallback);
     const details = await stat(candidate).catch(() => null);
     if (!details?.isDirectory())
       throw AppError.validation("The project repository path does not exist.");
@@ -274,8 +269,4 @@ function needsWorktree(access: AgentAccessMode) {
 function isTerminal(status: string) {
   return status === "cancelled" || status === "completed" || status === "failed";
 }
-function isCloudRuntime() {
-  return process.env.DEVKIT_SYNC_ROLE?.trim().toLowerCase() === "cloud";
-}
-
 export const agentWorktreeService = new AgentWorktreeService();

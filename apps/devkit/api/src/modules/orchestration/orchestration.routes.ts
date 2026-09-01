@@ -1,4 +1,5 @@
 import { ok } from "@codexsun/framework/http";
+import { AppError } from "@codexsun/framework/errors";
 import type { FastifyInstance } from "fastify";
 import { Readable } from "node:stream";
 import { z } from "zod";
@@ -39,6 +40,7 @@ import { hostingerMcpService } from "./hostinger-mcp.service.js";
 import { hostingerDashboardService } from "./hostinger-dashboard.service.js";
 import { hostingerSshService } from "./hostinger-ssh.service.js";
 import { modelProviderService } from "./model-provider.service.js";
+import { codexRuntimeService } from "./codex-runtime.service.js";
 
 const service = new OrchestrationService();
 const planningGateway = new OpenAiPlanningGateway();
@@ -400,6 +402,13 @@ export async function registerOrchestrationRoutes(app: FastifyInstance) {
   app.get("/orchestration/codex/connections", async (request) =>
     ok(await codexConnectorPool.statuses(), { requestId: request.id })
   );
+  app.post("/orchestration/codex/update", async (request) => {
+    const actor = requireDevkitActor();
+    if (!actor.roles.includes("super-admin")) {
+      throw AppError.forbidden("Only a super administrator can update the Codex runtime.");
+    }
+    return ok(await codexRuntimeService.update(), { requestId: request.id });
+  });
   app.post("/orchestration/codex/device-login", async (request) => {
     const { connectionId } = codexConnectionInputSchema.parse(request.body ?? {});
     return ok(await codexConnectorPool.client(connectionId).startDeviceLogin(), {

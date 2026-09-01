@@ -1,6 +1,6 @@
 import { Button } from "@codexsun/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RadioTowerIcon, SlidersHorizontalIcon } from "lucide-react";
+import { RadioTowerIcon, RefreshCwIcon, SlidersHorizontalIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CodexConnection } from "./codex-connection";
@@ -15,7 +15,8 @@ import {
   saveModelProvider,
   startCodexBrowserLogin,
   startCodexDeviceLogin,
-  testModelProvider
+  testModelProvider,
+  updateCodex
 } from "./launch-desk.services";
 import type {
   BrowserLogin,
@@ -42,7 +43,6 @@ export function LaunchDeskWorkspace() {
     queryFn: getModelProviders,
     queryKey: ["devkit", "model-providers"]
   });
-
   useEffect(() => {
     for (const status of connections.data ?? []) {
       if (!status.connected) continue;
@@ -53,6 +53,17 @@ export function LaunchDeskWorkspace() {
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["devkit", "codex", "connections"] });
+  const codexUpdate = useMutation({
+    mutationFn: updateCodex,
+    onError: (error) => toast.error(error.message),
+    onSuccess: (result) => {
+      const message = result.updated
+        ? `Codex updated to ${result.current}.`
+        : `Codex is current: ${result.current}.`;
+      toast.success(message);
+      void refresh();
+    }
+  });
   const device = useMutation({
     mutationFn: startCodexDeviceLogin,
     onSuccess: (login, id) => setDeviceLogins((current) => ({ ...current, [id]: login })),
@@ -129,12 +140,16 @@ export function LaunchDeskWorkspace() {
         <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground">
           <RadioTowerIcon className="size-4" />
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold leading-tight">Agent Connector</h1>
           <p className="text-sm text-muted-foreground">
             Native Codex plus provider-neutral OpenCode connections
           </p>
         </div>
+        <Button disabled={codexUpdate.isPending} onClick={() => codexUpdate.mutate()} size="sm" variant="outline">
+          <RefreshCwIcon className={codexUpdate.isPending ? "size-4 animate-spin" : "size-4"} />
+          {codexUpdate.isPending ? "Updating Codex…" : "Update Codex"}
+        </Button>
       </header>
       <section className="min-h-0 flex-1 overflow-y-auto">
         {resolvedStatuses(connections.data).map((status) => (

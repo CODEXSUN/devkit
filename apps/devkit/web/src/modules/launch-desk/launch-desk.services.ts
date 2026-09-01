@@ -27,6 +27,8 @@ export const cancelCodexLogin = (connectionId: CodexConnectionId, loginId: strin
   });
 export const logoutCodex = (connectionId: CodexConnectionId) =>
   apiPost<{ disconnected: true }>("/orchestration/codex/logout", { connectionId });
+export const updateCodex = () =>
+  apiPost<{ before: string; current: string; updated: boolean }>("/orchestration/codex/update");
 
 export const getModelProviders = () =>
   apiGet<ModelProviderStatus[]>("/orchestration/model-providers");

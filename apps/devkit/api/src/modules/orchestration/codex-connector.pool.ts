@@ -76,6 +76,10 @@ export class CodexConnectorPool {
     }
     throw AppError.notFound("The Codex approval request is no longer pending.");
   }
+
+  async stopAll() {
+    await Promise.all([...this.clients.values()].map((client) => client.stop()));
+  }
 }
 
 export function parseCodexConnectionId(value: unknown): CodexConnectionId {

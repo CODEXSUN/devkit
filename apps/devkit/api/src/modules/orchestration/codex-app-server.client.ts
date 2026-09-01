@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -392,9 +392,13 @@ export function resolveDevkitCodexHome(connectionId: string) {
   return connectionId === "primary" ? base : join(base, "connections", connectionId);
 }
 
-function resolveCodexCommand(subcommand: string[]) {
+export function resolveCodexCommand(subcommand: string[]) {
   const configured = process.env.CODEX_EXECUTABLE?.trim() || "bundled";
   if (configured === "bundled") {
+    const updatedScript = join(resolveDevkitCodexHome("primary"), "runtime", "node_modules", "@openai", "codex", "bin", "codex.js");
+    if (existsSync(updatedScript)) {
+      return { executable: process.execPath, args: [updatedScript, ...subcommand], label: "updated Codex CLI" };
+    }
     const require = createRequire(import.meta.url);
     const script = require.resolve("@openai/codex/bin/codex.js");
     return {
