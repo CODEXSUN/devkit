@@ -11,6 +11,7 @@ const EXCALIDRAW_CHUNK_LIMIT = 2_100_000;
 const MERMAID_PARSER_CHUNK_LIMIT = 700_000;
 
 export default defineConfig({
+  envDir: "../../..",
   build: {
     chunkSizeWarningLimit: MONACO_CHUNK_LIMIT / 1_000,
     emptyOutDir: true,

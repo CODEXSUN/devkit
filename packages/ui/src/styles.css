@@ -12,6 +12,55 @@
   --typeset-flow: 1.25em;
 }
 
+.development-ids-overlay {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 2147483000;
+}
+
+.development-id-badge {
+  align-items: center;
+  appearance: none;
+  background: #7c3aed;
+  border: 1px solid rgb(255 255 255 / 0.38);
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgb(49 18 93 / 0.22);
+  color: #fff;
+  cursor: copy;
+  display: inline-flex;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 650;
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 22px;
+  padding: 0 5px;
+  pointer-events: auto;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.development-id-badge:hover {
+  background: #6d28d9;
+  transform: translateY(-1px);
+}
+
+.development-id-badge:focus-visible {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 2px;
+}
+
+.development-id-badge--target {
+  position: absolute;
+}
+
+.development-id-badge--page {
+  bottom: 10px;
+  left: 10px;
+  position: fixed;
+}
+
 @source ".";
 
 @custom-variant dark (&:is(.dark *));

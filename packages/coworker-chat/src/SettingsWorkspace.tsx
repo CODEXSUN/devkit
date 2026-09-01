@@ -562,11 +562,18 @@ function useSettingsRequest(apiUrl: string, token: string) {
           ...init.headers
         }
       });
-      const envelope = (await response.json()) as {
+      const responseText = await response.text();
+      let envelope: {
         data?: T;
         error?: { message?: string };
         success: boolean;
       };
+      try {
+        envelope = JSON.parse(responseText) as typeof envelope;
+      } catch {
+        const contentType = response.headers.get("Content-Type") || "unknown content type";
+        throw new Error(`Settings API returned ${contentType} instead of JSON (${response.status}).`);
+      }
       if (!response.ok || !envelope.success)
         throw new Error(envelope.error?.message ?? `Settings request failed (${response.status}).`);
       return envelope.data as T;

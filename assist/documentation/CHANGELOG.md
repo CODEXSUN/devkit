@@ -1,8 +1,36 @@
 # Changelog
 
-Current version: 1.0.96
-Release tag: v-1.0.96
-Changelog label: v 1.0.96
+Current version: 1.0.97
+Release tag: v-1.0.97
+Changelog label: v 1.0.97
+
+## v-1.0.97
+
+### [v 1.0.97] 2026-09-01 5:56 pm - Developer IDs and session reliability
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.97.
+- Added optional developer technical-ID overlays to DevKit web and desktop.
+- Replaced long technical-ID labels with compact numbered markers that copy the full ID.
+- Shifted overlapping technical-ID markers into the next clear position.
+- Loaded the desktop developer-ID setting from the repository root environment file.
+- Routed the web Messenger workspace through the Platform API proxy instead of the SPA fallback.
+- Added a clear error when the Settings API returns a non-JSON response.
+
+#### Verification
+
+- Passed focused typecheck and lint checks for UI, Coworker Chat, and Platform web.
+- Passed the desktop check with typecheck, lint, 42 tests, and a production build.
+- Passed the release scope inventory, repository version check, and whitespace validation.
+- Built and signed the Windows MSI and setup EXE for version 1.0.97.
+- Passed the desktop release artifact, signature, checksum, and updater manifest check.
+- Confirmed the GitHub release helper dry run before publication.
 
 ## v-1.0.96
 

@@ -38,7 +38,7 @@ type IdentityPage =
   | "identity.profile";
 
 type Claims = { email: string; name?: string; permissions?: string[]; role?: string };
-const sameOriginApiUrl = "";
+const sameOriginApiUrl = import.meta.env.VITE_PLATFORM_API_URL.replace(/\/+$/u, "");
 
 export function AppDesk() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -63,6 +63,7 @@ export function usesMessengerDesk(pathname: string) {
 }
 
 function MessengerAppDesk() {
+  const navigate = useNavigate();
   const token = getToken();
   const [drawerCollapsed, setDrawerCollapsed] = useState(true);
   const [connectionState, setConnectionState] = useState<MessengerConnectionState>("connecting");
@@ -80,6 +81,10 @@ function MessengerAppDesk() {
           drawerCollapsed={drawerCollapsed}
           onConnectionStateChange={setConnectionState}
           onDrawerCollapsedChange={setDrawerCollapsed}
+          onSignOut={async () => {
+            await logout();
+            await navigate({ to: "/login" });
+          }}
           onToggleSidePanel={() => setSidePanelOpen((open) => !open)}
           product="DevKit"
           sidePanel={<MessengerConnectionPanel client="web" state={connectionState} />}
