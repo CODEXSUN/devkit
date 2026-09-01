@@ -1,8 +1,31 @@
 # Changelog
 
-Current version: 1.0.86
-Release tag: v-1.0.86
-Changelog label: v 1.0.86
+Current version: 1.0.87
+Release tag: v-1.0.87
+Changelog label: v 1.0.87
+
+## v-1.0.87
+
+### [v 1.0.87] 2026-09-01 12:13 pm - Docs module release gate
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.87.
+- Registered the existing DevKit API Docs module in the repository-boundary quality gate.
+- Allows production verification and deployment to recognize the module already composed by DevKit.
+
+#### Verification
+
+- Passed `npm.cmd run check`, including deployment, boundary, database lifecycle, typecheck, lint, and framework tests.
+- Passed `npm.cmd run release:scope`, `npm.cmd run check:versions`, and `git diff --check`.
+- Passed `npm.cmd run github:now -- --dry-run` with commit subject `#87 - Docs module release gate`.
+- GitHub release publication was not requested.
+- VPS deployment and live checks are pending after the corrected commit is pushed.
 
 ## v-1.0.86
 
