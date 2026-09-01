@@ -16,11 +16,12 @@ export class RoleService {
   }
   async list(f: RoleListFilters = {}) {
     await this.context.authorize("identity.role.view");
-    return this.repository.list(f);
+    return (await this.repository.list(f)).filter((role) => this.canSee(role));
   }
   async get(id: string) {
     await this.context.authorize("identity.role.view");
-    return this.repository.find(id);
+    const role = await this.repository.find(id);
+    return role && this.canSee(role) ? role : null;
   }
   async create(input: RoleSavePayload) {
     await this.context.authorize("identity.role.create");
@@ -62,6 +63,9 @@ export class RoleService {
     if (!r) throw AppError.notFound("Role was not found.");
     if (r.isProtected) throw AppError.forbidden("Protected roles cannot be modified.");
     return r;
+  }
+  private canSee(role: Role) {
+    return this.context.actorRole === "super-admin" || role.key !== "super-admin";
   }
   private audit(action: string, r: Role) {
     return recordAuditEvent({

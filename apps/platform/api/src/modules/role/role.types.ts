@@ -20,6 +20,7 @@ export type RoleSavePayload = {
 export type RoleListFilters = { search?: string };
 export type RoleContext = {
   actorEmail: string;
+  actorRole: string;
   authorize: (permission: string) => Promise<void>;
   database: Kysely<PlatformDatabase>;
 };

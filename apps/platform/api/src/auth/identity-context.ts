@@ -45,6 +45,7 @@ export function identityContext(request: FastifyRequest) {
 
   return {
     actorEmail: claims.email,
+    actorRole: claims.role ?? "",
     actorUser,
     authorize: async (permission: string) => {
       if (!(await can(permission))) {

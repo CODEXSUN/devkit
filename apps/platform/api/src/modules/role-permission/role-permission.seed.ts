@@ -3,11 +3,21 @@ import { sql, type Kysely } from "kysely";
 import type { PlatformDatabase } from "../../database/schema.js";
 
 export async function seedRolePermissionModule(database: Kysely<PlatformDatabase>) {
-  await retireLegacyAdministratorPermissions(database);
   await assignProtectedPermissions(database, "super-admin", () => true);
-  await assignProtectedPermissions(database, "admin", (key) => key.startsWith("identity."));
+  await reconcileAdministratorPermissions(database);
 
   const devkitDefaults: Record<string, string[]> = {
+    developer: [
+      "devkit.project-manager.view",
+      "devkit.task-manager.view",
+      "devkit.task-manager.manage",
+      "devkit.planning.view",
+      "devkit.planning.manage",
+      "devkit.registry.view",
+      "devkit.orchestration.view",
+      "devkit.github-dashboard.view",
+      "devkit.notification.view"
+    ],
     auditor: [
       "devkit.project-manager.view",
       "devkit.task-manager.view",
@@ -78,14 +88,20 @@ async function assignProtectedPermissions(
   }
 }
 
-async function retireLegacyAdministratorPermissions(database: Kysely<PlatformDatabase>) {
+async function reconcileAdministratorPermissions(database: Kysely<PlatformDatabase>) {
   await sql`UPDATE role_permissions rp
     INNER JOIN roles r ON r.id=rp.role_id
     INNER JOIN permissions p ON p.id=rp.permission_id
     SET rp.status='inactive'
-    WHERE r.\`key\`='admin'
-      AND p.\`key\` NOT LIKE 'identity.%'
-      AND rp.is_protected=TRUE`.execute(database);
+    WHERE r.\`key\`='admin' AND rp.is_protected=TRUE`.execute(database);
+  await assignProtectedPermissions(
+    database,
+    "admin",
+    (key) =>
+      !key.endsWith(".delete") &&
+      key !== "identity.user-role.remove" &&
+      key !== "identity.role-permission.remove"
+  );
 }
 
 function devkitPermissions() {

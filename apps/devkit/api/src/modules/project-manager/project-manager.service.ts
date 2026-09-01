@@ -655,8 +655,8 @@ function defaultStatus(kind: ProjectManagerKind) {
 
 function assertAgentIdeaRecord(record: ProjectManagerRecord) {
   if (record.kind !== "discussion" || record.type !== "idea") return;
-  if (!record.lane.startsWith("agent")) {
-    throw AppError.validation("Ideas can only be created through the Agent share workflow.");
+  if ((record.referenceId || record.lane) && !record.lane.startsWith("agent")) {
+    throw AppError.validation("Project ideas can only be created through the Agent share workflow.");
   }
 }
 

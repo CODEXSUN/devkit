@@ -40,7 +40,7 @@ export class UserRepository {
   async listActiveReferences() {
     const rows = await this.database
       .selectFrom("users")
-      .select(["id", "uuid", "name", "email"])
+      .select(["id", "uuid", "name", "email", "role"])
       .where("status", "=", "active")
       .orderBy("name", "asc")
       .execute();
@@ -58,7 +58,7 @@ export class UserRepository {
   async create(input: UserSavePayload, uuid: string, passwordHash: string) {
     const result = await sql`INSERT INTO users
       (uuid,name,email,password_hash,role,status,is_protected)
-      VALUES (${uuid},${input.name},${input.email},${passwordHash},'user',${input.status},FALSE)`.execute(
+      VALUES (${uuid},${input.name},${input.email},${passwordHash},'developer',${input.status},FALSE)`.execute(
       this.database
     );
     return (await this.find(Number(result.insertId)))!;

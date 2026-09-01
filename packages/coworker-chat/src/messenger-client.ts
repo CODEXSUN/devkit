@@ -132,11 +132,11 @@ export class MessengerClient {
   }
 
   contacts() {
-    return this.request<MessengerContact[]>("/api/identity/contacts");
+    return this.request<MessengerContact[]>("/identity/contacts");
   }
 
   profile() {
-    return this.request<MessengerProfile>("/api/identity/profile");
+    return this.request<MessengerProfile>("/identity/profile");
   }
 
   private async request<T>(path: string, init: RequestInit = {}) {

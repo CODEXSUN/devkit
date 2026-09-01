@@ -61,7 +61,7 @@ export function UserWorkspace({ actorEmail }: { actorEmail: string }) {
       ? userRoleLookups.data?.second.find((role) => role.key === editing.role)
       : undefined;
     const defaultRole = userRoleLookups.data?.second.find(
-      (role) => role.key === "user" && role.status === "active"
+      (role) => role.key === "developer" && role.status === "active"
     );
     return {
       roleId: assignedRole?.id ?? defaultRole?.id ?? null

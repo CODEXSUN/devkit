@@ -24,6 +24,7 @@ export type UserListFilters = { search?: string };
 export type UserReference = Pick<User, "email" | "id" | "name" | "uuid">;
 export type UserContext = {
   actorEmail: string;
+  actorRole: string;
   authorize: (permission: string) => Promise<void>;
   database: Kysely<PlatformDatabase>;
 };

@@ -23,11 +23,12 @@ export class UserService {
   }
   async list(filters: UserListFilters = {}) {
     await this.context.authorize("identity.user.view");
-    return this.repository.list(filters);
+    return this.visibleUsers(await this.repository.list(filters));
   }
   async get(id: string) {
     await this.context.authorize("identity.user.view");
-    return this.repository.find(id);
+    const record = await this.repository.find(id);
+    return record && this.canSee(record) ? record : null;
   }
   async getProfile(): Promise<UserProfile> {
     const record = await this.repository.findByEmail(this.context.actorEmail);
@@ -35,11 +36,9 @@ export class UserService {
     return profile(record);
   }
   async contacts() {
-    return (await this.repository.listActiveReferences()).map(({ email, name, uuid }) => ({
-      email,
-      name,
-      uuid
-    }));
+    return (await this.repository.listActiveReferences())
+      .filter((record) => this.isSuperAdministrator() || record.role !== "super-admin")
+      .map(({ email, name, uuid }) => ({ email, name, uuid }));
   }
   async updateProfile(input: UserProfileSavePayload): Promise<UserProfile> {
     const current = await this.repository.findByEmail(this.context.actorEmail);
@@ -132,6 +131,15 @@ export class UserService {
     const record = await this.repository.find(id);
     if (!record) throw AppError.notFound("User was not found.");
     return record;
+  }
+  private visibleUsers(records: User[]) {
+    return records.filter((record) => this.canSee(record));
+  }
+  private canSee(record: User) {
+    return this.isSuperAdministrator() || record.role !== "super-admin";
+  }
+  private isSuperAdministrator() {
+    return this.context.actorRole === "super-admin";
   }
   private async audit(action: string, record: User) {
     await recordAuditEvent({

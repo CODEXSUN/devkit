@@ -5,7 +5,8 @@ export const userMigrations = [
   { key: "identity.user.foundation-v1" },
   { key: "identity.user.single-client-v3" },
   { key: "identity.user.local-auth-only-v4" },
-  { key: "identity.user.super-admin-v5" }
+  { key: "identity.user.super-admin-v5" },
+  { key: "identity.user.developer-role-v6" }
 ] as const;
 export const userMigration = userMigrations[0];
 
@@ -32,6 +33,9 @@ export async function migrateUserModule(database: Kysely<PlatformDatabase>) {
       .execute(database);
   }
   await sql`UPDATE users SET role='super-admin' WHERE role IN ('super_admin','superadmin')`.execute(
+    database
+  );
+  await sql`UPDATE users SET role='developer' WHERE role='user' AND is_protected=FALSE`.execute(
     database
   );
   const removedIntegrationPrefix = ["fra", "ppe_"].join("");

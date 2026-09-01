@@ -116,11 +116,11 @@ export function userRoleStandardAccessContract(context: {
   const repository = new UserRoleRepository(context.database);
   return {
     async ensureForUser(userId: number) {
-      const current = await repository.findByUserAndRoleKey(userId, "user");
+      const current = await repository.findByUserAndRoleKey(userId, "developer");
       const assignment = await repository.ensureActiveByRoleKey(
         userId,
-        "user",
-        stable(`user-role:${userId}:user`)
+        "developer",
+        stable(`user-role:${userId}:developer`)
       );
       if (!assignment) {
         throw AppError.validation("Active user and standard user role are required.");

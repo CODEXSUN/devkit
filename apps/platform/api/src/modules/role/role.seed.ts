@@ -4,15 +4,21 @@ import type { PlatformDatabase } from "../../database/schema.js";
 
 const roles = [
   {
-    description: "Protected developer administration with unrestricted platform and DevKit access.",
+    description: "Maintains the repository, application features, protected identity, and hard-reset controls.",
     key: "super-admin",
     label: "Super Administrator",
     protected: true
   },
   {
-    description: "Protected user, role, permission, and access administration.",
+    description: "Maintains business features and ordinary identity administration without protected Super Administrator access.",
     key: "admin",
     label: "Administrator",
+    protected: true
+  },
+  {
+    description: "Uses only the DevKit features explicitly permitted by an administrator.",
+    key: "developer",
+    label: "Developer",
     protected: true
   },
   {

@@ -16,6 +16,12 @@ export async function seedUserRoleModule(database: Kysely<PlatformDatabase>) {
       .where("status", "=", "active")
       .executeTakeFirst();
     if (!role) continue;
+    await sql`UPDATE user_roles assignment
+      INNER JOIN roles assigned_role ON assigned_role.id=assignment.role_id
+      SET assignment.status='inactive'
+      WHERE assignment.user_id=${user.id}
+        AND assignment.is_protected=FALSE
+        AND assigned_role.\`key\`<>${user.role}`.execute(database);
     await sql`INSERT INTO user_roles (uuid,user_id,role_id,status,is_protected)
       VALUES (${stable(`user-role:${user.id}:${role.id}`)},${user.id},${role.id},'active',${Boolean(user.is_protected)})
       ON DUPLICATE KEY UPDATE status='active',is_protected=VALUES(is_protected)`.execute(database);

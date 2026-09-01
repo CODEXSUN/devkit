@@ -116,14 +116,21 @@ export function useMessenger({
   }, [client, peerActorId]);
 
   useEffect(() => {
-    void Promise.all([client.contacts(), client.profile(), client.conversations()])
-      .then(([availableContacts, profile, availableConversations]) => {
-        setContacts(availableContacts.filter((contact) => contact.uuid !== profile.uuid));
-        setProfile(profile);
-        setProfileId(profile.uuid);
-        setConversations(availableConversations);
-      })
-      .catch(() => setContacts([]));
+    void Promise.allSettled([client.contacts(), client.profile(), client.conversations()]).then(
+      ([contactResult, profileResult, conversationResult]) => {
+        if (profileResult.status === "fulfilled") {
+          setProfile(profileResult.value);
+          setProfileId(profileResult.value.uuid);
+        }
+        if (contactResult.status === "fulfilled") {
+          const ownId = profileResult.status === "fulfilled" ? profileResult.value.uuid : "";
+          setContacts(contactResult.value.filter((contact) => contact.uuid !== ownId));
+        }
+        if (conversationResult.status === "fulfilled") {
+          setConversations(conversationResult.value);
+        }
+      }
+    );
     void refreshRef.current();
     const socket = io(baseUrl, {
       auth: { token: `Bearer ${token}` },

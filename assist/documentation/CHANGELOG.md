@@ -1,8 +1,41 @@
 # Changelog
 
-Current version: 1.0.97
-Release tag: v-1.0.97
-Changelog label: v 1.0.97
+Current version: 1.0.98
+Release tag: v-1.0.98
+Changelog label: v 1.0.98
+
+## v-1.0.98
+
+### [v 1.0.98] 2026-09-01 10:24 pm - Messenger contacts and role boundaries
+
+#### Database Changes
+
+- Database update: Yes.
+- Added migration marker `identity.user.developer-role-v6`.
+- Migrated non-protected users whose primary role was `user` to `developer`.
+- Seeded the protected `developer` role and its default permitted DevKit feature assignments.
+- Reconciled non-protected user-role assignments so only the user's primary role remains active.
+- Expanded Administrator access to business features and ordinary identity management while withholding destructive identity permissions.
+- Kept the protected Super Administrator account, role, and unrestricted permissions unchanged; recovery uses the retained database backup because application rollback does not reverse role data changes.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.98.
+- Corrected Messenger contact and profile requests behind the production `/api/platform` proxy.
+- Preserved independently loaded contacts, profile, and conversations when one startup request fails.
+- Hid the protected Super Administrator account and role from Administrator API results and chat contacts.
+- Defined Super Administrator, Administrator, and Developer responsibilities in the protected role seeds.
+- Added a visible `New idea` action that opens a recoverable global idea draft.
+- Allowed manual global ideas while retaining Agent-only creation for project-scoped ideas.
+
+#### Verification
+
+- Passed the focused Messenger client test with 9 tests.
+- Passed typecheck and lint for Coworker Chat, Platform API, and DevKit API.
+- Passed Platform web typecheck and lint.
+- Passed the complete production build for framework, UI, DevKit API/web, Platform API/web, and desktop.
+- Passed the release scope inventory, repository version check, whitespace validation, and GitHub helper dry run.
+- Production database migration, seed, build, Socket.IO handshake, browser contact list, and Ideas workflow are pending guarded deployment.
 
 ## v-1.0.97
 

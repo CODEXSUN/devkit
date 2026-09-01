@@ -1,4 +1,4 @@
-import { Archive, Clock3, Globe2, Info, Lightbulb, LockKeyhole, MoreVertical, Search, Trash2 } from "lucide-react";
+import { Archive, Clock3, Globe2, Info, Lightbulb, LockKeyhole, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { WorkspaceLookup, type WorkspaceLookupOption } from "@codexsun/ui/workspace";
 import type { CoworkerClient } from "./client";
@@ -38,6 +38,25 @@ export function IdeasWorkspace({ client }: { client: CoworkerClient }) {
       setIdeas((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
       setEditing(null);
     }} />;
+  }
+
+  function createIdea() {
+    setEditing({
+      assignee: "",
+      createdAt: "",
+      description: "",
+      id: `draft:${crypto.randomUUID()}`,
+      key: "",
+      kind: "discussion",
+      lane: "",
+      moduleKey: "general",
+      referenceId: "",
+      referenceType: "",
+      status: "draft",
+      title: "",
+      type: "idea",
+      updatedAt: ""
+    });
   }
 
   async function archiveIdea(idea: CoworkerProjectRecord) {
@@ -87,6 +106,7 @@ export function IdeasWorkspace({ client }: { client: CoworkerClient }) {
       <label className="ideas-search"><Search size={15} /><input aria-label="Search ideas" onChange={(event) => setQuery(event.target.value)} placeholder="Search ideas" value={query} /></label>
       <select aria-label="Idea scope" className="ideas-select" onChange={(event) => setScope(event.target.value as typeof scope)} value={scope}><option value="all">All ideas</option><option value="global">Global ideas</option><option value="project">Project ideas</option></select>
       <select aria-label="Sort ideas" className="ideas-select" onChange={(event) => setSort(event.target.value as typeof sort)} value={sort}><option value="updated">Last updated</option><option value="newest">Newest first</option><option value="title">Title A–Z</option><option value="status">Status</option></select>
+      <button className="ideas-new-button" onClick={createIdea} type="button"><Plus size={16} /> New idea</button>
     </div>
     <div className="ideas-list-summary"><span>{visible.length} {visible.length === 1 ? "idea" : "ideas"}</span><span>{tagFilter ? <button onClick={() => setTagFilter("")} type="button">#{tagFilter} ×</button> : scope === "all" ? "Global and project work" : `${label(scope)} ideas`}</span></div>
     {actionError ? <p className="ideas-action-error" role="alert">{actionError}</p> : null}

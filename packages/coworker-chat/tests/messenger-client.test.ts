@@ -84,3 +84,21 @@ test("MessengerClient uses durable conversation routes", async () => {
   assert.equal(requests[0]?.body, JSON.stringify({ peerActorId: "peer-user" }));
   assert.equal(requests[2]?.body, JSON.stringify({ muted: true }));
 });
+
+test("MessengerClient uses identity routes relative to the configured API prefix", async () => {
+  const requests: string[] = [];
+  const fetcher = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response(JSON.stringify({ data: [], success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  }) as typeof fetch;
+  const client = new MessengerClient("https://devkit.example/api/platform", () => "token", fetcher);
+  await client.contacts();
+  await client.profile();
+  assert.deepEqual(requests, [
+    "https://devkit.example/api/platform/identity/contacts",
+    "https://devkit.example/api/platform/identity/profile"
+  ]);
+});
