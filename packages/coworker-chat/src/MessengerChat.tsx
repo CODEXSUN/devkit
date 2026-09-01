@@ -110,7 +110,11 @@ export function MessengerChat({
   workspaceName = "DevKit product roadmap"
 }: MessengerProps) {
   const baseUrl = apiUrl.replace(/\/+$/u, "");
-  const [activeSpace, setActiveSpace] = useState<WorkspaceSpace>("messenger");
+  const initialRoute = useRef(readWorkspaceRoute());
+  const pendingMessengerConversation = useRef(
+    initialRoute.current.space === "messenger" ? initialRoute.current.conversationId : null
+  );
+  const [activeSpace, setActiveSpace] = useState<WorkspaceSpace>(initialRoute.current.space);
   const [unsavedIdeaCount, setUnsavedIdeaCount] = useState(countUnsavedIdeaDrafts);
   const [drawerQuery, setDrawerQuery] = useState("");
   const globalSearchRef = useRef<HTMLButtonElement>(null);
@@ -119,8 +123,11 @@ export function MessengerChat({
   const [archivedAgentChats, setArchivedAgentChats] = useState<CoworkerChat[]>([]);
   const [agentProjects, setAgentProjects] = useState<CoworkerProject[]>([]);
   const [overviewProject, setOverviewProject] = useState<CoworkerProject | null>(null);
+  const [routeProjectId, setRouteProjectId] = useState(initialRoute.current.projectId);
   const agentProjectId = overviewProject?.id ?? null;
-  const [agentConversationId, setAgentConversationId] = useState<string | null>(null);
+  const [agentConversationId, setAgentConversationId] = useState(
+    initialRoute.current.space === "agent" ? initialRoute.current.conversationId : null
+  );
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const activeSidePanel =
     activeSpace === "agent"
@@ -128,6 +135,28 @@ export function MessengerChat({
       : activeSpace === "messenger"
         ? sidePanel
         : null;
+
+  useEffect(() => {
+    const restoreRoute = () => {
+      const route = readWorkspaceRoute();
+      setActiveSpace(route.space);
+      setAgentConversationId(route.space === "agent" ? route.conversationId : null);
+      setRouteProjectId(route.projectId);
+      setOverviewProject(
+        route.projectId
+          ? agentProjects.find((project) => project.id === route.projectId) ?? null
+          : null
+      );
+    };
+    window.addEventListener("popstate", restoreRoute);
+    return () => window.removeEventListener("popstate", restoreRoute);
+  }, [agentProjects]);
+
+  useEffect(() => {
+    if (!routeProjectId || overviewProject?.id === routeProjectId) return;
+    const project = agentProjects.find((candidate) => candidate.id === routeProjectId);
+    if (project) setOverviewProject(project);
+  }, [agentProjects, overviewProject?.id, routeProjectId]);
 
   useEffect(() => {
     const refresh = () => setUnsavedIdeaCount(countUnsavedIdeaDrafts());
@@ -163,6 +192,33 @@ export function MessengerChat({
     syncing,
     updateConversationPreferences
   } = useMessenger({ active: activeSpace === "messenger", apiUrl: baseUrl, clientKind, token });
+  useEffect(() => {
+    updateWorkspaceRoute({
+      conversationId:
+        activeSpace === "agent"
+          ? agentConversationId
+          : activeSpace === "messenger"
+            ? (peerActorId || pendingMessengerConversation.current)
+            : null,
+      projectId: activeSpace === "projects" ? routeProjectId : null,
+      space: activeSpace
+    });
+    if (peerActorId === pendingMessengerConversation.current) {
+      pendingMessengerConversation.current = null;
+    }
+  }, [activeSpace, agentConversationId, peerActorId, routeProjectId]);
+  useEffect(() => {
+    const restoreConversation = () => {
+      const route = readWorkspaceRoute();
+      if (route.space === "messenger") {
+        pendingMessengerConversation.current = route.conversationId;
+        setPeerActorId(route.conversationId ?? "");
+      }
+    };
+    restoreConversation();
+    window.addEventListener("popstate", restoreConversation);
+    return () => window.removeEventListener("popstate", restoreConversation);
+  }, [setPeerActorId]);
   const currentUser = profile ?? profileFromSessionToken(token);
   const totalUnread = conversations.reduce(
     (total, conversation) => total + conversation.unreadCount,
@@ -278,6 +334,14 @@ export function MessengerChat({
   const headerTitle =
     activeSpace === "messenger" ? selectedContact?.name ?? conversationName : workspaceTitle(activeSpace);
   const openedProject = overviewProject?.title ?? workspaceName;
+  const openProject = useCallback((project: CoworkerProject) => {
+    setOverviewProject(project);
+    setRouteProjectId(project.id);
+  }, []);
+  const closeProject = useCallback(() => {
+    setOverviewProject(null);
+    setRouteProjectId(null);
+  }, []);
   const searchItems = useMemo<WorkspaceSearchItem[]>(() => {
     const openSpace = (space: WorkspaceSpace) => () => {
       setActiveSpace(space);
@@ -355,7 +419,7 @@ export function MessengerChat({
         kind: "project" as const,
         label: project.title,
         run: () => {
-          setOverviewProject(project);
+          openProject(project);
           setActiveSpace("projects");
         }
       })),
@@ -386,6 +450,7 @@ export function MessengerChat({
   }, [
     agentChats,
     agentProjects,
+    openProject,
     contacts,
     drawerCollapsed,
     onDrawerCollapsedChange,
@@ -417,7 +482,7 @@ export function MessengerChat({
           setActiveSpace("messenger");
         }}
         onOpenProjects={() => {
-          setOverviewProject(null);
+          closeProject();
           setActiveSpace("projects");
         }}
         onOpenSettings={() => {
@@ -473,7 +538,7 @@ export function MessengerChat({
           )
         }
         onOpenProject={(project) => {
-          setOverviewProject(project);
+          openProject(project);
           setActiveSpace("projects");
         }}
       />
@@ -509,9 +574,9 @@ export function MessengerChat({
             activeSpace === "projects" ? (
               <ProjectDropdown
                 onChange={(projectId) => {
-                  setOverviewProject(
-                    agentProjects.find((project) => project.id === projectId) ?? null
-                  );
+                  const project = agentProjects.find((candidate) => candidate.id === projectId);
+                  if (project) openProject(project);
+                  else closeProject();
                   if (activeSpace === "agent") setAgentConversationId(null);
                 }}
                 projects={agentProjects}
@@ -526,7 +591,7 @@ export function MessengerChat({
               <button
                 className="messenger-project"
                 onClick={() => {
-                  setOverviewProject(null);
+                  closeProject();
                   setActiveSpace("projects");
                 }}
                 title="Open projects"
@@ -643,13 +708,13 @@ export function MessengerChat({
               client={agentClient}
               onArchived={(project) => {
                 setAgentProjects((current) => current.filter((item) => item.id !== project.id));
-                setOverviewProject(null);
+                closeProject();
               }}
               onUpdated={(project) => {
                 setAgentProjects((current) =>
                   current.map((item) => (item.id === project.id ? project : item))
                 );
-                setOverviewProject(project);
+                openProject(project);
               }}
               project={overviewProject}
             />
@@ -664,7 +729,7 @@ export function MessengerChat({
                 ...current.filter((item) => item.id !== project.id)
               ])
             }
-            onOpen={setOverviewProject}
+            onOpen={openProject}
             projects={agentProjects}
           />
         ) : activeSpace === "todos" ? (
@@ -860,6 +925,72 @@ function workspaceTitle(activeSpace: WorkspaceSpace) {
   if (activeSpace === "projects") return "Projects";
   if (activeSpace === "todos") return "Todos";
   return "Messenger";
+}
+
+const workspaceRouteNames: Record<WorkspaceSpace, string> = {
+  agent: "agent",
+  archives: "archives",
+  connection: "connect",
+  docs: "docs",
+  ideas: "ideas",
+  messenger: "chat",
+  projects: "projects",
+  settings: "settings",
+  todos: "tasks"
+};
+
+function readWorkspaceRoute() {
+  if (typeof window === "undefined") {
+    return { conversationId: null, projectId: null, space: "messenger" as WorkspaceSpace };
+  }
+  const query = new URLSearchParams(window.location.search);
+  const routeName = query.get("view");
+  const space =
+    (Object.entries(workspaceRouteNames).find(([, name]) => name === routeName)?.[0] as
+      | WorkspaceSpace
+      | undefined) ?? workspaceSpaceFromPath(window.location.pathname);
+  return {
+    conversationId:
+      space === "agent" || space === "messenger" ? query.get("conversation") : null,
+    projectId: space === "projects" ? query.get("project") : null,
+    space
+  };
+}
+
+function workspaceSpaceFromPath(pathname: string): WorkspaceSpace {
+  const normalizedPath = pathname.replace(/\/+$/u, "");
+  const routeName = normalizedPath.split("/").at(-1);
+  if (normalizedPath === "/app/settings" || routeName === "settings") return "settings";
+  if (routeName === "agent") return "agent";
+  if (routeName === "docs") return "docs";
+  if (routeName === "ideas") return "ideas";
+  if (routeName === "projects") return "projects";
+  if (routeName === "todos") return "todos";
+  return "messenger";
+}
+
+function updateWorkspaceRoute({
+  conversationId,
+  projectId,
+  space
+}: {
+  conversationId: string | null;
+  projectId: string | null;
+  space: WorkspaceSpace;
+}) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", workspaceRouteNames[space]);
+  if ((space === "agent" || space === "messenger") && conversationId) {
+    url.searchParams.set("conversation", conversationId);
+  }
+  else url.searchParams.delete("conversation");
+  if (space === "projects" && projectId) url.searchParams.set("project", projectId);
+  else {
+    url.searchParams.delete("project");
+    url.searchParams.delete("tab");
+  }
+  window.history.replaceState(window.history.state, "", url);
 }
 
 function profileFromSessionToken(token: string): MessengerProfile | undefined {

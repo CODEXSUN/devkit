@@ -286,3 +286,22 @@
     animation: none;
   }
 }
+/* Cloud device connection */
+.cloud-connect-page { display:grid; min-height:100vh; place-items:center; padding:24px; background:#f4f4f0; color:#242421; }
+.cloud-connect-page > section { display:grid; width:min(100%,440px); gap:14px; padding:34px; border:1px solid #deded8; border-radius:16px; background:#fff; }
+.cloud-connect-icon { display:grid; width:42px; height:42px; place-items:center; border-radius:11px; background:#20201e; color:#fff; }
+.cloud-connect-page small { color:#777770; font-size:11px; font-weight:700; letter-spacing:.12em; }
+.cloud-connect-page h1,.cloud-connect-page p { margin:0; }
+.cloud-connect-page h1 { font-size:28px; letter-spacing:-.03em; }
+.cloud-connect-page p,.cloud-connect-page footer { color:#686861; font-size:14px; line-height:1.5; }
+.cloud-connect-credential { display:grid; grid-template-columns:184px minmax(0,1fr); gap:18px; align-items:center; }
+.cloud-connect-qr { display:grid; place-items:center; overflow:hidden; border:1px solid #deded8; border-radius:12px; background:#fff; }
+.cloud-connect-code { display:flex; align-items:stretch; flex-direction:column; gap:10px; padding:12px; border:1px solid #d9d9d2; border-radius:11px; background:#fafaf8; }
+.cloud-connect-code span { display:grid; gap:6px; }
+.cloud-connect-code code { font-size:21px; font-weight:700; letter-spacing:.12em; }
+.cloud-connect-code button { display:flex; align-items:center; gap:6px; padding:9px 11px; border:0; border-radius:8px; background:#20201e; color:#fff; cursor:pointer; }
+.cloud-connect-loading { display:flex; align-items:center; gap:8px; color:#686861; }
+.cloud-connect-loading svg { animation:spin 1s linear infinite; }
+.cloud-connect-error { padding:10px; border-radius:8px; background:#fff0ee; color:#9f2f24; }
+.cloud-connect-page footer { padding-top:4px; font-size:12px; }
+@media (max-width:560px) { .cloud-connect-page > section { padding:26px; } .cloud-connect-credential { grid-template-columns:1fr; } }

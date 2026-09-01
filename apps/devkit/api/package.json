@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit-api",
-  "version": "1.0.91",
+  "version": "1.0.92",
   "private": true,
   "type": "module",
   "exports": {
@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
-    "@codexsun/framework": "1.0.91",
+    "@codexsun/framework": "1.0.92",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/agents": "^0.17.0",
     "@openai/codex": "^0.150.1",

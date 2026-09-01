@@ -38,10 +38,10 @@ export async function registerSyncRoutes(app: FastifyInstance) {
   });
   app.post("/admin/sync/bind", async (request) => {
     const body = z
-      .object({ instanceId: z.string().min(2).max(80), token: tokenSchema })
+      .object({ cloudUrl: z.string().url().max(300).optional(), instanceId: z.string().min(2).max(80), token: tokenSchema })
       .strict()
       .parse(request.body);
-    return ok(await service.bind(body.token, body.instanceId), {
+    return ok(await service.bind(body.token, body.instanceId, body.cloudUrl), {
       requestId: request.id
     });
   });

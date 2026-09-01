@@ -1,8 +1,37 @@
 # Changelog
 
-Current version: 1.0.91
-Release tag: v-1.0.91
-Changelog label: v 1.0.91
+Current version: 1.0.92
+Release tag: v-1.0.92
+Changelog label: v 1.0.92
+
+## v-1.0.92
+
+### [v 1.0.92] 2026-09-01 1:19 pm - Cloud device connection flow
+
+#### Database Changes
+
+- Database update: No.
+- No persisted schema, seed, or data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.92.
+- Added the signed-in cloud `/connect` page, which creates a one-time pairing code and QR representation without placing credentials in the URL.
+- Made desktop and mobile pairing use fixed runtime identities, a selectable cloud origin, and a browser handoff to retrieve a connection code.
+- Persisted the approved cloud origin with the encrypted sync connection and reused it for verify, publish, pull, and project-transfer requests.
+- Expanded the App workspace shell to use the unified Messenger navigation for its primary product pages and to retain selected chat, project, and project-tab routes.
+- Improved agent device-code sign-in with copy, open-verification, automatic three-second status refresh, and clearer connected-state feedback.
+
+#### Verification
+
+- Passed `npm.cmd --workspace @codexsun/devkit-api run typecheck`.
+- Passed `npm.cmd --workspace @codexsun/devkit-api run lint`.
+- Passed `npm.cmd --workspace @codexsun/coworker-chat run typecheck`.
+- Passed `npm.cmd --workspace @codexsun/coworker-chat run lint`.
+- Passed `npm.cmd --workspace @devkit/platform-web run build` (with the existing large-chunk warning).
+- Passed `npm.cmd --workspace @devkit/mobile run typecheck`.
+- Passed `npm.cmd --workspace @devkit/mobile run lint -- --quiet`.
+- Pending guarded VPS deployment and authenticated browser pairing verification.
 
 ## v-1.0.91
 
@@ -16,6 +45,12 @@ Changelog label: v 1.0.91
 
 - Bumped repository version to 1.0.91.
 - Rewrote the public same-origin identity path before proxying so it reaches the Platform API identity routes.
+- Made the cloud web runtime identify as `web-devkit` and issue connection credentials from the signed-in `/connect` page.
+- Made desktop and mobile identify as `desktop-devkit` and `mobile-devkit` without a device-name field.
+- Added a QR representation beside the 16-character connection code.
+- Kept the connection credential out of the `/connect` URL.
+- Limited cloud page device labels to the known desktop and mobile runtime identities.
+- Removed manual credential creation from the cloud Connect Service panel.
 
 #### Verification
 
@@ -24,6 +59,10 @@ Changelog label: v 1.0.91
 - Passed `npm.cmd run check:versions`.
 - Passed `npm.cmd run release:scope`.
 - Passed `git diff --check`.
+- Passed the shared coworker-chat typecheck and lint.
+- Passed the Platform Web production build.
+- Passed the mobile typecheck and focused connection-page lint.
+- Pending deployed verification of QR and code linking on the cloud runtime.
 
 ## v-1.0.90
 
@@ -37,10 +76,25 @@ Changelog label: v 1.0.91
 
 - Bumped repository version to 1.0.90.
 - Proxied same-origin identity routes to the Platform API so shared Messenger contacts and profile calls no longer fall through to the SPA document.
+- Added a separate `/connect` cloud page that creates a connection code for the requested device after sign-in.
+- Added `https://devkit.codexsun.com` as the default connection domain for desktop, web, and mobile.
+- Added a cloud domain override to the desktop, web, and mobile Connect Service pages.
+- Opened `<cloud-domain>/connect?device=<name>` from each local Connect Service page.
+- Stored the normalized cloud origin with the encrypted connection token.
+- Used the stored cloud origin for verify, publish, pull, and project connection requests.
+- Preserved the existing bind request contract by using the default domain when `cloudUrl` is absent.
+- Returned users to the `/connect` page after a required cloud sign-in.
 
 #### Verification
 
+- Passed DevKit API typecheck, lint, and build.
+- Passed shared coworker-chat typecheck and lint.
+- Passed Platform Web production build.
+- Passed mobile and desktop typechecks plus focused mobile lint.
+- Passed three sync row-validation tests.
+- Passed `git diff --check`.
 - Pending deployment verification of authenticated identity, Messenger, and whiteboard requests.
+- Pending deployed verification of the cloud `/connect` flow.
 
 ## v-1.0.89
 
@@ -236,14 +290,6 @@ Changelog label: v 1.0.91
 - Synchronized side-menu and Windows taskbar badges directly from WebSocket unread events, while retaining HTTP catch-up after reconnect.
 - Suppressed successful Socket.IO transport handshakes and polling frames from general request logs while preserving all 4xx and 5xx socket failures.
 - Removed all Socket.IO transport frames, including stale polling responses, from the general HTTP request log.
-- Added a separate `/connect` cloud page that creates a connection code for the requested device after sign-in.
-- Added `https://devkit.codexsun.com` as the default connection domain for desktop, web, and mobile.
-- Added a cloud domain override to the desktop, web, and mobile Connect Service pages.
-- Opened `<cloud-domain>/connect?device=<name>` from each local Connect Service page.
-- Stored the normalized cloud origin with the encrypted connection token.
-- Used the stored cloud origin for verify, publish, pull, and project connection requests.
-- Preserved the existing bind request contract by using the default domain when `cloudUrl` is absent.
-- Returned users to the `/connect` page after a required cloud sign-in.
 - Kept one actor-wide Messenger socket alive across chat selection, contact loading, and workspace navigation instead of reconnecting on UI state changes.
 - Reduced `messenger.unread` payloads from full conversation lists to one changed-conversation delta plus the total unread count.
 - Extended healthy socket fallback polling from 30 to 60 seconds while retaining five-second disconnected recovery.

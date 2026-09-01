@@ -42,9 +42,24 @@ const sameOriginApiUrl = "";
 
 export function AppDesk() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  if (["/app/devkit/docs", "/app/devkit/project-sync"].includes(pathname))
-    return <_LegacyAppDesk />;
-  return <MessengerAppDesk />;
+  return usesMessengerDesk(pathname) ? <MessengerAppDesk /> : <_LegacyAppDesk />;
+}
+
+const messengerDeskPaths = new Set([
+  "/app/devkit/agent",
+  "/app/devkit/chat",
+  "/app/devkit/dashboard",
+  "/app/devkit/docs",
+  "/app/devkit/ideas",
+  "/app/devkit/projects",
+  "/app/devkit/settings",
+  "/app/devkit/todos",
+  "/app/settings"
+]);
+
+export function usesMessengerDesk(pathname: string) {
+  const normalizedPath = pathname.length > 1 ? pathname.replace(/\/+$/u, "") : pathname;
+  return messengerDeskPaths.has(normalizedPath);
 }
 
 function MessengerAppDesk() {

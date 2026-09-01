@@ -28,6 +28,17 @@ const tabs = [
   "Changelog"
 ] as const;
 type ProjectTab = (typeof tabs)[number];
+const projectTabRoutes: Record<ProjectTab, string> = {
+  Architect: "architect",
+  Changelog: "changelog",
+  Modules: "modules",
+  Notes: "notes",
+  Overview: "overview",
+  Reviews: "reviews",
+  Schema: "schema",
+  Tasks: "tasks",
+  "White Board": "white-board"
+};
 type RecordEditorMode = { kind: "discussion" | "release" | "task"; noun: "architecture" | "change" | "note" | "task" };
 
 export function ProjectOverviewSpace({
@@ -41,7 +52,7 @@ export function ProjectOverviewSpace({
   onUpdated: (project: CoworkerProject) => void;
   project: CoworkerProject;
 }) {
-  const [activeTab, setActiveTab] = useState<ProjectTab>("Overview");
+  const [activeTab, setActiveTab] = useState<ProjectTab>(readProjectTabRoute);
   const [records, setRecords] = useState<CoworkerProjectRecord[]>([]);
   const [editingIdea, setEditingIdea] = useState<CoworkerProjectRecord | null>(null);
   const [recordEditorMode, setRecordEditorMode] = useState<RecordEditorMode>({ kind: "discussion", noun: "note" });
@@ -53,6 +64,14 @@ export function ProjectOverviewSpace({
   const [moduleGroups, setModuleGroups] = useState<CoworkerRegistryGroup[]>([]);
   const [modules, setModules] = useState<CoworkerRegistryModule[]>([]);
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    updateProjectTabRoute(activeTab);
+  }, [activeTab]);
+  useEffect(() => {
+    const restoreTab = () => setActiveTab(readProjectTabRoute());
+    window.addEventListener("popstate", restoreTab);
+    return () => window.removeEventListener("popstate", restoreTab);
+  }, []);
   useEffect(() => {
     setLoading(true);
     void Promise.all(
@@ -141,6 +160,23 @@ export function ProjectOverviewSpace({
     setRecordEditorMode({ kind: "discussion", noun: "note" });
     setEditingIdea(newRecord("discussion", "general"));
   }
+}
+
+function readProjectTabRoute(): ProjectTab {
+  if (typeof window === "undefined") return "Overview";
+  const route = new URLSearchParams(window.location.search).get("tab");
+  return (
+    (Object.entries(projectTabRoutes).find(([, name]) => name === route)?.[0] as
+      | ProjectTab
+      | undefined) ?? "Overview"
+  );
+}
+
+function updateProjectTabRoute(tab: ProjectTab) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("tab", projectTabRoutes[tab]);
+  window.history.replaceState(window.history.state, "", url);
 }
 
 function ProjectTabContent({

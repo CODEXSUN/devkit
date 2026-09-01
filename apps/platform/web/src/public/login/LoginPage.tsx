@@ -63,7 +63,9 @@ function LoginSurface({ landing, superAdmin = false }: { landing: boolean; super
       .then((session) => {
         if (cancelled) return;
         if (session.authenticated && (!superAdmin || session.superAdmin)) {
-          void navigate({ replace: true, to: superAdmin ? "/sa" : applicationEntryPath() });
+          const destination = loginDestination(superAdmin);
+          if (destination.startsWith("/connect")) window.location.replace(destination);
+          else void navigate({ replace: true, to: destination });
           return;
         }
         clearToken();
@@ -93,7 +95,9 @@ function LoginSurface({ landing, superAdmin = false }: { landing: boolean; super
     void developmentLogin()
       .then((result) => {
         if (result.success && (!superAdmin || result.data.superAdmin)) {
-          void navigate({ replace: true, to: superAdmin ? "/sa" : applicationEntryPath() });
+          const destination = loginDestination(superAdmin);
+          if (destination.startsWith("/connect")) window.location.replace(destination);
+          else void navigate({ replace: true, to: destination });
         } else if (result.success) {
           clearToken();
           setMessage("The development account is not assigned to Super Admin.");
@@ -111,7 +115,11 @@ function LoginSurface({ landing, superAdmin = false }: { landing: boolean; super
       if (superAdmin && !result.data.superAdmin) {
         clearToken();
         setMessage("This account is not assigned to Super Admin.");
-      } else void navigate({ replace: true, to: superAdmin ? "/sa" : applicationEntryPath() });
+      } else {
+        const destination = loginDestination(superAdmin);
+        if (destination.startsWith("/connect")) window.location.replace(destination);
+        else void navigate({ replace: true, to: destination });
+      }
     } else setMessage(result.error.message);
     setLoading(false);
   }
@@ -166,4 +174,10 @@ function LoginSurface({ landing, superAdmin = false }: { landing: boolean; super
       {form}
     </PlatformAuthLayout>
   );
+}
+
+function loginDestination(superAdmin: boolean) {
+  if (superAdmin) return "/sa";
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo") ?? "";
+  return returnTo.startsWith("/connect") ? returnTo : applicationEntryPath();
 }

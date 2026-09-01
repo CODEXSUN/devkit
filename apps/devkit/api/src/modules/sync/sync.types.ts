@@ -14,7 +14,7 @@ export type DevkitSyncSnapshot = {
 
 export type DevkitSyncStatus = {
   bound: boolean;
-  cloudUrl: typeof DEVKIT_SYNC_CLOUD_URL;
+  cloudUrl: string;
   conflictCount: number;
   instanceId: string;
   lastError: string | null;

@@ -10,6 +10,9 @@ const HealthPage = lazy(() =>
 const LoginPage = lazy(() =>
   import("../public/login/LoginPage").then((module) => ({ default: module.LoginPage }))
 );
+const ConnectPage = lazy(() =>
+  import("../public/connect/ConnectPage").then((module) => ({ default: module.ConnectPage }))
+);
 const LandingLoginPage = lazy(() =>
   import("../public/login/LoginPage").then((module) => ({ default: module.LandingLoginPage }))
 );
@@ -25,6 +28,7 @@ const routeTree = rootRoute.addChildren([
   createRoute({ component: LandingLoginPage, getParentRoute: () => rootRoute, path: "/" }),
   createRoute({ component: HealthPage, getParentRoute: () => rootRoute, path: "/status" }),
   createRoute({ component: LoginPage, getParentRoute: () => rootRoute, path: "/login" }),
+  createRoute({ component: ConnectPage, getParentRoute: () => rootRoute, path: "/connect" }),
   createRoute({ component: SuperAdminLoginPage, getParentRoute: () => rootRoute, path: "/sa/login" }),
   createRoute({ component: SaDesk, getParentRoute: () => rootRoute, path: "/sa" }),
   createRoute({ component: SaDesk, getParentRoute: () => rootRoute, path: "/sa/$" }),

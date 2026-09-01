@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 type Status = {
   bound: boolean;
@@ -15,8 +15,8 @@ type Status = {
 
 export function ConnectionServicePage({ apiUrl, token }: { apiUrl: string; token: string }) {
   const [status, setStatus] = useState<Status>();
-  const [deviceName, setDeviceName] = useState("Mobile device");
   const [code, setCode] = useState("");
+  const [cloudUrl, setCloudUrl] = useState("https://devkit.codexsun.com");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const request = useCallback(
@@ -41,7 +41,11 @@ export function ConnectionServicePage({ apiUrl, token }: { apiUrl: string; token
     [apiUrl, token]
   );
   const refresh = useCallback(
-    async () => setStatus(await request<Status>("/admin/sync/status")),
+    async () => {
+      const next = await request<Status>("/admin/sync/status");
+      setStatus(next);
+      setCloudUrl(next.cloudUrl);
+    },
     [request]
   );
   useEffect(() => {
@@ -97,8 +101,9 @@ export function ConnectionServicePage({ apiUrl, token }: { apiUrl: string; token
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {status.role === "local" && !status.bound ? (
           <View style={styles.form}>
-            <Text style={styles.label}>Device name</Text>
-            <TextInput onChangeText={setDeviceName} style={styles.input} value={deviceName} />
+            <Text style={styles.label}>Cloud domain</Text>
+            <TextInput autoCapitalize="none" keyboardType="url" onChangeText={setCloudUrl} placeholder="https://devkit.codexsun.com" style={styles.input} value={cloudUrl} />
+            <Text style={styles.device}>Connecting as <Text style={styles.deviceStrong}>mobile-devkit</Text></Text>
             <Text style={styles.label}>One-time connection code</Text>
             <TextInput
               autoCapitalize="characters"
@@ -109,13 +114,23 @@ export function ConnectionServicePage({ apiUrl, token }: { apiUrl: string; token
               value={code}
             />
             <Action
-              disabled={busy || deviceName.trim().length < 2 || code.length !== 16}
+              disabled={busy}
+              icon="open-outline"
+              label="Get connection code"
+              onPress={() =>
+                void run(async () => {
+                  await Linking.openURL(connectUrl(cloudUrl));
+                })
+              }
+            />
+            <Action
+              disabled={busy || code.length !== 16}
               icon="link-outline"
               label="Connect device"
               onPress={() =>
                 void run(async () => {
                   await request("/admin/sync/bind", {
-                    body: JSON.stringify({ instanceId: deviceName.trim(), token: code }),
+                    body: JSON.stringify({ cloudUrl: normalizedCloudUrl(cloudUrl), instanceId: "mobile-devkit", token: code }),
                     method: "POST"
                   });
                   setCode("");
@@ -186,6 +201,16 @@ export function ConnectionServicePage({ apiUrl, token }: { apiUrl: string; token
       </View>
     </View>
   );
+}
+
+function normalizedCloudUrl(value: string) {
+  return new URL(value.trim()).origin;
+}
+
+function connectUrl(cloudUrl: string) {
+  const url = new URL("/connect", normalizedCloudUrl(cloudUrl));
+  url.searchParams.set("device", "mobile-devkit");
+  return url.toString();
 }
 
 function Action({
@@ -269,6 +294,8 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", flex: 1, justifyContent: "center" },
   copy: { color: "#6f6f68", fontSize: 15, lineHeight: 22, marginTop: 7 },
   disabled: { opacity: 0.55 },
+  device: { color: "#686861", fontSize: 14, lineHeight: 21, paddingVertical: 5 },
+  deviceStrong: { color: "#292926", fontWeight: "700" },
   eyebrow: { color: "#65655f", fontSize: 11, fontWeight: "700", letterSpacing: 1.4 },
   form: { gap: 7, marginTop: 24 },
   heading: { color: "#292926", fontSize: 17, fontWeight: "700" },

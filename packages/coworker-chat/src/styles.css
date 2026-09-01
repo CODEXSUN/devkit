@@ -531,6 +531,7 @@ body {
   width: 32px;
 }
 .settings-icon-button:disabled {
+  cursor: default;
   opacity: 0.55;
 }
 .settings-message {
@@ -547,6 +548,14 @@ body {
   border-radius: 10px;
   margin-top: 24px;
   overflow: hidden;
+}
+.codex-connection-card.connected {
+  border-color: #afd5b8;
+  background: #f3faf4;
+}
+.codex-connection-card.connected .codex-connected-actions {
+  border-top-color: #cde5d2;
+  background: #f7fcf8;
 }
 .codex-connection-summary {
   align-items: flex-start;
@@ -650,6 +659,30 @@ body {
   font-size: 22px;
   letter-spacing: 0.2em;
 }
+.device-login-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.device-login-card .device-login-code button {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d6d6cf;
+  border-radius: 6px;
+  background: #fff;
+  color: #4d4d47;
+  font-size: 12px;
+  font-weight: 600;
+}
+.device-login-code button span {
+  display: inline;
+}
+.device-login-refresh {
+  color: #777770;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
 .device-login-card a,
 .device-login-card button {
   align-items: center;
@@ -661,6 +694,22 @@ body {
 }
 .device-login-card button {
   padding: 5px;
+}
+.device-login-card .device-login-open {
+  padding: 7px 8px;
+  white-space: nowrap;
+}
+.device-login-card .device-login-cancel {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 6px;
+}
+.device-login-card .device-login-open:hover,
+.device-login-card .device-login-cancel:hover,
+.device-login-card .device-login-code button:hover {
+  background: #ecece7;
 }
 .settings-security-note {
   align-items: flex-start;
@@ -719,13 +768,17 @@ body {
     align-items: flex-start;
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .device-login-card > button {
+  .device-login-card > .device-login-cancel {
     grid-column: 2;
     grid-row: 1;
   }
-  .device-login-card > a {
+  .device-login-card > .device-login-open {
     grid-column: 1;
     grid-row: 2;
+    justify-self: start;
+  }
+  .device-login-code {
+    flex-wrap: wrap;
   }
   .settings-row {
     align-items: flex-start;
@@ -3935,6 +3988,20 @@ body {
   gap: 14px;
   grid-template-columns: 1fr 1fr auto;
   margin-top: 28px;
+}
+.connection-service-device {
+  margin: 2px 0;
+  color: #686861;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.connection-service-device strong,
+.connection-service-device code {
+  color: #292926;
+  font-weight: 700;
+}
+.connection-service-form > .connection-service-device {
+  grid-column: 1 / -1;
 }
 .connection-service-form label {
   display: grid;

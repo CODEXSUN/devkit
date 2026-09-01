@@ -1,4 +1,4 @@
-import { Cloud, Link2, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import { Cloud, ExternalLink, Link2, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 type ConnectionStatus = {
@@ -30,16 +30,15 @@ export function ConnectionServiceWorkspace({
 }) {
   const request = useConnectionRequest(apiUrl, token);
   const [status, setStatus] = useState<ConnectionStatus>();
-  const [instanceId, setInstanceId] = useState(`${clientKind} device`);
   const [connectionToken, setConnectionToken] = useState("");
-  const [deviceLabel, setDeviceLabel] = useState(`${clientKind} device`);
-  const [generatedCode, setGeneratedCode] = useState("");
+  const [cloudUrl, setCloudUrl] = useState("https://devkit.codexsun.com");
   const [issuedTokens, setIssuedTokens] = useState<ConnectionToken[]>([]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const refresh = useCallback(async () => {
     const next = await request<ConnectionStatus>("/admin/sync/status");
     setStatus(next);
+    setCloudUrl(next.cloudUrl);
     if (next.role === "cloud")
       setIssuedTokens(await request<ConnectionToken[]>("/admin/sync/cloud/tokens"));
   }, [request]);
@@ -96,9 +95,10 @@ export function ConnectionServiceWorkspace({
           {status?.role === "local" && !status.bound ? (
             <div className="connection-service-form">
               <label>
-                <span>Device name</span>
-                <input onChange={(event) => setInstanceId(event.target.value)} value={instanceId} />
+                <span>Cloud domain</span>
+                <input onChange={(event) => setCloudUrl(event.target.value)} placeholder="https://devkit.codexsun.com" type="url" value={cloudUrl} />
               </label>
+              <p className="connection-service-device">Connecting as <strong>{deviceIdentity(clientKind)}</strong></p>
               <label>
                 <span>One-time connection code</span>
                 <input
@@ -109,16 +109,33 @@ export function ConnectionServiceWorkspace({
                 />
               </label>
               <button
+                disabled={busy === "connect"}
+                onClick={() => {
+                  try {
+                    window.open(
+                      connectUrl(cloudUrl, deviceIdentity(clientKind)),
+                      "_blank",
+                      "noopener,noreferrer"
+                    );
+                  } catch {
+                    setMessage("Enter a valid cloud domain, including https://.");
+                  }
+                }}
+                type="button"
+              >
+                <ExternalLink size={17} /> Get connection code
+              </button>
+              <button
                 disabled={
                   busy === "connect" ||
-                  instanceId.trim().length < 2 ||
                   connectionToken.length !== 16
                 }
                 onClick={() =>
                   void act("connect", async () => {
                     await request("/admin/sync/bind", {
                       body: JSON.stringify({
-                        instanceId: instanceId.trim(),
+                        cloudUrl: normalizedCloudUrl(cloudUrl),
+                        instanceId: deviceIdentity(clientKind),
                         token: connectionToken
                       }),
                       method: "POST"
@@ -196,45 +213,7 @@ export function ConnectionServiceWorkspace({
           ) : null}
           {status?.role === "cloud" ? (
             <div className="connection-service-cloud">
-              <div className="connection-service-form">
-                <label>
-                  <span>Device label</span>
-                  <input
-                    onChange={(event) => setDeviceLabel(event.target.value)}
-                    value={deviceLabel}
-                  />
-                </label>
-                <button
-                  disabled={busy === "generate" || !deviceLabel.trim()}
-                  onClick={() =>
-                    void act("generate", async () => {
-                      const result = await request<{ token: string }>("/admin/sync/cloud/tokens", {
-                        body: JSON.stringify({ label: deviceLabel.trim() }),
-                        method: "POST"
-                      });
-                      setGeneratedCode(result.token);
-                      setMessage("One-time code created for this device.");
-                    })
-                  }
-                  type="button"
-                >
-                  Generate code
-                </button>
-              </div>
-              {generatedCode ? (
-                <div className="connection-service-code">
-                  <span>
-                    <small>ONE-TIME CODE</small>
-                    <code>{generatedCode}</code>
-                  </span>
-                  <button
-                    onClick={() => void navigator.clipboard.writeText(generatedCode)}
-                    type="button"
-                  >
-                    Copy code
-                  </button>
-                </div>
-              ) : null}
+              <p className="connection-service-device">This installation is the <strong>web-devkit cloud server</strong>. It issues signed-in device codes from <code>/connect</code>.</p>
               <div className="connection-service-devices">
                 <h3>Your device codes</h3>
                 {issuedTokens.length ? (
@@ -323,4 +302,18 @@ function statusCopy(status?: ConnectionStatus) {
   if (status.role === "cloud") return "Issue account codes and review connected devices.";
   if (status.bound) return `Signed in · ${status.cloudUrl}`;
   return "Waiting for a one-time code from your cloud account.";
+}
+
+function normalizedCloudUrl(value: string) {
+  return new URL(value.trim()).origin;
+}
+
+function connectUrl(cloudUrl: string, instanceId: string) {
+  const url = new URL("/connect", normalizedCloudUrl(cloudUrl));
+  url.searchParams.set("device", instanceId.trim());
+  return url.toString();
+}
+
+function deviceIdentity(clientKind: "desktop" | "mobile" | "web") {
+  return `${clientKind}-devkit`;
 }

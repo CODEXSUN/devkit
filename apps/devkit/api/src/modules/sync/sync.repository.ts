@@ -248,7 +248,7 @@ export class DevkitSyncRepository {
       .executeTakeFirst();
   }
 
-  async saveConnection(input: { encryptedToken: string; instanceId: string }) {
+  async saveConnection(input: { encryptedToken: string; instanceId: string; serverUrl: string }) {
     await this.database
       .insertInto("devkit_sync_connections")
       .values({
@@ -260,7 +260,7 @@ export class DevkitSyncRepository {
         last_pulled_at: null,
         remote_revision: 0,
         server_id: "codexsun-cloud",
-        server_url: "https://devkit.codexsun.com",
+        server_url: input.serverUrl,
         status: "bound"
       })
       .onDuplicateKeyUpdate({
@@ -268,6 +268,7 @@ export class DevkitSyncRepository {
         instance_id: input.instanceId,
         last_error: null,
         last_verified_at: new Date(),
+        server_url: input.serverUrl,
         status: "bound"
       })
       .executeTakeFirst();

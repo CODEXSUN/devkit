@@ -1,7 +1,9 @@
 import {
   Archive,
   Bell,
+  Check,
   Cloud,
+  Copy,
   ExternalLink,
   KeyRound,
   Laptop,
@@ -63,12 +65,38 @@ export function SettingsWorkspace({
   const [message, setMessage] = useState("");
   const request = useSettingsRequest(apiUrl, token);
   const refreshConnections = useCallback(async () => {
-    setConnections(await request<CodexConnection[]>("/orchestration/codex/connections"));
+    const next = await request<CodexConnection[]>("/orchestration/codex/connections");
+    setConnections(next);
+    return next;
   }, [request]);
 
   useEffect(() => {
     void refreshConnections().catch((reason) => setMessage(errorMessage(reason)));
   }, [refreshConnections]);
+
+  useEffect(() => {
+    if (!deviceLogin) return;
+    let active = true;
+    const checkConnection = async () => {
+      try {
+        const next = await refreshConnections();
+        if (!active) return;
+        const primary = next.find((connection) => connection.default) ?? next[0];
+        if (primary?.connected) {
+          setDeviceLogin(undefined);
+          setMessage("Codex connected. This device is ready for agent work.");
+        }
+      } catch {
+        // Keep the short-lived login session active through temporary refresh failures.
+      }
+    };
+    void checkConnection();
+    const interval = window.setInterval(() => void checkConnection(), 3_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [deviceLogin, refreshConnections]);
 
   async function run(name: string, action: () => Promise<void>) {
     setBusy(name);
@@ -150,9 +178,7 @@ export function SettingsWorkspace({
                   method: "POST"
                 });
                 setDeviceLogin(login);
-                setMessage(
-                  "Enter the displayed code in your browser to authenticate this local Codex runtime."
-                );
+                setMessage("Device code ready. Connection status refreshes automatically during this session.");
               })
             }
             onLogout={(connectionId) =>
@@ -225,7 +251,28 @@ function CodexSettings({
   onLogout: (id: CodexConnection["id"]) => void;
   onRefresh: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const primary = connections.find((connection) => connection.default) ?? connections[0];
+
+  useEffect(() => setCopied(false), [deviceLogin?.userCode]);
+
+  async function copyDeviceCode() {
+    if (!deviceLogin) return;
+    try {
+      await copyText(deviceLogin.userCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2_000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  function openVerification() {
+    if (!deviceLogin) return;
+    void copyDeviceCode();
+    window.open(deviceLogin.verificationUrl, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <section className="settings-panel codex-settings-panel">
       <header>
@@ -240,7 +287,7 @@ function CodexSettings({
         <button
           aria-label="Refresh Codex connection"
           className="settings-icon-button"
-          disabled={busy === "refresh"}
+          disabled={busy === "refresh" || Boolean(primary?.connected)}
           onClick={onRefresh}
           type="button"
         >
@@ -253,7 +300,7 @@ function CodexSettings({
         </p>
       ) : null}
       {primary ? (
-        <div className="codex-connection-card">
+        <div className={`codex-connection-card${primary.connected ? " connected" : ""}`}>
           <div className="codex-connection-summary">
             <span className={primary.connected ? "settings-status connected" : "settings-status"}>
               <i />
@@ -310,13 +357,20 @@ function CodexSettings({
         <div className="device-login-card">
           <div>
             <small>DEVICE AUTHENTICATION</small>
-            <strong>{deviceLogin.userCode}</strong>
+            <span className="device-login-code">
+              <strong>{deviceLogin.userCode}</strong>
+              <button aria-label="Copy device authentication code" onClick={() => void copyDeviceCode()} title="Copy code" type="button">
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                <span>{copied ? "Copied" : "Copy"}</span>
+              </button>
+            </span>
             <p>Open the verification page, sign in, and enter this one-time code.</p>
+            <small className="device-login-refresh">Checking connection automatically every 3 seconds</small>
           </div>
-          <a href={deviceLogin.verificationUrl} rel="noreferrer" target="_blank">
+          <button className="device-login-open" onClick={openVerification} type="button">
             Open verification <ExternalLink size={15} />
-          </a>
-          <button aria-label="Cancel device sign-in" onClick={onCancelDeviceLogin} type="button">
+          </button>
+          <button aria-label="Cancel device sign-in" className="device-login-cancel" onClick={onCancelDeviceLogin} type="button">
             <X size={16} />
           </button>
         </div>
@@ -470,4 +524,19 @@ function notificationLabel(permission: NotificationPermission | "unsupported") {
   if (permission === "denied") return "Notifications blocked by system";
   if (permission === "unsupported") return "Notifications unavailable";
   return "Notifications are not enabled";
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const input = document.createElement("textarea");
+  input.value = value;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.append(input);
+  input.select();
+  document.execCommand("copy");
+  input.remove();
 }

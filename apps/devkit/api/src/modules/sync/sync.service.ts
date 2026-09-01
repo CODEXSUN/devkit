@@ -52,7 +52,7 @@ export class DevkitSyncService {
               : "unbound";
     return {
       bound: Boolean(connection),
-      cloudUrl: DEVKIT_SYNC_CLOUD_URL,
+      cloudUrl: connection?.server_url ?? DEVKIT_SYNC_CLOUD_URL,
       conflictCount: conflicts,
       instanceId: connection?.instance_id ?? process.env.DEVKIT_SYNC_INSTANCE_ID?.trim() ?? "",
       lastError: connection?.last_error ?? null,
@@ -102,14 +102,16 @@ export class DevkitSyncService {
     return { revoked: true as const, uuid };
   }
 
-  async bind(token: string, instanceId: string) {
+  async bind(token: string, instanceId: string, cloudUrl = DEVKIT_SYNC_CLOUD_URL) {
     this.requireRole("local");
     const normalizedToken = requiredToken(token);
     const normalizedInstance = requiredInstanceId(instanceId);
-    await cloudRequest<{ valid: true }>("/v1/status", normalizedToken);
+    const normalizedCloudUrl = requiredCloudUrl(cloudUrl);
+    await cloudRequest<{ valid: true }>("/v1/status", normalizedToken, undefined, normalizedCloudUrl);
     await this.repository.saveConnection({
       encryptedToken: encryptSyncToken(normalizedToken),
-      instanceId: normalizedInstance
+      instanceId: normalizedInstance,
+      serverUrl: normalizedCloudUrl
     });
     return this.status();
   }
@@ -125,7 +127,7 @@ export class DevkitSyncService {
         revision: number;
         serverId: string;
         valid: true;
-      }>("/v1/status", token);
+      }>("/v1/status", token, undefined, connection.server_url);
       await this.repository.updateConnection({
         error: null,
         revision: remote.revision,
@@ -155,10 +157,10 @@ export class DevkitSyncService {
       revision: number;
       serverId: string;
       valid: true;
-    }>("/v1/status", token);
+    }>("/v1/status", token, undefined, connection.server_url);
     const counts = await this.repository.projectCounts();
     return {
-      cloudUrl: DEVKIT_SYNC_CLOUD_URL,
+      cloudUrl: connection.server_url,
       instanceId: connection.instance_id,
       localAccepted: true as const,
       pendingProjects: counts.pending,
@@ -191,7 +193,7 @@ export class DevkitSyncService {
         records: number;
         revision: number;
         synchronizedAt: string;
-      }>("/v1/snapshot", token, { baseRevision: connection.remote_revision, snapshot });
+      }>("/v1/snapshot", token, { baseRevision: connection.remote_revision, snapshot }, connection.server_url);
       await this.repository.updateConnection({
         error: null,
         publishedAt: new Date(response.synchronizedAt),
@@ -227,7 +229,7 @@ export class DevkitSyncService {
       }>("/v1/snapshot", token, {
         baseRevision: connection.remote_revision,
         snapshot
-      });
+      }, connection.server_url);
       await this.repository.updateConnection({
         error: null,
         publishedAt: new Date(response.synchronizedAt),
@@ -270,7 +272,7 @@ export class DevkitSyncService {
     const run = await this.repository.startRun("pull", connection.remote_revision);
     try {
       const token = decryptSyncToken(connection.encrypted_token);
-      const response = await cloudRequest<CloudSnapshotEnvelope>("/v1/snapshot", token);
+      const response = await cloudRequest<CloudSnapshotEnvelope>("/v1/snapshot", token, undefined, connection.server_url);
       const pendingRecords = await this.repository.pendingCount();
       if (pendingRecords > 0 && response.revision > connection.remote_revision) {
         const message = `Cloud revision is ${response.revision}, but this installation has ${pendingRecords} pending local records. Publish or resolve local changes before pulling.`;
@@ -395,8 +397,8 @@ export class DevkitSyncService {
   }
 }
 
-async function cloudRequest<T>(path: string, token: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${cloudUrl()}${path}`, {
+async function cloudRequest<T>(path: string, token: string, body?: unknown, serverUrl?: string): Promise<T> {
+  const response = await fetch(`${cloudUrl(serverUrl)}${path}`, {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     headers: {
       accept: "application/json",
@@ -422,10 +424,18 @@ async function cloudRequest<T>(path: string, token: string, body?: unknown): Pro
   return result.data;
 }
 
-function cloudUrl() {
+function cloudUrl(serverUrl?: string) {
   const testUrl =
     process.env.NODE_ENV === "test" ? process.env.DEVKIT_SYNC_TEST_CLOUD_URL?.trim() : "";
-  return `${testUrl || `${DEVKIT_SYNC_CLOUD_URL}/api/devkit/sync/cloud`}`.replace(/\/+$/u, "");
+  return `${testUrl || `${serverUrl ?? DEVKIT_SYNC_CLOUD_URL}/api/devkit/sync/cloud`}`.replace(/\/+$/u, "");
+}
+
+function requiredCloudUrl(value: string) {
+  const url = new URL(value.trim());
+  if (url.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && url.protocol === "http:")) {
+    throw AppError.validation("Cloud domain must use HTTPS.");
+  }
+  return url.origin;
 }
 
 function requiredLabel(value: string) {
