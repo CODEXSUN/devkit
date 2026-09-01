@@ -1,8 +1,25 @@
 # Changelog
 
-Current version: 1.0.87
-Release tag: v-1.0.87
-Changelog label: v 1.0.87
+Current version: 1.0.88
+Release tag: v-1.0.88
+Changelog label: v 1.0.88
+
+## v-1.0.88
+
+### [v 1.0.88] 2026-09-01 12:29 pm - Live Messenger WebSocket proxy
+
+#### Database Changes
+
+- Database update: No.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.88.
+- Forwarded WebSocket upgrade headers through the DevKit API proxy so Messenger sockets can connect through the public web origin.
+
+#### Verification
+
+- Pending local quality checks and a production WebSocket handshake after the corrected proxy image is deployed.
 
 ## v-1.0.87
 
