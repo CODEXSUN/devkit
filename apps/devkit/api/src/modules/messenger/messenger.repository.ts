@@ -3,6 +3,8 @@ import { AppError } from "@codexsun/framework/errors";
 import { sql, type Kysely } from "kysely";
 import { getDevkitDatabase } from "../../database/devkit-database.js";
 import type { DevkitDatabase } from "../../database/schema.js";
+import { DirectConversation, MessengerMessageBody } from "./domain/messenger-conversation.js";
+import { MessengerMessageCursor } from "./domain/messenger-message-cursor.js";
 
 type ConversationRow = {
   archived_at: Date | null;
@@ -51,14 +53,34 @@ export class MessengerRepository {
   }
 
   async list(actorId: string, conversationId: string) {
+    return (await this.history(actorId, conversationId, 300)).items;
+  }
+
+  async history(actorId: string, conversationId: string, limit: number, before?: string) {
     await this.requireParticipant(actorId, conversationId);
     await this.database.updateTable("devkit_messenger_messages").set({ delivered_at: new Date() })
       .where("conversation_uuid", "=", conversationId).where("actor_id", "!=", actorId)
       .where("delivered_at", "is", null).execute();
-    const messages = await this.database.selectFrom("devkit_messenger_messages").selectAll()
-      .where("conversation_uuid", "=", conversationId)
-      .orderBy("created_at", "desc").orderBy("uuid", "desc").limit(300).execute();
-    return messages.reverse();
+    let query = this.database.selectFrom("devkit_messenger_messages").selectAll()
+      .where("conversation_uuid", "=", conversationId);
+    if (before) {
+      const cursor = MessengerMessageCursor.decode(before);
+      const createdAt = new Date(cursor.createdAt);
+      query = query.where(({ and, eb, or }) => or([
+        eb("created_at", "<", createdAt),
+        and([eb("created_at", "=", createdAt), eb("uuid", "<", cursor.uuid)])
+      ]));
+    }
+    const rows = await query.orderBy("created_at", "desc").orderBy("uuid", "desc").limit(limit + 1).execute();
+    const hasOlder = rows.length > limit;
+    const selected = rows.slice(0, limit);
+    const oldest = selected.at(-1);
+    return {
+      items: selected.reverse(),
+      nextCursor: hasOlder && oldest
+        ? MessengerMessageCursor.encode({ createdAt: oldest.created_at.toISOString(), uuid: oldest.uuid })
+        : null
+    };
   }
 
   async messageDetails(actorId: string, conversationId: string, messageIds: string[]) {
@@ -117,10 +139,17 @@ export class MessengerRepository {
 
   async create(actorId: string, activityActorId: string, conversationId: string, body: string, client: string) {
     await this.requireParticipant(actorId, conversationId);
+    const conversation = await this.database.selectFrom("devkit_messenger_conversations")
+      .select("kind").where("uuid", "=", conversationId).executeTakeFirstOrThrow();
+    const participants = await this.participantIds(actorId, conversationId);
+    const recipientActorId = conversation.kind === "direct"
+      ? DirectConversation.between(participants[0]!, participants[1]!).recipientFor(actorId)
+      : null;
+    const messageBody = MessengerMessageBody.create(body).value;
     const uuid = randomBytes(16).toString("hex");
     await this.database.transaction().execute(async (transaction) => {
       await transaction.insertInto("devkit_messenger_messages")
-        .values({ actor_id: actorId, body, client, conversation_uuid: conversationId, recipient_actor_id: null, uuid })
+        .values({ actor_id: actorId, body: messageBody, client, conversation_uuid: conversationId, recipient_actor_id: recipientActorId, uuid })
         .executeTakeFirstOrThrow();
       await transaction.updateTable("devkit_messenger_conversations")
         .set({ updated_at: new Date() }).where("uuid", "=", conversationId).executeTakeFirstOrThrow();
@@ -173,8 +202,8 @@ export class MessengerRepository {
 
   private async ensureDeviceConversation(actorId: string, activityActorId = actorId) {
     const uuid = conversationId("device", [actorId]);
-    const created = await this.insertConversation(uuid, "device", "My Devices", actorId);
-    await this.insertParticipant(uuid, actorId);
+    const created = await this.insertConversation(this.database, uuid, "device", "My Devices", actorId);
+    await this.insertParticipant(this.database, uuid, actorId);
     await this.database.updateTable("devkit_messenger_messages").set({ conversation_uuid: uuid })
       .where("actor_id", "=", actorId).where("recipient_actor_id", "is", null)
       .where("conversation_uuid", "is", null).execute();
@@ -184,27 +213,35 @@ export class MessengerRepository {
   }
 
   private async ensureDirectConversation(actorId: string, activityActorId: string, peerActorId: string) {
-    if (actorId === peerActorId) return this.ensureDeviceConversation(actorId, activityActorId);
-    const uuid = conversationId("direct", [actorId, peerActorId]);
-    const created = await this.insertConversation(uuid, "direct", "", actorId);
-    await Promise.all([this.insertParticipant(uuid, actorId), this.insertParticipant(uuid, peerActorId)]);
+    const directConversation = DirectConversation.between(actorId, peerActorId);
+    const uuid = directConversation.id;
+    await this.database.transaction().execute(async (transaction) => {
+      const created = await this.insertConversation(transaction, uuid, "direct", "", actorId);
+      await this.insertParticipant(transaction, uuid, actorId);
+      await this.insertParticipant(transaction, uuid, peerActorId);
+      if (created) {
+        await writeActivity(transaction, activityActorId, "conversation-created", uuid, {
+          kind: "direct",
+          peerActorId
+        });
+      }
+    });
     await sql`UPDATE devkit_messenger_messages SET conversation_uuid=${uuid}
       WHERE conversation_uuid IS NULL AND ((actor_id=${actorId} AND recipient_actor_id=${peerActorId})
       OR (actor_id=${peerActorId} AND recipient_actor_id=${actorId}))`.execute(this.database);
     await this.refreshConversationTime(uuid);
-    if (created) await writeActivity(this.database, activityActorId, "conversation-created", uuid, { kind: "direct", peerActorId });
     return uuid;
   }
 
-  private async insertConversation(uuid: string, kind: string, title: string, actorId: string) {
+  private async insertConversation(database: Kysely<DevkitDatabase>, uuid: string, kind: string, title: string, actorId: string) {
     const result = await sql`INSERT IGNORE INTO devkit_messenger_conversations
-      (uuid,kind,title,created_by_actor_id) VALUES (${uuid},${kind},${title},${actorId})`.execute(this.database);
+      (uuid,kind,title,created_by_actor_id) VALUES (${uuid},${kind},${title},${actorId})`.execute(database);
     return Number(result.numAffectedRows ?? 0) > 0;
   }
 
-  private insertParticipant(conversationUuid: string, actorId: string) {
+  private insertParticipant(database: Kysely<DevkitDatabase>, conversationUuid: string, actorId: string) {
     return sql`INSERT IGNORE INTO devkit_messenger_participants
-      (conversation_uuid,actor_id) VALUES (${conversationUuid},${actorId})`.execute(this.database);
+      (conversation_uuid,actor_id) VALUES (${conversationUuid},${actorId})`.execute(database);
   }
 
   private async requireParticipant(actorId: string, conversationId: string) {

@@ -4,6 +4,7 @@ export type DevkitActor = {
   canMessageActor?: (actorId: string) => Promise<boolean>;
   email?: string;
   id: string;
+  messageableActors?: () => Promise<Array<{ email: string; name: string; uuid: string }>>;
   permissions: readonly string[];
   roles: readonly string[];
 };

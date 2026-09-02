@@ -4,15 +4,20 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireDevkitActor } from "../../request-context.js";
 import { MessengerRepository } from "./messenger.repository.js";
+import { MessengerService } from "./messenger.service.js";
+import { MessengerRateLimiter } from "./messenger-rate-limit.js";
 import { publishMessengerEvent, publishMessengerUnreadEvent } from "./messenger.runtime.js";
 import { MessengerAttachmentStorage, validateMessengerAttachment } from "./messenger.storage.js";
 import { randomBytes } from "node:crypto";
 
 const repository = new MessengerRepository();
+const service = new MessengerService(repository);
+const rateLimiter = new MessengerRateLimiter();
 const id = z.string().trim().length(32);
 const actorId = z.string().trim().min(1).max(160);
-const conversationInput = z.object({ peerActorId: actorId.optional() }).strict();
+const conversationInput = z.object({ peerActorId: actorId }).strict();
 const conversationParams = z.object({ conversationId: id }).strict();
+const historyQuery = z.object({ before: z.string().trim().max(512).optional(), limit: z.coerce.number().int().min(20).max(100).default(50) }).strict();
 const sendSchema = z.object({ body: z.string().trim().min(1).max(8_000), client: z.enum(["desktop", "mobile", "web"]) }).strict();
 const preferenceSchema = z.object({ archived: z.boolean().optional(), muted: z.boolean().optional() }).strict().refine((input) => input.archived !== undefined || input.muted !== undefined);
 const messageParams = conversationParams.extend({ messageId: id });
@@ -22,19 +27,28 @@ const reactionSchema = z.object({ emoji: z.enum(["👍", "❤️", "😂", "😮
 const attachmentStorage = new MessengerAttachmentStorage();
 
 export function registerMessengerRoutes(app: FastifyInstance) {
+  app.get("/messenger/contacts", async (request) =>
+    ok(await service.contacts(requireDevkitActor()), { requestId: request.id })
+  );
   app.get("/messenger/conversations", async (request) => {
     const actor = requireDevkitActor();
     return ok((await repository.conversations(actor.id)).map(mapConversation), { requestId: request.id });
   });
   app.post("/messenger/conversations", async (request) => {
     const actor = requireDevkitActor();
+    rateLimiter.consume(actor.id, "conversation");
     const input = conversationInput.parse(request.body);
-    if (input.peerActorId && actor.canMessageActor && !(await actor.canMessageActor(input.peerActorId))) {
-      throw AppError.notFound("Messenger recipient is not an active user.");
-    }
-    const conversationId = await repository.conversation(actor.id, actor.id, input.peerActorId);
-    const conversation = (await repository.conversations(actor.id)).find((item) => item.uuid === conversationId)!;
-    await publishUnreadState(await repository.participantIds(actor.id, conversationId), conversationId);
+    const conversation = await service.openDirectConversation(actor, input.peerActorId);
+    await publishUnreadState(await repository.participantIds(actor.id, conversation.uuid), conversation.uuid);
+    return ok(mapConversation(conversation), { requestId: request.id });
+  });
+  app.post("/messenger/device-conversation", async (request) => {
+    const actor = requireDevkitActor();
+    const conversationId = await repository.conversation(actor.id, actor.id);
+    const conversation = (await repository.conversations(actor.id)).find(
+      (item) => item.uuid === conversationId
+    );
+    if (!conversation) throw AppError.notFound("Device conversation was not found.");
     return ok(mapConversation(conversation), { requestId: request.id });
   });
   app.get("/messenger/conversations/:conversationId/messages", async (request) => {
@@ -44,8 +58,20 @@ export function registerMessengerRoutes(app: FastifyInstance) {
     const details = await repository.messageDetails(actor.id, conversationId, messages.map((message) => message.uuid));
     return ok(messages.map((message) => mapMessage(message, details)), { requestId: request.id });
   });
+  app.get("/messenger/conversations/:conversationId/message-history", async (request) => {
+    const actor = requireDevkitActor();
+    const { conversationId } = conversationParams.parse(request.params);
+    const query = historyQuery.parse(request.query);
+    const page = await repository.history(actor.id, conversationId, query.limit, query.before);
+    const details = await repository.messageDetails(actor.id, conversationId, page.items.map((message) => message.uuid));
+    return ok({
+      items: page.items.map((message) => mapMessage(message, details)),
+      nextCursor: page.nextCursor
+    }, { requestId: request.id });
+  });
   app.post("/messenger/conversations/:conversationId/messages/:messageId/attachments", async (request) => {
     const actor = requireDevkitActor();
+    rateLimiter.consume(actor.id, "attachment");
     const { conversationId, messageId } = messageParams.parse(request.params);
     const headers = attachmentHeaders.parse(request.headers);
     if (!Buffer.isBuffer(request.body)) throw AppError.validation("Attachment request body must be binary.");
@@ -67,10 +93,17 @@ export function registerMessengerRoutes(app: FastifyInstance) {
     const actor = requireDevkitActor();
     const { conversationId, attachmentId } = attachmentParams.parse(request.params);
     const attachment = await repository.attachment(actor.id, conversationId, attachmentId);
-    return reply.header("cache-control", "private, no-store").header("content-type", attachment.mime_type).header("content-disposition", `inline; filename*=UTF-8''${encodeURIComponent(attachment.original_name)}`).send(await attachmentStorage.read(attachment.storage_key));
+    return reply
+      .header("cache-control", "private, no-store")
+      .header("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(attachment.original_name)}`)
+      .header("content-security-policy", "sandbox")
+      .header("content-type", attachment.mime_type)
+      .header("x-content-type-options", "nosniff")
+      .send(await attachmentStorage.read(attachment.storage_key));
   });
   app.post("/messenger/conversations/:conversationId/messages/:messageId/reactions", async (request) => {
     const actor = requireDevkitActor();
+    rateLimiter.consume(actor.id, "reaction");
     const { conversationId, messageId } = messageParams.parse(request.params);
     const { emoji } = reactionSchema.parse(request.body);
     const reactions = (await repository.toggleReaction(actor.id, conversationId, messageId, emoji)).map((row) => ({ actorId: row.actor_id, emoji: row.emoji, id: row.uuid }));
@@ -79,9 +112,10 @@ export function registerMessengerRoutes(app: FastifyInstance) {
   });
   app.post("/messenger/conversations/:conversationId/messages", async (request) => {
     const actor = requireDevkitActor();
+    rateLimiter.consume(actor.id, "message");
     const { conversationId } = conversationParams.parse(request.params);
     const input = sendSchema.parse(request.body);
-    const message = mapMessage(await repository.create(actor.id, actor.id, conversationId, input.body, input.client));
+    const message = mapMessage(await service.send(actor, conversationId, input.body, input.client));
     const actorIds = await repository.participantIds(actor.id, conversationId);
     publishMessengerEvent({ actorIds, message });
     await publishUnreadState(actorIds, conversationId);

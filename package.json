@@ -1,6 +1,6 @@
 {
   "name": "devkit",
-  "version": "1.0.99",
+  "version": "1.0.100",
   "private": true,
   "packageManager": "npm@12.0.2",
   "description": "CodeLogicX developer and engineering orchestration workspace",
@@ -52,6 +52,7 @@
     "dependencies:clean": "node tools/clean-workspace-artifacts.mjs",
     "dependencies:check": "node tools/check-root-node-modules.mjs",
     "test": "npm test --workspace @codexsun/framework && npm run test:exports --workspace @codexsun/framework && npm run package:check --workspace @codexsun/framework",
+    "test:messenger": "npm run test:messenger --workspace @codexsun/devkit-api && npm run test:messenger --workspace @codexsun/coworker-chat && npm run test:messenger --workspace @devkit/platform-api",
     "test:e2e:runtime": "node tools/e2e/runtime-smoke.e2e.mjs",
     "test:e2e:launch-desk": "node tools/e2e/launch-desk-stream.e2e.mjs",
     "test:e2e:codex-chat": "node tools/e2e/codex-chat.e2e.mjs",

@@ -12,7 +12,10 @@ export function MessengerDeviceWorkspace({
   clientKind,
   contacts,
   error,
+  hasOlder,
+  loadingOlder,
   messages,
+  onLoadOlder,
   onRefresh,
   onReact,
   onSend,
@@ -25,7 +28,10 @@ export function MessengerDeviceWorkspace({
   clientKind: MessengerClientKind;
   contacts: MessengerContact[];
   error: string;
+  hasOlder: boolean;
+  loadingOlder: boolean;
   messages: MessengerMessage[];
+  onLoadOlder: () => Promise<boolean>;
   onRefresh: () => Promise<void>;
   onReact: (messageId: string, emoji: string) => Promise<void>;
   onSend: (body: string, files?: File[]) => Promise<boolean>;
@@ -128,6 +134,17 @@ export function MessengerDeviceWorkspace({
     composerRef.current?.focus();
   }
 
+  async function loadOlderMessages() {
+    const thread = threadRef.current;
+    if (!thread) return;
+    const previousHeight = thread.scrollHeight;
+    const previousTop = thread.scrollTop;
+    if (!(await onLoadOlder())) return;
+    requestAnimationFrame(() => {
+      thread.scrollTop = previousTop + thread.scrollHeight - previousHeight;
+    });
+  }
+
   return (
     <section
       className={`messenger-device-space${dragActive ? " drag-active" : ""}`}
@@ -149,6 +166,7 @@ export function MessengerDeviceWorkspace({
         }}
         ref={threadRef}
       >
+        {hasOlder ? <button className="messenger-load-older" disabled={loadingOlder} onClick={() => void loadOlderMessages()} type="button">{loadingOlder ? "Loading…" : "Load older messages"}</button> : null}
         {activeTag ? <div className="messenger-tag-filter"><Hash size={14} /><span>Showing #{activeTag}</span><button onClick={() => setActiveTag("")} type="button">Clear</button></div> : null}
         {visibleMessages.length ? (
           visibleMessages.map((message, index) => {

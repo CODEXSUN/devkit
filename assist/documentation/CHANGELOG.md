@@ -1,8 +1,47 @@
 # Changelog
 
-Current version: 1.0.99
-Release tag: v-1.0.99
-Changelog label: v 1.0.99
+Current version: 1.0.100
+Release tag: v-1.0.100
+Changelog label: v 1.0.100
+
+## v-1.0.100
+
+### [v 1.0.100] 2026-09-02 10:08 am - Messenger history and runtime safeguards
+
+#### Database Changes
+
+- Database update: No.
+- No migration, schema, seed, or persisted data changed.
+
+#### App Codebase Changes
+
+- Bumped repository version to 1.0.100.
+- Split Messenger rules into a domain layer and use cases into an application service.
+- Added stable direct-conversation identity, recipient, participant, and message-body rules.
+- Added a Messenger-owned contact endpoint for active application users other than the signed-in user.
+- Kept Platform identity behind the DevKit host actor contract.
+- Made mobile Messenger open user chats and kept device chat in a separate My Device workspace.
+- Added older-message pagination and preserved explicit device-chat compatibility routes.
+- Added strict shared contracts for actors, conversations, recipients, delivery state, and read state.
+- Removed the unverified JWT profile fallback from the Messenger client.
+- Disconnected Messenger sockets when their verified authentication token expires.
+- Added actor and action rate limits for conversations, messages, attachments, and reactions.
+- Added attachment download headers and rejected active or spoofed attachment content.
+- Created direct conversations and both participants in one database transaction.
+- Added Messenger module guidance and focused domain, service, storage, runtime, socket, and client tests.
+- Updated the Messenger defect record with the implemented boundaries and remaining live checks.
+- Added stable cursor pagination for older Messenger messages.
+- Kept the existing message endpoint for compatibility with older clients.
+- Preserved the visible message position when web, desktop, or mobile loads older messages.
+- Kept live refreshes additive so they do not remove loaded message history.
+
+#### Verification
+
+- Passed 29 focused Messenger tests across the API and shared client packages.
+- Passed API, shared client, and mobile TypeScript checks.
+- Passed API, shared client, and mobile lint checks.
+- Passed focused whitespace validation for the changed Messenger files.
+- Authenticated multi-client runtime checks were not run because the local API was not available.
 
 ## v-1.0.99
 
@@ -735,7 +774,12 @@ Changelog label: v 1.0.99
 
 #### Verification
 
-- Not yet run. Add the exact commands and live checks before commit.
+- Passed `npm.cmd run test:messenger` with 29 tests across the DevKit API, shared client, and Platform socket session.
+- Passed DevKit API typecheck, lint, and build.
+- Passed shared Coworker Chat typecheck and lint.
+- Passed Platform API typecheck, lint, and build.
+- Passed mobile typecheck and Platform Web typecheck and lint.
+- Authenticated multi-user browser, desktop, mobile, database, and WebSocket checks were not run.
 
 ## v-1.0.78
 

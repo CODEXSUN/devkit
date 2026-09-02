@@ -25,6 +25,7 @@ import { rolePermissionModule } from "./modules/role-permission/index.js";
 import { roleModule } from "./modules/role/index.js";
 import { userRoleModule } from "./modules/user-role/index.js";
 import { userModule } from "./modules/user/index.js";
+import { messengerSocketExpiryDelay } from "./messenger-socket-session.js";
 
 const modules = [userModule, roleModule, permissionModule, userRoleModule, rolePermissionModule];
 
@@ -99,6 +100,13 @@ export async function createApp() {
               canMessageActor: async (actorId: string) => Boolean(await context.database.selectFrom("users").select("uuid").where("uuid", "=", actorId).where("status", "=", "active").executeTakeFirst()),
               email: actor.email,
               id: actor.uuid,
+              messageableActors: async () => context.database
+                .selectFrom("users")
+                .select(["email", "name", "uuid"])
+                .where("status", "=", "active")
+                .where("uuid", "!=", actor.uuid)
+                .orderBy("name", "asc")
+                .execute(),
               permissions: [],
               roles: [actor.role]
             },
@@ -163,16 +171,23 @@ function registerMessengerSocket(app: Awaited<ReturnType<typeof createApiApp>>) 
     const actor = verifyAuthToken(authorization.replace(/^Bearer\s+/iu, ""));
     if (!actor) return next(new Error("Messenger authentication failed."));
     socket.data.actorId = actor.userId;
+    socket.data.expiresAt = actor.exp * 1_000;
     socket.join(`actor:${actor.userId}`);
     next();
   });
   io.on("connection", (socket) => {
     const actorId = String(socket.data.actorId);
+    const expiresAt = Number(socket.data.expiresAt);
+    const expiryTimer = globalThis.setTimeout(
+      () => socket.disconnect(true),
+      messengerSocketExpiryDelay(expiresAt)
+    );
     const connectionCount = (actorConnections.get(actorId) ?? 0) + 1;
     actorConnections.set(actorId, connectionCount);
     socket.emit("messenger.presence.snapshot", [...actorConnections.keys()]);
     if (connectionCount === 1) io.emit("messenger.presence", { actorId, online: true });
     socket.on("disconnect", () => {
+      globalThis.clearTimeout(expiryTimer);
       const remaining = Math.max(0, (actorConnections.get(actorId) ?? 1) - 1);
       if (remaining) actorConnections.set(actorId, remaining);
       else {

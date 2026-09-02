@@ -50,6 +50,7 @@ const messengerDeskPaths = new Set([
   "/app/devkit/chat",
   "/app/devkit/dashboard",
   "/app/devkit/docs",
+  "/app/devkit/devices",
   "/app/devkit/ideas",
   "/app/devkit/projects",
   "/app/devkit/settings",

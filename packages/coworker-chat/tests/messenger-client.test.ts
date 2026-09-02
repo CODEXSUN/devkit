@@ -10,15 +10,25 @@ import {
 import { isMessengerConversationMessage } from "../src/use-messenger";
 
 const first: MessengerMessage = {
+  actorId: "user-a",
   body: "First",
   client: "web",
+  conversationId: "c".repeat(32),
   createdAt: "2026-08-30T08:00:00.000Z",
+  deliveredAt: null,
+  readAt: null,
+  recipientActorId: "user-b",
   uuid: "first"
 };
 const second: MessengerMessage = {
+  actorId: "user-b",
   body: "Second",
   client: "mobile",
+  conversationId: "c".repeat(32),
   createdAt: "2026-08-30T08:01:00.000Z",
+  deliveredAt: null,
+  readAt: null,
+  recipientActorId: "user-a",
   uuid: "second"
 };
 
@@ -50,8 +60,8 @@ test("direct chats align the signed-in actor on the right", () => {
 });
 
 test("private device chat accepts only the signed-in actor without a recipient", () => {
-  assert.equal(isMessengerConversationMessage({ ...first, actorId: "me" }, "me", ""), true);
-  assert.equal(isMessengerConversationMessage({ ...first, actorId: "other" }, "me", ""), false);
+  assert.equal(isMessengerConversationMessage({ ...first, actorId: "me", recipientActorId: null }, "me", ""), true);
+  assert.equal(isMessengerConversationMessage({ ...first, actorId: "other", recipientActorId: null }, "me", ""), false);
   assert.equal(isMessengerConversationMessage({ ...first, actorId: "me", recipientActorId: "other" }, "me", ""), false);
 });
 
@@ -85,7 +95,7 @@ test("MessengerClient uses durable conversation routes", async () => {
   assert.equal(requests[2]?.body, JSON.stringify({ muted: true }));
 });
 
-test("MessengerClient uses identity routes relative to the configured API prefix", async () => {
+test("MessengerClient uses Messenger contacts and Platform profile routes", async () => {
   const requests: string[] = [];
   const fetcher = (async (input: RequestInfo | URL) => {
     requests.push(String(input));
@@ -98,7 +108,38 @@ test("MessengerClient uses identity routes relative to the configured API prefix
   await client.contacts();
   await client.profile();
   assert.deepEqual(requests, [
-    "https://devkit.example/api/platform/identity/contacts",
+    "https://devkit.example/api/platform/api/devkit/messenger/contacts",
     "https://devkit.example/api/platform/identity/profile"
   ]);
+});
+
+test("MessengerClient keeps the legacy device chat on its explicit route", async () => {
+  const requests: string[] = [];
+  const fetcher = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response(JSON.stringify({ data: { id: "d".repeat(32) }, success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  }) as typeof fetch;
+  const client = new MessengerClient("http://localhost:9050", () => "token", fetcher);
+  await client.deviceConversation();
+  assert.deepEqual(requests, ["http://localhost:9050/api/devkit/messenger/device-conversation"]);
+});
+
+test("MessengerClient requests older history with an encoded cursor", async () => {
+  const requests: string[] = [];
+  const fetcher = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response(JSON.stringify({ data: { items: [], nextCursor: null }, success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  }) as typeof fetch;
+  const client = new MessengerClient("http://localhost:9050", () => "token", fetcher);
+  await client.history("c".repeat(32), "date/id+cursor");
+  assert.equal(
+    requests[0],
+    `http://localhost:9050/api/devkit/messenger/conversations/${"c".repeat(32)}/message-history?limit=50&before=date%2Fid%2Bcursor`
+  );
 });

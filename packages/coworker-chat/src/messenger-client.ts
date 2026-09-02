@@ -1,14 +1,14 @@
 export type MessengerClientKind = "desktop" | "mobile" | "web";
 
 export type MessengerMessage = {
-  actorId?: string;
+  actorId: string;
   body: string;
   client: MessengerClientKind;
-  conversationId?: string;
+  conversationId: string;
   createdAt: string;
-  deliveredAt?: string | null;
-  recipientActorId?: string | null;
-  readAt?: string | null;
+  deliveredAt: string | null;
+  recipientActorId: string | null;
+  readAt: string | null;
   uuid: string;
   attachments?: MessengerAttachment[];
   reactions?: MessengerReaction[];
@@ -55,6 +55,7 @@ export type MessengerUnreadEvent = {
   totalUnread: number;
 };
 export type MessengerPresenceEvent = { actorId: string; online: boolean };
+export type MessengerMessagePage = { items: MessengerMessage[]; nextCursor: string | null };
 
 type Envelope<T> = { data: T; success: true } | { error: { message: string }; success: false };
 
@@ -73,15 +74,28 @@ export class MessengerClient {
     return this.request<MessengerConversation[]>("/api/devkit/messenger/conversations");
   }
 
-  conversation(peerActorId?: string) {
+  conversation(peerActorId: string) {
     return this.request<MessengerConversation>("/api/devkit/messenger/conversations", {
-      body: JSON.stringify(peerActorId ? { peerActorId } : {}),
+      body: JSON.stringify({ peerActorId }),
+      method: "POST"
+    });
+  }
+
+  deviceConversation() {
+    return this.request<MessengerConversation>("/api/devkit/messenger/device-conversation", {
+      body: "{}",
       method: "POST"
     });
   }
 
   list(conversationId: string) {
     return this.request<MessengerMessage[]>(`/api/devkit/messenger/conversations/${conversationId}/messages`);
+  }
+
+  history(conversationId: string, before?: string) {
+    const query = new URLSearchParams({ limit: "50" });
+    if (before) query.set("before", before);
+    return this.request<MessengerMessagePage>(`/api/devkit/messenger/conversations/${conversationId}/message-history?${query.toString()}`);
   }
 
   send(conversationId: string, body: string, client: MessengerClientKind) {
@@ -132,7 +146,7 @@ export class MessengerClient {
   }
 
   contacts() {
-    return this.request<MessengerContact[]>("/identity/contacts");
+    return this.request<MessengerContact[]>("/api/devkit/messenger/contacts");
   }
 
   profile() {

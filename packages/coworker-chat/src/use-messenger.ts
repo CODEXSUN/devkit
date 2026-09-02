@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   mergeMessengerMessage,
   MessengerClient,
+  reconcileMessengerMessages,
   type MessengerClientKind,
   type MessengerContact,
   type MessengerConversation,
@@ -21,11 +22,13 @@ export function useMessenger({
   active = true,
   apiUrl,
   clientKind,
+  deviceConversation = false,
   token
 }: {
   active?: boolean;
   apiUrl: string;
   clientKind: MessengerClientKind;
+  deviceConversation?: boolean;
   token: string;
 }) {
   const baseUrl = apiUrl.replace(/\/+$/u, "");
@@ -36,6 +39,8 @@ export function useMessenger({
   >("connecting");
   const [error, setError] = useState("");
   const [messages, setMessages] = useState<MessengerMessage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [activity, setActivity] = useState<MessengerActivity[]>([]);
   const [conversations, setConversations] = useState<MessengerConversation[]>([]);
   const [conversationId, setConversationId] = useState("");
@@ -71,8 +76,8 @@ export function useMessenger({
     setSyncing(true);
     try {
       if (!conversationId) return;
-      const latest = await client.list(conversationId);
-      setMessages((current) => (sameMessages(current, latest) ? current : latest));
+      const latest = await client.history(conversationId);
+      setMessages((current) => reconcileMessengerMessages(current, latest.items));
       setError("");
       const [conversationResult] = await Promise.allSettled([
         client.conversations(),
@@ -91,17 +96,25 @@ export function useMessenger({
 
   useEffect(() => {
     setMessages([]);
+    setHistoryCursor(null);
     setError("");
     setConversationId("");
+    if (!peerActorId && !deviceConversation) {
+      setActivity([]);
+      return;
+    }
     const load = ++conversationLoad.current;
-    void client
-      .conversation(peerActorId || undefined)
+    const openConversation = peerActorId
+      ? client.conversation(peerActorId)
+      : client.deviceConversation();
+    void openConversation
       .then(async (conversation) => {
         if (load !== conversationLoad.current) return;
         setConversationId(conversation.id);
-        const items = await client.list(conversation.id);
+        const page = await client.history(conversation.id);
         if (load !== conversationLoad.current) return;
-        setMessages(items);
+        setMessages(page.items);
+        setHistoryCursor(page.nextCursor);
         setError("");
         const log = await client.activity(conversation.id).catch(() => []);
         if (load !== conversationLoad.current) return;
@@ -113,7 +126,7 @@ export function useMessenger({
     return () => {
       if (load === conversationLoad.current) conversationLoad.current += 1;
     };
-  }, [client, peerActorId]);
+  }, [client, deviceConversation, peerActorId]);
 
   useEffect(() => {
     void Promise.allSettled([client.contacts(), client.profile(), client.conversations()]).then(
@@ -124,7 +137,8 @@ export function useMessenger({
         }
         if (contactResult.status === "fulfilled") {
           const ownId = profileResult.status === "fulfilled" ? profileResult.value.uuid : "";
-          setContacts(contactResult.value.filter((contact) => contact.uuid !== ownId));
+          const availableContacts = contactResult.value.filter((contact) => contact.uuid !== ownId);
+          setContacts(availableContacts);
         }
         if (conversationResult.status === "fulfilled") {
           setConversations(conversationResult.value);
@@ -261,8 +275,8 @@ export function useMessenger({
         setMessages((current) => mergeMessengerMessage(current, message));
         if (files.length)
           await Promise.all(files.map((file) => client.attach(conversationId, message.uuid, file)));
-        const latest = await client.list(conversationId);
-        setMessages((current) => (sameMessages(current, latest) ? current : latest));
+        const latest = await client.history(conversationId);
+        setMessages((current) => reconcileMessengerMessages(current, latest.items));
         const log = await client.activity(conversationId).catch(() => null);
         if (log) setActivity(log);
         setError("");
@@ -281,11 +295,28 @@ export function useMessenger({
     async (messageId: string, emoji: string) => {
       if (!conversationId) return;
       await client.react(conversationId, messageId, emoji);
-      const latest = await client.list(conversationId);
-      setMessages((current) => (sameMessages(current, latest) ? current : latest));
+      const latest = await client.history(conversationId);
+      setMessages((current) => reconcileMessengerMessages(current, latest.items));
     },
     [client, conversationId]
   );
+
+  const loadOlder = useCallback(async () => {
+    if (!conversationId || !historyCursor || loadingOlder) return false;
+    setLoadingOlder(true);
+    try {
+      const page = await client.history(conversationId, historyCursor);
+      setMessages((current) => reconcileMessengerMessages(page.items, current));
+      setHistoryCursor(page.nextCursor);
+      setError("");
+      return true;
+    } catch (reason) {
+      setError(messageFrom(reason));
+      return false;
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [client, conversationId, historyCursor, loadingOlder]);
 
   const updateConversationPreferences = useCallback(
     async (targetId: string, input: { archived?: boolean; muted?: boolean }) => {
@@ -315,6 +346,9 @@ export function useMessenger({
     contacts,
     conversations,
     error,
+    hasOlder: Boolean(historyCursor),
+    loadOlder,
+    loadingOlder,
     messages,
     notificationPermission,
     onlineActorIds,
@@ -349,26 +383,6 @@ function messageFrom(reason: unknown) {
   return reason instanceof Error
     ? reason.message
     : "Messenger could not connect. Please try again.";
-}
-
-function sameMessages(current: MessengerMessage[], latest: MessengerMessage[]) {
-  if (current.length !== latest.length) return false;
-  return current.every((message, index) => {
-    const next = latest[index];
-    return (
-      next?.uuid === message.uuid &&
-      next.createdAt === message.createdAt &&
-      next.deliveredAt === message.deliveredAt &&
-      next.readAt === message.readAt &&
-      next.body === message.body &&
-      sameMessageItems(next.attachments, message.attachments) &&
-      sameMessageItems(next.reactions, message.reactions)
-    );
-  });
-}
-
-function sameMessageItems(left: unknown[] | undefined, right: unknown[] | undefined) {
-  return JSON.stringify(left ?? []) === JSON.stringify(right ?? []);
 }
 
 function isConversationVisible(active: boolean) {

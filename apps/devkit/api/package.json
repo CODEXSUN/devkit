@@ -1,6 +1,6 @@
 {
   "name": "@codexsun/devkit-api",
-  "version": "1.0.99",
+  "version": "1.0.100",
   "private": true,
   "type": "module",
   "exports": {
@@ -12,11 +12,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test:messenger": "tsx --test src/modules/messenger/**/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
-    "@codexsun/framework": "1.0.99",
+    "@codexsun/framework": "1.0.100",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/agents": "^0.17.0",
     "@openai/codex": "^0.150.1",

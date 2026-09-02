@@ -55,4 +55,17 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required")
 });
 
-export const env = loadEnv(envSchema);
+const loadedEnv = loadEnv(envSchema);
+
+export const env = {
+  ...loadedEnv,
+  REDIS_URL: localDevelopmentRedisUrl(loadedEnv.REDIS_URL, loadedEnv.NODE_ENV)
+};
+
+export function localDevelopmentRedisUrl(redisUrl: string, environment: string) {
+  if (!redisUrl || environment !== "development") return redisUrl;
+  const url = new URL(redisUrl);
+  if (url.hostname !== "cxapp-redis") return redisUrl;
+  url.hostname = "127.0.0.1";
+  return url.toString();
+}

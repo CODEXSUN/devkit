@@ -30,6 +30,9 @@ export function MessengerMobile({
     contacts,
     conversations,
     error,
+    hasOlder,
+    loadOlder,
+    loadingOlder,
     messages,
     onlineActorIds,
     peerActorId,
@@ -52,6 +55,9 @@ export function MessengerMobile({
     atBottom.current = true;
     requestAnimationFrame(() => list.current?.scrollToEnd({ animated: false }));
   }, [peerActorId]);
+  useEffect(() => {
+    if (!peerActorId && contacts[0]) setPeerActorId(contacts[0].uuid);
+  }, [contacts, peerActorId, setPeerActorId]);
   async function submitMessage() {
     const text = body.trim();
     if (!text || sending) return;
@@ -65,12 +71,12 @@ export function MessengerMobile({
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>{selectedContact?.name ?? "My Devices"}</Text>
+            <Text style={styles.title}>{selectedContact?.name ?? "Messenger"}</Text>
             <Text style={styles.caption}>
               {selectedContact
                 ? onlineActorIds.includes(selectedContact.uuid) ? "Online" : "Offline"
                 : connected
-                ? "Web, desktop, and mobile"
+                ? "Select a user to start a chat"
                 : syncing
                   ? "Syncing your messages"
                   : "Offline — refresh to retry"}
@@ -84,7 +90,6 @@ export function MessengerMobile({
         <View style={styles.contactPicker}>
           <View style={styles.contactSearch}><Ionicons color="#777770" name="search-outline" size={15} /><TextInput onChangeText={setContactQuery} placeholder="Search people" style={styles.contactSearchInput} value={contactQuery} /></View>
           <ScrollView contentContainerStyle={styles.contactRows} horizontal showsHorizontalScrollIndicator={false}>
-            <ConversationChip label="My Devices" onPress={() => setPeerActorId("")} online={connected} selected={!peerActorId} unread={conversations.find((item) => item.kind === "device")?.unreadCount ?? 0} />
             {visibleContacts.map((contact) => <ConversationChip key={contact.uuid} label={contact.name} onPress={() => setPeerActorId(contact.uuid)} online={onlineActorIds.includes(contact.uuid)} selected={peerActorId === contact.uuid} unread={conversations.find((item) => item.peerActorId === contact.uuid)?.unreadCount ?? 0} />)}
           </ScrollView>
         </View>
@@ -92,6 +97,8 @@ export function MessengerMobile({
           contentContainerStyle={styles.list}
           data={messages}
           keyExtractor={(item) => item.uuid}
+          ListHeaderComponent={hasOlder ? <Pressable disabled={loadingOlder} onPress={() => void loadOlder()} style={styles.loadOlder}><Text style={styles.loadOlderText}>{loadingOlder ? "Loading…" : "Load older messages"}</Text></Pressable> : null}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           onContentSizeChange={() => {
             if (atBottom.current) list.current?.scrollToEnd({ animated: false });
           }}
@@ -119,7 +126,7 @@ export function MessengerMobile({
             editable={!sending}
             multiline
             onChangeText={setBody}
-            placeholder="Message web and desktop"
+            placeholder={selectedContact ? `Message ${selectedContact.name}` : "Select a user"}
             style={styles.input}
             value={body}
           />
@@ -212,6 +219,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, maxHeight: 120, minHeight: 38, padding: 8 },
   label: { color: "#777770", fontSize: 12, textTransform: "capitalize" },
   list: { flexGrow: 1, justifyContent: "flex-end", padding: 14 },
+  loadOlder: { alignSelf: "center", paddingHorizontal: 12, paddingVertical: 8 },
+  loadOlderText: { color: "#66665f", fontSize: 13 },
   message: { gap: 3, marginVertical: 4, maxWidth: "84%" },
   onlineDot: { backgroundColor: "#16a34a", borderColor: "#f7f7f4", borderRadius: 999, borderWidth: 1.5, bottom: -1, height: 8, position: "absolute", right: -1, width: 8 },
   outgoingMessage: {

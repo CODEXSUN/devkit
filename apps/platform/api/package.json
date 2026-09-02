@@ -1,16 +1,17 @@
 {
   "name": "@devkit/platform-api",
-  "version": "1.0.99",
+  "version": "1.0.100",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test:messenger": "tsx --test src/messenger-socket-session.test.ts"
   },
   "dependencies": {
-    "@codexsun/devkit-api": "1.0.99",
-    "@codexsun/framework": "1.0.99",
+    "@codexsun/devkit-api": "1.0.100",
+    "@codexsun/framework": "1.0.100",
     "fastify": "^5.12.1",
     "kysely": "^0.29.5",
     "mysql2": "^3.24.2",

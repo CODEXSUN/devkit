@@ -11,6 +11,7 @@ import {
   ListTodo,
   FolderPlus,
   Lightbulb,
+  Laptop,
   Link2,
   Menu,
   MessageCircle,
@@ -55,8 +56,7 @@ import type {
   MessengerActivity,
   MessengerClientKind,
   MessengerContact,
-  MessengerConversation,
-  MessengerProfile
+  MessengerConversation
 } from "./messenger-client";
 import type { CoworkerChat, CoworkerProject } from "./types";
 
@@ -73,6 +73,7 @@ type WorkspaceSpace =
   | "agent"
   | "archives"
   | "connection"
+  | "devices"
   | "docs"
   | "ideas"
   | "messenger"
@@ -107,7 +108,7 @@ export function MessengerChat({
   apiUrl,
   clientKind,
   connectionHref,
-  conversationName = "My Devices",
+  conversationName = "My Device",
   drawerCollapsed = false,
   logoSrc,
   onConnectionStateChange,
@@ -145,7 +146,7 @@ export function MessengerChat({
   const activeSidePanel =
     activeSpace === "agent"
       ? (agentSidePanel ?? sidePanel)
-      : activeSpace === "messenger"
+      : activeSpace === "messenger" || activeSpace === "devices"
         ? sidePanel
         : null;
 
@@ -190,6 +191,9 @@ export function MessengerChat({
     contacts,
     conversations,
     error: messengerError,
+    hasOlder,
+    loadOlder,
+    loadingOlder,
     messages,
     notificationPermission,
     onlineActorIds,
@@ -204,7 +208,13 @@ export function MessengerChat({
     setPeerActorId,
     syncing,
     updateConversationPreferences
-  } = useMessenger({ active: activeSpace === "messenger", apiUrl: baseUrl, clientKind, token });
+  } = useMessenger({
+    active: activeSpace === "messenger" || activeSpace === "devices",
+    apiUrl: baseUrl,
+    clientKind,
+    deviceConversation: activeSpace === "devices",
+    token
+  });
   useEffect(() => {
     updateWorkspaceRoute({
       conversationId:
@@ -232,15 +242,20 @@ export function MessengerChat({
     window.addEventListener("popstate", restoreConversation);
     return () => window.removeEventListener("popstate", restoreConversation);
   }, [setPeerActorId]);
-  const currentUser = profile ?? profileFromSessionToken(token);
+  const currentUser = profile;
   const totalUnread = conversations.reduce(
     (total, conversation) => total + conversation.unreadCount,
     0
   );
+  const deviceUnread = conversations
+    .filter((conversation) => conversation.kind === "device")
+    .reduce((total, conversation) => total + conversation.unreadCount, 0);
+  const messengerUnread = totalUnread - deviceUnread;
   useEffect(() => onUnreadCountChange?.(totalUnread), [onUnreadCountChange, totalUnread]);
   useEffect(() => () => onUnreadCountChange?.(0), [onUnreadCountChange]);
   const [workspaceError, setWorkspaceError] = useState("");
-  const displayedError = activeSpace === "messenger" ? messengerError : workspaceError;
+  const displayedError =
+    activeSpace === "messenger" || activeSpace === "devices" ? messengerError : workspaceError;
   const agentClient = useMemo(() => new CoworkerClient(baseUrl, () => token), [baseUrl, token]);
   const refreshAgentNavigation = useCallback(async () => {
     const [chats, projects] = await Promise.allSettled([
@@ -345,9 +360,11 @@ export function MessengerChat({
   const selectedContact = contacts.find((contact) => contact.uuid === peerActorId);
   const selectedContactOnline = Boolean(peerActorId && onlineActorIds.includes(peerActorId));
   const headerTitle =
-    activeSpace === "messenger"
-      ? (selectedContact?.name ?? conversationName)
-      : workspaceTitle(activeSpace);
+    activeSpace === "devices"
+      ? conversationName
+      : activeSpace === "messenger"
+        ? (selectedContact?.name ?? "Messenger")
+        : workspaceTitle(activeSpace);
   const openedProject = overviewProject?.title ?? workspaceName;
   const openProject = useCallback((project: CoworkerProject) => {
     setOverviewProject(project);
@@ -371,12 +388,20 @@ export function MessengerChat({
         run: openSpace("ideas")
       },
       {
-        detail: "Open device and private conversations",
+        detail: "Open private user conversations",
         group: "Commands",
         id: "command:messenger",
         kind: "contact",
         label: "Go to Messenger",
         run: openSpace("messenger")
+      },
+      {
+        detail: "Open the private chat shared by your signed-in devices",
+        group: "Commands",
+        id: "command:devices",
+        kind: "contact",
+        label: "Go to My Device",
+        run: openSpace("devices")
       },
       {
         detail: "Start or continue work with Codex",
@@ -493,6 +518,10 @@ export function MessengerChat({
         onOpenConnection={() => {
           setActiveSpace("connection");
         }}
+        onOpenDevices={() => {
+          setPeerActorId("");
+          setActiveSpace("devices");
+        }}
         onOpenMessenger={() => {
           setActiveSpace("messenger");
         }}
@@ -508,7 +537,8 @@ export function MessengerChat({
           setActiveSpace("todos");
         }}
         unsavedIdeaCount={unsavedIdeaCount}
-        unreadCount={totalUnread}
+        deviceUnreadCount={deviceUnread}
+        unreadCount={messengerUnread}
       />
       <MessengerDevelopmentDrawer
         activeAgentConversationId={agentConversationId}
@@ -627,7 +657,7 @@ export function MessengerChat({
                 <ChevronDown size={15} />
               </button>
             )}
-            {activeSpace === "messenger" ? (
+            {activeSpace === "messenger" || activeSpace === "devices" ? (
               <>
                 <span
                   aria-label={connected ? "Messenger online" : "Messenger offline"}
@@ -765,13 +795,16 @@ export function MessengerChat({
             selectedProjectId={agentProjectId}
             token={token}
           />
-        ) : (
+        ) : activeSpace === "devices" || (activeSpace === "messenger" && peerActorId) ? (
           <MessengerDeviceWorkspace
             attachmentBlob={attachmentBlob}
             clientKind={clientKind}
             contacts={contacts}
             error={displayedError}
+            hasOlder={hasOlder}
+            loadingOlder={loadingOlder}
             messages={messages}
+            onLoadOlder={loadOlder}
             onRefresh={refresh}
             onReact={react}
             onSend={sendMessage}
@@ -780,6 +813,8 @@ export function MessengerChat({
             sending={sending}
             syncing={syncing}
           />
+        ) : (
+          <MessengerChatEmpty contacts={contacts} onOpen={setPeerActorId} />
         )}
       </section>
       {activeSidePanel ? (
@@ -945,6 +980,7 @@ function workspaceTitle(activeSpace: WorkspaceSpace) {
   if (activeSpace === "settings") return "Settings";
   if (activeSpace === "docs") return "Documentation";
   if (activeSpace === "connection") return "Connect Service";
+  if (activeSpace === "devices") return "My Device";
   if (activeSpace === "agent") return "Agent chat";
   if (activeSpace === "ideas") return "Ideas";
   if (activeSpace === "archives") return "Archived chats";
@@ -957,6 +993,7 @@ const workspaceRouteNames: Record<WorkspaceSpace, string> = {
   agent: "agent",
   archives: "archives",
   connection: "connect",
+  devices: "devices",
   docs: "docs",
   ideas: "ideas",
   messenger: "chat",
@@ -987,6 +1024,7 @@ function workspaceSpaceFromPath(pathname: string): WorkspaceSpace {
   if (normalizedPath === "/app/settings" || routeName === "settings") return "settings";
   if (routeName === "agent") return "agent";
   if (routeName === "docs") return "docs";
+  if (routeName === "devices") return "devices";
   if (routeName === "ideas") return "ideas";
   if (routeName === "projects") return "projects";
   if (routeName === "todos") return "todos";
@@ -1004,6 +1042,8 @@ function updateWorkspaceRoute({
 }) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
+  if (space === "devices") url.pathname = "/app/devkit/devices";
+  if (space === "messenger") url.pathname = "/app/devkit/chat";
   url.searchParams.set("view", workspaceRouteNames[space]);
   if ((space === "agent" || space === "messenger") && conversationId) {
     url.searchParams.set("conversation", conversationId);
@@ -1016,24 +1056,6 @@ function updateWorkspaceRoute({
   window.history.replaceState(window.history.state, "", url);
 }
 
-function profileFromSessionToken(token: string): MessengerProfile | undefined {
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) return undefined;
-    const decoded = atob(payload.replace(/-/gu, "+").replace(/_/gu, "/"));
-    const claims = JSON.parse(decoded) as { email?: string; name?: string; sub?: string };
-    const email = claims.email?.trim();
-    if (!email) return undefined;
-    return {
-      email,
-      name: claims.name?.trim() || email.split("@")[0] || email,
-      uuid: claims.sub?.trim() || email
-    };
-  } catch {
-    return undefined;
-  }
-}
-
 function MessengerActivityBar({
   activeSpace,
   collapsed,
@@ -1043,10 +1065,12 @@ function MessengerActivityBar({
   onOpenAgent,
   onOpenIdeas,
   onOpenConnection,
+  onOpenDevices,
   onOpenMessenger,
   onOpenProjects,
   onOpenSettings,
   onOpenTodos,
+  deviceUnreadCount,
   unsavedIdeaCount,
   unreadCount
 }: {
@@ -1058,10 +1082,12 @@ function MessengerActivityBar({
   onOpenAgent: () => void;
   onOpenIdeas: () => void;
   onOpenConnection: () => void;
+  onOpenDevices: () => void;
   onOpenMessenger: () => void;
   onOpenProjects: () => void;
   onOpenSettings: () => void;
   onOpenTodos: () => void;
+  deviceUnreadCount: number;
   unsavedIdeaCount: number;
   unreadCount: number;
 }) {
@@ -1087,6 +1113,20 @@ function MessengerActivityBar({
         <MessageCircle size={18} />
         {unreadCount ? (
           <b className="messenger-activity-unread">{unreadCount > 99 ? "99+" : unreadCount}</b>
+        ) : null}
+      </button>
+      <button
+        aria-current={activeSpace === "devices" ? "page" : undefined}
+        aria-label="My Device"
+        onClick={onOpenDevices}
+        title="My Device"
+        type="button"
+      >
+        <Laptop size={18} />
+        {deviceUnreadCount ? (
+          <b className="messenger-activity-unread">
+            {deviceUnreadCount > 99 ? "99+" : deviceUnreadCount}
+          </b>
         ) : null}
       </button>
       <button
@@ -1331,11 +1371,22 @@ function MessengerDevelopmentDrawer({
         </section>
       ) : activeSpace === "projects" ? (
         <ProjectNavigationList onOpen={onOpenProject} projects={agentProjects} query={query} />
+      ) : activeSpace === "devices" ? (
+        <section className="todo-navigation-list" aria-label="My Device">
+          <CollapsibleDrawerBlock count={1} label="Device chat">
+            <div className="drawer-summary-row">
+              <Laptop size={16} />
+              <span>
+                <strong>{conversationName}</strong>
+                <small>Web, desktop, and mobile</small>
+              </span>
+            </div>
+          </CollapsibleDrawerBlock>
+        </section>
       ) : (
         <MessengerConversationList
           clientKind={clientKind}
           contacts={contacts}
-          conversationName={conversationName}
           conversations={conversations}
           onOpen={onOpenMessengerConversation}
           onPreference={onMessengerPreference}
@@ -1401,10 +1452,32 @@ function ContactPicker({
   );
 }
 
+function MessengerChatEmpty({
+  contacts,
+  onOpen
+}: {
+  contacts: MessengerContact[];
+  onOpen: (peerId: string) => void;
+}) {
+  return (
+    <section className="messenger-device-space">
+      <div className="messenger-empty">
+        <MessageCircle size={24} />
+        <h1>Select a conversation</h1>
+        <p>Messenger contains private chats with users. Device chat is available in My Device.</p>
+        {contacts.length ? (
+          <button onClick={() => onOpen(contacts[0]!.uuid)} type="button">
+            Open {contacts[0]!.name}
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function MessengerConversationList({
   clientKind,
   contacts,
-  conversationName,
   conversations,
   onOpen,
   onPreference,
@@ -1415,7 +1488,6 @@ function MessengerConversationList({
 }: {
   clientKind: MessengerClientKind;
   contacts: MessengerContact[];
-  conversationName: string;
   conversations: MessengerConversation[];
   onOpen: (peerId: string) => void;
   onPreference: (conversationId: string, input: { archived?: boolean; muted?: boolean }) => void;
@@ -1425,23 +1497,13 @@ function MessengerConversationList({
   selectedPeerId: string;
 }) {
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const device = conversations.find((conversation) => conversation.kind === "device");
-  const rows = [
-    {
-      conversation: device,
-      email: "Web, desktop, and mobile",
-      name: conversationName,
-      online: false,
-      peerId: ""
-    },
-    ...contacts.map((contact) => ({
+  const rows = contacts.map((contact) => ({
       conversation: conversations.find((item) => item.peerActorId === contact.uuid),
       email: contact.email,
       name: contact.name,
       online: onlineActorIds.includes(contact.uuid),
       peerId: contact.uuid
-    }))
-  ].filter((row) =>
+    })).filter((row) =>
     `${row.name} ${row.email} ${row.conversation?.lastMessage ?? ""}`
       .toLocaleLowerCase()
       .includes(normalizedQuery)
